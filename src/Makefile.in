@@ -1,0 +1,39 @@
+EXT := cu 
+
+OBJS := rinterface.o mi.o sort.o granger.o qrdecomp.o correlation.o hcluster.o distance.o matmult.o lsfit.o cuseful.o
+
+OBJS13 := @OBJS13@ 
+
+CULA_OBJS := @CULA_OBJS@
+CULA_INCS := -I@CULA_HOME@/include
+
+#compiler/preprocessor options
+INCS := -I. -I@CUDA_HOME@/include @R_INCLUDE@
+PARAMS := @MISC_PARAMS@ @DEVICEOPTS@ -Xcompiler @CPICFLAGS@
+
+#linker options
+LD_PARAMS := @DEVICEOPTS@ -Xlinker @RPATHFLAG@
+LIBS :=  @R_LIB@ @LIBS@
+
+TARGETS := gputools.so
+
+NVCC := @CUDA_HOME@/bin/nvcc -gencode arch=compute_10,code=sm_10 -gencode arch=compute_11,code=sm_11 -gencode arch=compute_12,code=sm_12 -gencode arch=compute_13,code=sm_13 -gencode arch=compute_20,code=sm_20
+
+all: $(TARGETS) 
+
+$(TARGETS): $(OBJS13) $(CULA_OBJS) $(OBJS)
+	$(NVCC) -shared $(LD_PARAMS) $(LIBS) $(OBJS13) $(CULA_OBJS) $(OBJS) -o $@
+
+$(OBJS): %.o: %.$(EXT)
+	$(NVCC) -c $(INCS) $(PARAMS) $^ -o $@
+
+$(OBJS13): %.o: %.$(EXT)
+	$(NVCC) -c $(INCS) $(PARAMS) $^ -o $@
+
+$(CULA_OBJS): %.o: %.c
+	$(NVCC) -c $(INCS) $(CULA_INCS) $(PARAMS) $^ -o $@
+
+clean:
+	rm -rf *o
+
+.PHONY: all clean

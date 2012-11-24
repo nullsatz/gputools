@@ -1,0 +1,134 @@
+gputools
+=========
+
+contents
+=========
++ notes
++ machines w/ older gpus
++ machines w/o a gpu at all
++ your cuda install is not in /usr/local/cuda
++ mac os x systems
++ windows systems
++ cula
+
+========
++ notes
+========
+
+The usual installation procedure should go something like this:
+1. procure a machine with a cuda capable nvidia gpu
+2. install nvidia's cuda capable video driver
+3. install nvidia's cuda toolkit
+4. install this package using R
+
+The package gputools attempts to follow the standard R package installation
+procedure. To install the package, you must first install
+nvidia's cuda toolkit (preferably version 2.3) available from
+
+http://www.nvidia.com/object/cuda_get.html
+
+You need not use a gpu, to use the package without a cuda capable gpu and
+video driver, please skip to the third section 'machines w/o a gpu at all'.
+
+To use a gpu, you will need a cuda capable gpu and a cuda capable video driver.
+You can get the video driver from
+
+http://www.nvidia.com/object/cuda_get.html
+
+also.
+
+For exotic R installs, the following configure arguments may help:
+--with-r-lib=<location of R shared libraries>
+--with-r-include=<location of R header files>
+
+As far as compatibility goes, Windows is not supported. Neither is OS X 10.6.
+Rumor has it that the source package does work with the 32bit build of R under
+OS X 10.6. The source package does not support Mac dynamic libraries, so you
+may have trouble with certain Mac versions of CULA.
+
+In case you have a Linux distribution with default gcc compiler version > 4.4,
+install gcc 4.4 elsewhere and us the configure argument
+--with-compiler-bindir=<directory containing gcc 4.4>
+or set the environment variable COMPILER_BINDIR.
+
+=========================
++ machines w/ older gpus
+=========================
+
+See
+
+http://brainarray.mbni.med.umich.edu/Brainarray/Rgpgpu/#issues
+
+for a table listing compute capabilities of various nVidia cards.
+If you have a GPU that has compute capability < 1.3 then
+the 'kendall' method of 'gpuCor' and
+the functions 'gpuSvmTrain' and 'gpuSvmPredict'
+will not function correctly! All other methods should be fine with such a card.
+
+============================
++ machines w/o a gpu at all
+============================
+
+If you do not have a CUDA capable GPU or just don't wish to use one read
+this section. You need not install a cuda capable video driver. You can
+still use the package using one of the following commands.
+
+From a terminal:
+
+R CMD INSTALL --configure-args='--enable-emulation' <path-to-package>gputools_<version-of-package>.tar.gz
+
+From inside an R environment:
+
+install.packages(gputools, configure.args = '--enable-emulation')
+
+Please note that you must still install the CUDA toolkit.
+Device emulation may not work with CUDA toolkit version 2.2.
+Version 2.3 is strongly recommended for gpu emulation.
+
+The support vector machine functions are disabled in device emulation mode.
+They make use of device driver api calls which are not available unless you
+are able to install a CUDA capable driver. To install a CUDA capable drive,
+you usually need a CUDA capable device.
+
+==============================================
++ your cuda install is not in /usr/local/cuda
+==============================================
+
+If the CUDA toolkit is not in '/user/local/cuda' then you can specify the
+location of the CUDA toolkit by either setting the environment variable
+'CUDA_HOME' or using one of the following commands.
+
+From a terminal:
+
+R CMD INSTALL --configure-args='--with-cuda-home=<path-to-cuda>' <path-to-package>gputools_<version-of-package>.tar.gz
+
+From inside an R environment:
+
+install.packages(gputools, configure.args = '--with-cuda-home=/usr/local/cuda')
+
+====================
++ mac os x systems
+====================
+
+All of the above should work on mac os x systems and even in the R gui without
+modification. If something doesn't work as expected on the mac please email
+the maintainer.
+
+==================
++ windows systems
+==================
+
+There is no support for Windows yet. If you would like to write a windows port,
+please feel free. You are welcome to email it to the maintainer for merging
+with the main package, but only if you want to.
+
+========
++ cula
+========
+
+Since version 0.1-4, gputools supports the use of the CULA library from
+http://www.culatools.com
+
+If you install CULA to a directory other than '/usr/local/cula' you'll want to adjust the CULA_HOME variable similar to CUDA_HOME mentioned above.
+
+Also, on linux machines, please remove the cuda library directory from your LD_LIBRARY_PATH environment variable. Make sure it has the cula library directory instead!

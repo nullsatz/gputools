@@ -1,0 +1,90 @@
+#  File R/gpuSvd.R
+#  Part of the gputools package
+#  most of the code taken from the source for R's svd base function
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  A copy of the GNU General Public License is available at
+#  http://www.r-project.org/Licenses/
+
+gpuSvd <- function(x, nu = min(n,p), nv = min(n,p)) {
+	if("@HAS_CULA@" == "no") {
+		stop("cula not found; gpuSvd is disabled; use the svd function")
+	}
+
+    x <- as.matrix(x)
+    if (any(!is.finite(x))) {
+		stop("infinite or missing values in 'x'")
+	}
+
+    dx <- dim(x)
+    n <- dx[1L]
+    p <- dx[2L]
+
+    if(!n || !p) {
+		stop("0 extent dimensions")
+	}
+    if (is.complex(x)) {
+		stop("complex arguments not yet supported by gpuSvd")
+    }
+    if(!is.numeric(x)) {
+		stop("argument to 'svd' must be numeric")
+	}
+
+    diagLen <- min(n,p)
+
+    if(nu == 0L) {
+		jobu <- 'N'
+		u <- single(0L)
+    } else if(nu == n) {
+		jobu <- 'A'
+		u <- matrix(0, n, n)
+		mode(u) <- 'single'
+    } else if(nu == p) {
+		jobu <- 'S'
+		u <- matrix(0, n, diagLen)
+		mode(u) <- 'single'
+    } else {
+		stop("'nu' must be 0, nrow(x) or ncol(x)")
+	}
+
+    if(nv == 0L) {
+		jobv <- 'N'
+		v <- single(0L)
+    } else if(nv == p) {
+		jobv <- 'A'
+		v <- matrix(0, p, p)
+		mode(v) <- 'single'
+		nv <- p
+    } else if(nv == n) {
+		jobv <- 'S'
+		v <- matrix(0, diagLen, p)
+		mode(v) <- 'single'
+		nv <- diagLen
+    } else {
+		stop("'nv' must be 0, nrow(x) or ncol(x)")
+	}
+
+    z <- .C("rSvd",
+		jobu, jobv, as.integer(n), as.integer(p), as.single(x), as.integer(n),
+		d = single(diagLen), u = u, as.integer(n), v = v, as.integer(nv),
+		PACKAGE='gputools'
+	)[c('d', 'u', 'v')]
+
+    if(nv && nv < p) {
+		z$v <- z$v[, 1L:nv, drop = FALSE]
+	}
+	if(nv) {
+		z$v <- t(z$v)
+	}
+
+    z[c("d", if(nu) "u", if(nv) "v")]
+}

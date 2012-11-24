@@ -1,0 +1,22 @@
+Package: gputools
+Version: 0.26
+Date: 2011-08-11
+Title: A few GPU enabled functions
+Author: Josh Buckner <bucknerj@umich.edu>, Mark Seligman
+        <mseligman@rapidbiologics.com>, Justin Wilson
+Maintainer: Josh Buckner <bucknerj@umich.edu>
+Depends: R (>= 2.8.0)
+SystemRequirements: Nvidia's CUDA toolkit (>= release 2.3)
+Description: This package provides R interfaces to a handful of common
+        statistical algorithms. These algorithms are implemented in
+        parallel using a mixture of Nvidia's CUDA langauge, Nvidia's
+        CUBLAS library, and EMI Photonics' CULA libraries. On a
+        computer equiped with an Nvidia GPU some of these functions may
+        be substantially more efficient than native R routines. Thanks
+        to Craig Stark at UC Irvine for donating time on his lab's Mac
+        hardware.
+License: GPL-3
+URL: http://brainarray.mbni.med.umich.edu/Brainarray/Rgpgpu
+Repository: CRAN
+Date/Publication: 2011-11-03 21:30:47
+Packaged: 2011-11-03 16:47:34 UTC; bucknerj

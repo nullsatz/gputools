@@ -1,0 +1,13 @@
+useDynLib(gputools)
+export(gpuCor, 
+	gpuTtest,
+	gpuQr, gpuSolve,
+	gpuGranger, 
+	gpuDist, gpuHclust, gpuDistClust,
+	gpuMatMult, gpuCrossprod, gpuTcrossprod,
+	gpuSvmTrain, gpuSvmPredict, getAucEstimate,
+	gpuMi,
+	gpuFastICA,
+	gpuSvd,
+	gpuLm, gpuLm.fit, gpuLsfit, gpuGlm, gpuGlm.fit,
+	chooseGpu, getGpuId)
