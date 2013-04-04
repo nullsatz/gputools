@@ -319,13 +319,6 @@ glm.D93 <- gpuGlm(counts ~ outcome + treatment, family=poisson())
 anova(glm.D93)
 summary(glm.D93)
 
-## an example with offsets from Venables & Ripley (2002, p.189)
-utils::data(anorexia, package="MASS")
-
-anorex.1 <- gpuGlm(Postwt ~ Prewt + Treat + offset(Prewt),
-                family = gaussian, data = anorexia)
-summary(anorex.1)
-
 # A Gamma example, from McCullagh & Nelder (1989, pp. 300-2)
 clotting <- data.frame(
     u = c(5,10,15,20,30,40,60,80,100),
