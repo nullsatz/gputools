@@ -13,7 +13,8 @@
 \title{Fitting Linear Models using a GPU--enabled QR}
 \description{
 	Most of this documentation is copied from R's documentation for \code{lm}.
-  \code{gpuLm} is used to fit linear models using a GPU enabled QR decomposition.
+	\code{gpuLm} is used to fit linear models using a
+	GPU enabled QR decomposition.
   It can be used to carry out regression,
   single stratum analysis of variance and
   analysis of covariance (although \code{\link{aov}} may provide a more
@@ -24,11 +25,13 @@
   function \code{gpuQR}, should be used.  The most reliable
   determination of rank, however, will be obtained with the \code{svd} command.
 }
+
 \usage{
 gpuLm(formula, data, subset, weights, na.action,
    method = "qr", model = TRUE, x = FALSE, y = FALSE, qr = TRUE,
    singular.ok = TRUE, contrasts = NULL, useSingle = TRUE, offset, \dots)
 }
+
 \arguments{
   \item{formula}{an object of class \code{"\link{formula}"} (or one that
     can be coerced to that class): a symbolic description of the
@@ -63,8 +66,7 @@ gpuLm(formula, data, subset, weights, na.action,
 
   \item{model, x, y, qr}{logicals.  If \code{TRUE} the corresponding
     components of the fit (the model frame, the model matrix, the
-    response, the qr decomposition) are returned.
-  }
+    response, the qr decomposition) are returned.}
 
   \item{singular.ok}{logical. If \code{FALSE} (the default in S but
     not in \R) a singular fit is an error.}
@@ -86,6 +88,7 @@ gpuLm(formula, data, subset, weights, na.action,
   \item{\dots}{additional arguments to be passed to the low level
     regression fitting functions (see below).}
 }
+
 \details{
   Models for \code{lm} are specified symbolically.  A typical model has
   the form \code{response ~ terms} where \code{response} is the (numeric)
@@ -219,14 +222,15 @@ gpuLm(formula, data, subset, weights, na.action,
 
 \references{
   Chambers, J. M. (1992)
-  \emph{Linear models.}
-  Chapter 4 of \emph{Statistical Models in S}
+  Linear models.
+  Chapter 4 of Statistical Models in S
   eds J. M. Chambers and T. J. Hastie, Wadsworth & Brooks/Cole.
 
   Wilkinson, G. N. and Rogers, C. E. (1973)
   Symbolic descriptions of factorial models for analysis of variance.
-  \emph{Applied Statistics}, \bold{22}, 392--9.
+  Applied Statistics, 22, 392--9.
 }
+
 \author{
   The design was inspired by the S function of the same name described
   in Chambers (1992).  The implementation of model formula by Ross Ihaka
@@ -243,6 +247,7 @@ gpuLm(formula, data, subset, weights, na.action,
   by \code{\link{predict.lm}}, whereas those specified by an offset term
   in the formula will be.
 }
+
 \examples{
 # require(graphics)
 
@@ -266,4 +271,6 @@ stopifnot(identical(gpuLm(weight ~ group, method = "model.frame"),
 
 ### less simple examples in "See Also" above
 }
+
 \keyword{regression}
+

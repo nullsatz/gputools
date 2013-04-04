@@ -59,13 +59,13 @@ gpuFastICA(X, n.comp, alg.typ = c("parallel","deflation"),
   neg-entropy (J) which are more robust than kurtosis based measures and fast
   to compute.
 
-  The approximation takes the form
-
-  \eqn{J(y)=[E\{G(y)\}-E\{G(v)\}]^2} where \eqn{v} is a N(0,1) r.v.
-  
-  The following choices of G are included as options
-  \eqn{G(u)=\frac{1}{\alpha} \log \cosh (\alpha u)}
-  and \eqn{G(u)=-\exp(\frac{-u^2}{2})}
+%  The approximation takes the form
+%
+%  \eqn{J(y)=[E\{G(y)\}-E\{G(v)\}]^2} where \eqn{v} is a N(0,1) r.v.
+%  
+%  The following choices of G are included as options
+%  \eqn{G(u)=\frac{1}{\alpha} \log \cosh (\alpha u)}
+%  and \eqn{G(u)=-\exp(\frac{-u^2}{2})}
 
   \bold{Algorithm}
   

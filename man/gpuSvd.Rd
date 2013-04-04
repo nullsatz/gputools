@@ -28,10 +28,10 @@ gpuSvd(x, nu = min(n, p), nv = min(n, p))
 }
 \value{
   The SVD decomposition of the matrix,
-  \deqn{ \bold{X = U D V'},} where \eqn{\bold{U}} and \eqn{\bold{V}} are
-  orthogonal, \eqn{\bold{V'}} means \emph{V transposed}, and
-  \eqn{\bold{D}} is a diagonal matrix with the singular
-  values \eqn{D_{ii}}{D[i,i]}.  Equivalently, \eqn{\bold{D = U' X V}},
+  X = U D V' where U and V are
+  orthogonal, V' means V transposed, and
+  D is a diagonal matrix with the singular
+  values D[i,i].  Equivalently, D = U' X V,
   which is verified in the examples, below.
 
   The returned value is a list with components

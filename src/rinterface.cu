@@ -10,7 +10,6 @@
 #include<hcluster.h>
 /* #include<lr.h> */
 #include<matmult.h>
-#include<classification.h>
 #include<qrdecomp.h>
 #include<mi.h>
 #include<lsfit.h>

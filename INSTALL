@@ -61,8 +61,7 @@ http://brainarray.mbni.med.umich.edu/Brainarray/Rgpgpu/#issues
 
 for a table listing compute capabilities of various nVidia cards.
 If you have a GPU that has compute capability < 1.3 then
-the 'kendall' method of 'gpuCor' and
-the functions 'gpuSvmTrain' and 'gpuSvmPredict'
+the 'kendall' method of 'gpuCor'
 will not function correctly! All other methods should be fine with such a card.
 
 ============================

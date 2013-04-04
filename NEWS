@@ -1,6 +1,11 @@
 gputools changes
 =================
 
+changes in gputools 0.27
+- removed LICENSE file and updated DESCRIPTION file
+- fixed R documentation files
+- removed nonfunctioning svm code
+
 changes in gputools 0.26
 - fixes to several potential bugs:  
 	There was a variable in the QR code which was never  
