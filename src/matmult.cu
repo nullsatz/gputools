@@ -30,16 +30,10 @@ SEXP gpuMatMult(SEXP a, SEXP b) {
 	cudaError_t cudaStat;
 
 	cudaStat = cudaMalloc((void**) &gpua, rowsa * colsa * sizeof(double));
-	if (cudaStat != cudaSuccess) {
-		printf ("device memory allocation failed");
-		return NULL;
-	}  
+	if (cudaStat != cudaSuccess) error("device memory allocation failed");
 
 	cudaStat = cudaMalloc((void**) &gpub, rowsb * colsb * sizeof(double));
-	if (cudaStat != cudaSuccess) {
-		printf ("device memory allocation failed");
-		return NULL;
-	}  
+	if (cudaStat != cudaSuccess) error("device memory allocation failed");
 
 //	cublasOperation_t opA = tpA ? CUBLAS_OP_T : CUBLAS_OP_N;
 //	cublasOperation_t opB = tpB ? CUBLAS_OP_T : CUBLAS_OP_N;
@@ -52,37 +46,29 @@ SEXP gpuMatMult(SEXP a, SEXP b) {
         rowsOpA = rowsa, colsOpA = colsa, colsOpB = colsb;
 
 	cudaStat = cudaMalloc((void**) &gpuc, rowsOpA * colsOpB * sizeof(double));
-	if (cudaStat != cudaSuccess) {
-		printf ("device memory allocation failed");
-		return NULL;
-	}  
+	if (cudaStat != cudaSuccess) error("device memory allocation failed");
 
 	stat = cublasCreate(&handle);
-	if(stat != CUBLAS_STATUS_SUCCESS) {
-		printf("CUBLAS initialization failed\n");
-		return NULL;
-	}
+	if(stat != CUBLAS_STATUS_SUCCESS) error("CUBLAS initialization failed\n");
 
 	stat = cublasSetMatrix(rowsa, colsa, sizeof(double), xa, rowsa,
 		gpua, rowsa);
 	if(stat != CUBLAS_STATUS_SUCCESS) {
-		printf("data download failed\n");
 		cudaFree(gpuc);
 		cudaFree(gpub);
 		cudaFree(gpua);
 		cublasDestroy(handle);
-		return NULL;
+		error("data download failed\n");
 	}
 
 	stat = cublasSetMatrix(rowsb, colsb, sizeof(double), xb, rowsb,
 		gpub, rowsb);
 	if(stat != CUBLAS_STATUS_SUCCESS) {
-		printf("data download failed\n");
 		cudaFree(gpuc);
 		cudaFree(gpub);
 		cudaFree(gpua);
 		cublasDestroy(handle);
-		return NULL;
+		error("data download failed\n");
 	}
 
 	const double alpha = 1.0, beta = 0.0;
@@ -100,12 +86,11 @@ SEXP gpuMatMult(SEXP a, SEXP b) {
 	stat = cublasGetMatrix(rowsOpA, colsOpB, sizeof(double), gpuc, rowsOpA,
 		xab, rowsOpA);
 	if(stat != CUBLAS_STATUS_SUCCESS) {
-		printf("data upload failed\n");
 		cudaFree(gpuc);
 		cudaFree(gpub);
 		cudaFree(gpua);
 		cublasDestroy(handle);
-		return NULL;
+		error("data upload failed\n");
 	}
 
 	cudaFree(gpua);
