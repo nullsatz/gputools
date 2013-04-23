@@ -9,37 +9,29 @@ gpuMatMult <- function(a, b) {
 }
 
 gpuCrossprod <- function(a, b=NULL) {
-	a <- as.matrix(a)
-        if (is.null(b))
-          b <- as.matrix(a)
-        else
-          b <- as.matrix(b)
+    a <- as.matrix(a)
 
-        if (nrow(a) != nrow(b))
-          stop("error:  matrix dimensions mismatched for cross-product.")
+    if (is.null(b)) b <- as.matrix(a)
+    else b <- as.matrix(b)
+
+    if (nrow(a) != nrow(b))
+        stop("error: matrix dim mismatch for cross-product.")
         
-	results <- .C("RgpuMatMult", as.integer(1L), as.integer(0L),
-		as.single(a), as.integer(nrow(a)), as.integer(ncol(a)),
-		as.single(b), as.integer(nrow(b)), as.integer(ncol(b)),
-		output = single(ncol(a)*ncol(b)),
-		PACKAGE='gputools')
-
-	matrix(results$output, ncol(a), ncol(b))
+	results <- .Call("gpuMatMult", t(a), b, PACKAGE='gputools')
+	return(results)
 }
 
 
 gpuTcrossprod <- function(a, b=NULL) 
 {
-	a <- as.matrix(a)
-	b <- as.matrix(b)
+    a <- as.matrix(a)
 
-        if (ncol(a) != ncol(b))
-          stop("error:  matrix dimensions mismatched for transposed cross-product")
-	results <- .C("RgpuMatMult", as.integer(0L), as.integer(1L),
-		as.single(a), as.integer(nrow(a)), as.integer(ncol(a)),
-		as.single(b), as.integer(nrow(b)), as.integer(ncol(b)),
-		output = single(nrow(a)*nrow(b)),
-		PACKAGE='gputools')
+    if (is.null(b)) b <- as.matrix(a)
+    else b <- as.matrix(b)
 
-	matrix(results$output, nrow(a), nrow(b))
+    if (ncol(a) != ncol(b))
+        stop("error: matrix dim mismatch for transposed cross-product")
+        
+	results <- .Call("gpuMatMult", a,t(b), PACKAGE='gputools')
+	return(results)
 }
