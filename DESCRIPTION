@@ -5,7 +5,7 @@ Author: Josh Buckner <nullsatz@gmail.com>, Mark Seligman
         <mseligman@rapidbiologics.com>, Justin Wilson
 Maintainer: Josh Buckner <nullsatz@gmail.com>
 Depends: R (>= 2.8.0)
-SystemRequirements: 64 bit Linux, Nvidia's CUDA toolkit (>= release 2.3)
+SystemRequirements: 64 bit Linux, Nvidia's CUDA toolkit (>= release 2.3), a CUDA Device of Compute Capability 1.3 or higher
 Description: This package provides R interfaces to a handful of common
         statistical algorithms. These algorithms are implemented in
         parallel using a mixture of Nvidia's CUDA language, Nvidia's
