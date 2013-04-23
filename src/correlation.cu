@@ -4,6 +4,7 @@
 #include<cublas.h>
 #include<cuseful.h>
 #include<R.h>
+#include<Rinternals.h>
 #include<correlation.h>
 
 #define FALSE 0
@@ -622,10 +623,7 @@ size_t signifFilter(const double * data, size_t rows, double * results)
 	size_t i, inrow, outrow, rowcount = 0;
 	double tscore, radicand, cor, npairs;
 
-	if(results == NULL) {
-		fprintf(stderr, "signifFilter : no ram set aside for results\n");
-		exit(EXIT_FAILURE);
-	}
+	if(results == NULL) error("signifFilter : no ram set aside for results\n");
 
 	for(i = 0; i < rows; i++) {
 		inrow = i * 5;
@@ -726,10 +724,7 @@ size_t gpuSignifFilter(const float * data, size_t rows, float * results)
 		i, rowbytes = 6*sizeof(float),
 		inrow, outrow, rowcount = 0;
 
-	if(results == NULL) {
-		fprintf(stderr, "signifFilter : no ram set aside for results\n");
-		exit(EXIT_FAILURE);
-	}
+	if(results == NULL) error("signifFilter : no ram set aside for results\n");
 
 	updateSignifs(data, rows, results);
 

@@ -4,6 +4,7 @@
 #include<string.h>
 #include<cublas.h>
 #include<R.h>
+#include<Rinternals.h>
 
 #include"cuseful.h"
 
@@ -65,7 +66,7 @@ char * getTime() {
 }
 
 void printVect(int n, const float * vect, const char * msg) {
-	if(msg != NULL) puts(msg);
+	if(msg != NULL) Rprintf(msg);
 	for(int i = 0; i < n; i++) {
 		Rprintf("%6.4f, ", vect[i]);
 		if((i+1)%10 == 0) Rprintf("\n");
@@ -76,7 +77,7 @@ void printVect(int n, const float * vect, const char * msg) {
 
 void printMat(int rows, int cols, const float * mat, const char * msg) {
 	int i;
-	if(msg != NULL) puts(msg);
+	if(msg != NULL) Rprintf(msg);
 	for(i = 0; i < rows; i++)
 		printVect(cols, mat+i*cols, NULL);
 	if(msg != NULL) Rprintf("----------\n");

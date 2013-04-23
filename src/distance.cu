@@ -1,3 +1,6 @@
+#include<R.h>
+#include<Rinternals.h>
+
 #include<stdio.h>
 #include<string.h>
 #include<cuseful.h>
@@ -759,8 +762,7 @@ void distance_host(const float * vg_a, size_t pitch_a, size_t n_a,
 			minkowski(vg_a, n_a, vg_b, n_b, k, p, d);
 			break;
 		default:
-			fprintf(stderr, "unknown distance method");
-			exit(EXIT_FAILURE);
+			error("unknown distance method");
 /*  case DOT:
     dot(vg_a, pitch_a / sizeof(float), n_a,
 	vg_b, pitch_b / sizeof(float), n_b,
@@ -809,8 +811,7 @@ void distance_device(const float * vg_a_d, size_t pitch_a, size_t n_a,
 				n_a, vg_b_d, pitch_b, n_b, k, d_d, pitch_d, p);
 			break;
 		default:
-			fprintf(stderr, "unknown distance method");
-			exit(EXIT_FAILURE);
+			error("unknown distance method");
 	}
 }
 
