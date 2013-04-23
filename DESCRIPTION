@@ -1,5 +1,5 @@
 Package: gputools
-Version: 0.27
+Version: 0.28
 Title: A few GPU enabled functions
 Author: Josh Buckner <nullsatz@gmail.com>, Mark Seligman
         <mseligman@rapidbiologics.com>, Justin Wilson

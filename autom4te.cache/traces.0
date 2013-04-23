@@ -148,33 +148,33 @@ m4trace:configure.ac:1: -1- AC_SUBST_TRACE([target_alias])
 m4trace:configure.ac:1: -1- m4_pattern_allow([^target_alias$])
 m4trace:configure.ac:2: -1- AC_CONFIG_AUX_DIR([tools])
 m4trace:configure.ac:7: -2- _m4_warn([obsolete], [The macro `AC_HELP_STRING' is obsolete.
-You should run autoupdate.], [../../lib/autoconf/general.m4:207: AC_HELP_STRING is expanded from...
+You should run autoupdate.], [../../lib/autoconf/general.m4:209: AC_HELP_STRING is expanded from...
 configure.ac:7: the top level])
 m4trace:configure.ac:12: -2- _m4_warn([obsolete], [The macro `AC_HELP_STRING' is obsolete.
-You should run autoupdate.], [../../lib/autoconf/general.m4:207: AC_HELP_STRING is expanded from...
+You should run autoupdate.], [../../lib/autoconf/general.m4:209: AC_HELP_STRING is expanded from...
 configure.ac:12: the top level])
 m4trace:configure.ac:17: -2- _m4_warn([obsolete], [The macro `AC_HELP_STRING' is obsolete.
-You should run autoupdate.], [../../lib/autoconf/general.m4:207: AC_HELP_STRING is expanded from...
+You should run autoupdate.], [../../lib/autoconf/general.m4:209: AC_HELP_STRING is expanded from...
 configure.ac:17: the top level])
 m4trace:configure.ac:22: -2- _m4_warn([obsolete], [The macro `AC_HELP_STRING' is obsolete.
-You should run autoupdate.], [../../lib/autoconf/general.m4:207: AC_HELP_STRING is expanded from...
+You should run autoupdate.], [../../lib/autoconf/general.m4:209: AC_HELP_STRING is expanded from...
 configure.ac:22: the top level])
 m4trace:configure.ac:27: -2- _m4_warn([obsolete], [The macro `AC_HELP_STRING' is obsolete.
-You should run autoupdate.], [../../lib/autoconf/general.m4:207: AC_HELP_STRING is expanded from...
+You should run autoupdate.], [../../lib/autoconf/general.m4:209: AC_HELP_STRING is expanded from...
 configure.ac:27: the top level])
-m4trace:configure.ac:36: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2777: AC_CHECK_FILE is expanded from...
+m4trace:configure.ac:36: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2778: AC_CHECK_FILE is expanded from...
 configure.ac:36: the top level])
-m4trace:configure.ac:62: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2777: AC_CHECK_FILE is expanded from...
+m4trace:configure.ac:62: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2778: AC_CHECK_FILE is expanded from...
 configure.ac:62: the top level])
-m4trace:configure.ac:70: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2777: AC_CHECK_FILE is expanded from...
+m4trace:configure.ac:70: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2778: AC_CHECK_FILE is expanded from...
 configure.ac:70: the top level])
-m4trace:configure.ac:99: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2777: AC_CHECK_FILE is expanded from...
+m4trace:configure.ac:99: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2778: AC_CHECK_FILE is expanded from...
 configure.ac:99: the top level])
-m4trace:configure.ac:100: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2777: AC_CHECK_FILE is expanded from...
+m4trace:configure.ac:100: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2778: AC_CHECK_FILE is expanded from...
 configure.ac:100: the top level])
-m4trace:configure.ac:104: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2777: AC_CHECK_FILE is expanded from...
+m4trace:configure.ac:104: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2778: AC_CHECK_FILE is expanded from...
 configure.ac:104: the top level])
-m4trace:configure.ac:105: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2777: AC_CHECK_FILE is expanded from...
+m4trace:configure.ac:105: -1- _m4_warn([cross], [cannot check for file existence when cross compiling], [../../lib/autoconf/general.m4:2778: AC_CHECK_FILE is expanded from...
 configure.ac:105: the top level])
 m4trace:configure.ac:136: -1- AC_CANONICAL_HOST
 m4trace:configure.ac:136: -1- AC_CANONICAL_BUILD
@@ -247,21 +247,20 @@ m4trace:configure.ac:181: -1- AC_SUBST([RPATHFLAG])
 m4trace:configure.ac:181: -1- AC_SUBST_TRACE([RPATHFLAG])
 m4trace:configure.ac:181: -1- m4_pattern_allow([^RPATHFLAG$])
 m4trace:configure.ac:183: -1- AC_CONFIG_FILES([src/Makefile])
-m4trace:configure.ac:184: -1- AC_CONFIG_FILES([R/gpuSvm.R])
-m4trace:configure.ac:185: -1- AC_CONFIG_FILES([R/gpuFastICA.R])
-m4trace:configure.ac:186: -1- AC_CONFIG_FILES([R/gpuSvd.R])
-m4trace:configure.ac:187: -1- AC_SUBST([LIB@&t@OBJS], [$ac_libobjs])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([LIB@&t@OBJS])
-m4trace:configure.ac:187: -1- m4_pattern_allow([^LIB@&t@OBJS$])
-m4trace:configure.ac:187: -1- AC_SUBST([LTLIBOBJS], [$ac_ltlibobjs])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([LTLIBOBJS])
-m4trace:configure.ac:187: -1- m4_pattern_allow([^LTLIBOBJS$])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([top_builddir])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([top_build_prefix])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([srcdir])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([abs_srcdir])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([top_srcdir])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([abs_top_srcdir])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([builddir])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([abs_builddir])
-m4trace:configure.ac:187: -1- AC_SUBST_TRACE([abs_top_builddir])
+m4trace:configure.ac:184: -1- AC_CONFIG_FILES([R/gpuFastICA.R])
+m4trace:configure.ac:185: -1- AC_CONFIG_FILES([R/gpuSvd.R])
+m4trace:configure.ac:186: -1- AC_SUBST([LIB@&t@OBJS], [$ac_libobjs])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([LIB@&t@OBJS])
+m4trace:configure.ac:186: -1- m4_pattern_allow([^LIB@&t@OBJS$])
+m4trace:configure.ac:186: -1- AC_SUBST([LTLIBOBJS], [$ac_ltlibobjs])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([LTLIBOBJS])
+m4trace:configure.ac:186: -1- m4_pattern_allow([^LTLIBOBJS$])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([top_builddir])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([top_build_prefix])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([srcdir])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([abs_srcdir])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([top_srcdir])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([abs_top_srcdir])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([builddir])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([abs_builddir])
+m4trace:configure.ac:186: -1- AC_SUBST_TRACE([abs_top_builddir])

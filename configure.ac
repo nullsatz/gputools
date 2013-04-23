@@ -76,7 +76,7 @@ else
 	CUDA_LIB_DIR="/lib64"
 fi
 
-: ${R_HOME=`R RHOME`}
+${R_HOME=`R RHOME`}
 if test -z "${R_HOME}"; then
 	AC_MSG_ERROR("could not determine R_HOME")
 else
@@ -124,7 +124,7 @@ else
 fi
 
 DEVICEOPTS=""
-OBJS13="kendall.o classification.o"
+OBJS13="kendall.o"
 SVMDISABLED="FALSE"
 
 AC_MSG_NOTICE([determining host platform])
@@ -181,7 +181,6 @@ AC_SUBST(SVMDISABLED)
 AC_SUBST(RPATHFLAG)
 
 AC_CONFIG_FILES([src/Makefile])
-AC_CONFIG_FILES([R/gpuSvm.R])
 AC_CONFIG_FILES([R/gpuFastICA.R])
 AC_CONFIG_FILES([R/gpuSvd.R])
 AC_OUTPUT

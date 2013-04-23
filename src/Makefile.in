@@ -7,8 +7,10 @@ OBJS13 := @OBJS13@
 CULA_OBJS := @CULA_OBJS@
 CULA_INCS := -I@CULA_HOME@/include
 
+R_HOME := $(shell R RHOME)
+
 #compiler/preprocessor options
-INCS := -I. -I@CUDA_HOME@/include @R_INCLUDE@
+INCS := -I. -I@CUDA_HOME@/include -I"$(R_HOME)/include"
 PARAMS := @MISC_PARAMS@ @DEVICEOPTS@ -Xcompiler @CPICFLAGS@
 
 #linker options

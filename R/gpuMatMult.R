@@ -1,22 +1,14 @@
-gpuMatMult <- function(a, b) 
-{
+gpuMatMult <- function(a, b) {
 	a <- as.matrix(a)
 	b <- as.matrix(b)
 
 	if (ncol(a) != nrow(b))
 		stop("error:  matrix dimensions mismatched for matrix multiplication")
         
-#	results <- .C("RgpuMatMult", as.integer(0L), as.integer(0L),
-#		as.single(a), as.integer(nrow(a)), as.integer(ncol(a)),
-#		as.single(b), as.integer(nrow(b)), as.integer(ncol(b)),
-#		output = single(nrow(a)*ncol(b)),
-#		PACKAGE='gputools')
-
-	.Call("gpuMatMult", a, b)
+	.Call("gpuMatMult", a, b, PACKAGE='gputools')
 }
 
-gpuCrossprod <- function(a, b=NULL) 
-{
+gpuCrossprod <- function(a, b=NULL) {
 	a <- as.matrix(a)
         if (is.null(b))
           b <- as.matrix(a)

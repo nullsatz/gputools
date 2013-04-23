@@ -9,12 +9,12 @@
 #include<granger.h>
 #include<hcluster.h>
 /* #include<lr.h> */
-#include<matmult.h>
 #include<qrdecomp.h>
 #include<mi.h>
 #include<lsfit.h>
 #include<cuseful.h>
 #include<R.h>
+#include<Rinternals.h>
 
 #include<rinterface.h>
 
@@ -280,13 +280,6 @@ void depthFirst(const int len, const int * merge, int level, int * otop,
 	} else
 		depthFirst(len, merge, merge[left]-1, otop, order);
 }
-/*
-void RgpuMatMult(int *tpA, int *tpB, float * a, int * rowsa, int * colsa, 
-	float * b, int * rowsb, int * colsb, float * result) {
-
-	gpuMatMult(*tpA, *tpB, a, *rowsa, *colsa, b, *rowsb, *colsb, result);
-}
-*/
 
 void RgetQRDecomp(int * rows, int * cols, float * a, float * q, int * pivot,
 	int * rank)
