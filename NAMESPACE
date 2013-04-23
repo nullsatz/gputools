@@ -5,7 +5,6 @@ export(gpuCor,
 	gpuGranger, 
 	gpuDist, gpuHclust, gpuDistClust,
 	gpuMatMult, gpuCrossprod, gpuTcrossprod,
-	getAucEstimate,
 	gpuMi,
 	gpuLm, gpuLm.fit, gpuLsfit, gpuGlm, gpuGlm.fit,
 	chooseGpu, getGpuId)
