@@ -8,11 +8,11 @@ R_HOME := $(shell R RHOME)
 
 #compiler/preprocessor options
 INCS := -I. -I@CUDA_HOME@/include -I"$(R_HOME)/include"
-PARAMS := @MISC_PARAMS@ @DEVICEOPTS@ -Xcompiler @CPICFLAGS@
+PARAMS := @DEVICEOPTS@ -Xcompiler @CPICFLAGS@
 
 #linker options
 LD_PARAMS := @DEVICEOPTS@ -Xlinker @RPATHFLAG@
-LIBS :=  @R_LIB@ @LIBS@
+LIBS :=  -L"$(R_HOME)/lib" @LIBS@
 
 TARGETS := gputools.so
 

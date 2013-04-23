@@ -564,17 +564,10 @@ PACKAGE_URL=''
 ac_subst_vars='LTLIBOBJS
 LIB@&t@OBJS
 RPATHFLAG
-SVMDISABLED
 OBJS13
 DEVICEOPTS
 CPICFLAGS
-R_LIB
-R_INCLUDE
-CULA_OBJS
-CULA_HOME
-HAS_CULA
 CUDA_HOME
-MISC_PARAMS
 SW_VERS
 host_os
 host_vendor
@@ -625,11 +618,6 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
-with_compiler_bindir
-with_cuda_home
-with_cula_home
-with_r_include
-with_r_lib
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1245,23 +1233,6 @@ if test -n "$ac_init_help"; then
    esac
   cat <<\_ACEOF
 
-Optional Packages:
-  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
-  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-compiler-bindir=compiler_bindir 
-                          specify the directory containing gcc, e.g. /usr/bin
-  --with-cuda-home=cuda_home 
-                          specify the root of your cuda install, e.g.
-                          /usr/local/cuda
-  --with-cula-home=cula_home 
-                          specify the root of your cula install, e.g.
-                          /usr/local/cula
-  --with-r-include=r_include 
-                          specify the full path to your R header files, e.g.
-                          /usr/share/R/include
-  --with-r-lib=r-lib      specify the full path to your R shared libraries,
-                          e.g. /usr/lib64/R/lib
-
 Report bugs to the package provider.
 _ACEOF
 ac_status=$?
@@ -1723,80 +1694,6 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for critical tools used by configure" >&5
 $as_echo "$as_me: checking for critical tools used by configure" >&6;}
 
-
-@%:@ Check whether --with-compiler-bindir was given.
-if test "${with_compiler_bindir+set}" = set; then :
-  withval=$with_compiler_bindir; COMPILER_BINDIR="$withval"
-fi
-
-
-
-@%:@ Check whether --with-cuda-home was given.
-if test "${with_cuda_home+set}" = set; then :
-  withval=$with_cuda_home; CUDA_HOME="$withval"
-fi
-
-
-
-@%:@ Check whether --with-cula-home was given.
-if test "${with_cula_home+set}" = set; then :
-  withval=$with_cula_home; CUDA_HOME="$withval"
-fi
-
-
-
-@%:@ Check whether --with-r-include was given.
-if test "${with_r_include+set}" = set; then :
-  withval=$with_r_include; R_INCLUDE="$withval"
-fi
-
-
-
-@%:@ Check whether --with-r-lib was given.
-if test "${with_r_lib+set}" = set; then :
-  withval=$with_r_lib; R_LIB="$withval"
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking \"environment variable COMPILER_BINDIR\"" >&5
-$as_echo_n "checking \"environment variable COMPILER_BINDIR\"... " >&6; }
-if test -z "${COMPILER_BINDIR}"; then
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"COMPILER_BINDIR not set; using user's default path\"" >&5
-$as_echo "\"COMPILER_BINDIR not set; using user's default path\"" >&6; }
-else
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"using COMPILER_BINDIR=${COMPILER_BINDIR}\"" >&5
-$as_echo "\"using COMPILER_BINDIR=${COMPILER_BINDIR}\"" >&6; }
-	as_ac_File=`$as_echo "ac_cv_file_${COMPILER_BINDIR}/gcc" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ${COMPILER_BINDIR}/gcc" >&5
-$as_echo_n "checking for ${COMPILER_BINDIR}/gcc... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "${COMPILER_BINDIR}/gcc"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  HAS_GCC="yes"
-fi
-
-	if test -z "${HAS_GCC}"; then
-		as_fn_error $? "\"cannot find gcc; check that ${COMPILER_BINDIR} is the correct location; using user's default path\"" "$LINENO" 5
-		MISC_PARAMS=""
-	else
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"gcc found in ${COMPILER_BINDIR}\"" >&5
-$as_echo "\"gcc found in ${COMPILER_BINDIR}\"" >&6; }
-		MISC_PARAMS="--compiler-bindir ${COMPILER_BINDIR}"
-	fi
-fi
-
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking \"environment variable CUDA_HOME\"" >&5
 $as_echo_n "checking \"environment variable CUDA_HOME\"... " >&6; }
 if test -z "${CUDA_HOME}"; then
@@ -1806,17 +1703,6 @@ $as_echo "\"CUDA_HOME not set; using default /usr/local/cuda\"" >&6; }
 else
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"using CUDA_HOME=${CUDA_HOME}\"" >&5
 $as_echo "\"using CUDA_HOME=${CUDA_HOME}\"" >&6; }
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking \"environment variable CULA_HOME\"" >&5
-$as_echo_n "checking \"environment variable CULA_HOME\"... " >&6; }
-if test -z "${CULA_HOME}"; then
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"CULA_HOME not set; using default /usr/local/cula\"" >&5
-$as_echo "\"CULA_HOME not set; using default /usr/local/cula\"" >&6; }
-	CULA_HOME="/usr/local/cula"
-else
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"using CULA_HOME=${CULA_HOME}\"" >&5
-$as_echo "\"using CULA_HOME=${CULA_HOME}\"" >&6; }
 fi
 
 as_ac_File=`$as_echo "ac_cv_file_${CUDA_HOME}/bin/nvcc" | $as_tr_sh`
@@ -1885,139 +1771,10 @@ if test -z "${R_HOME}"; then
 	as_fn_error $? "\"could not determine R_HOME\"" "$LINENO" 5
 else
 	CPICFLAGS=`"${R_HOME}/bin/R" CMD config CPICFLAGS`
-	if test -z "${R_INCLUDE}"; then
-		R_INCLUDE=`"${R_HOME}/bin/R" CMD config --cppflags`
-	else
-		R_INCLUDE="-I${R_INCLUDE}"
-	fi
-	if test -z "${R_LIB}"; then
-		R_LIB=`"${R_HOME}/bin/R" CMD config --ldflags`
-	else
-		R_LIB="-L${R_LIB} -lR"
-	fi
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"using ${R_INCLUDE} for R header files\"" >&5
-$as_echo "\"using ${R_INCLUDE} for R header files\"" >&6; }
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"using ${R_LIB} for R shared libraries\"" >&5
-$as_echo "\"using ${R_LIB} for R shared libraries\"" >&6; }
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking \"whether this is the 64 bit version of CULA\"" >&5
-$as_echo_n "checking \"whether this is the 64 bit version of CULA\"... " >&6; }
-as_ac_File=`$as_echo "ac_cv_file_${CULA_HOME}/lib64/libcula.so" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ${CULA_HOME}/lib64/libcula.so" >&5
-$as_echo_n "checking for ${CULA_HOME}/lib64/libcula.so... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "${CULA_HOME}/lib64/libcula.so"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  CULA64BIT="yes"
-fi
-
-as_ac_File=`$as_echo "ac_cv_file_${CULA_HOME}/lib64/libcula.dylib" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ${CULA_HOME}/lib64/libcula.dylib" >&5
-$as_echo_n "checking for ${CULA_HOME}/lib64/libcula.dylib... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "${CULA_HOME}/lib64/libcula.dylib"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  CULA64BIT="yes"
-fi
-
-if test -z "${CULA64BIT}"; then
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"no\"" >&5
-$as_echo "\"no\"" >&6; }
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking \"checking whether cula is present at all\"" >&5
-$as_echo_n "checking \"checking whether cula is present at all\"... " >&6; }
-	as_ac_File=`$as_echo "ac_cv_file_${CULA_HOME}/lib/libcula.so" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ${CULA_HOME}/lib/libcula.so" >&5
-$as_echo_n "checking for ${CULA_HOME}/lib/libcula.so... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "${CULA_HOME}/lib/libcula.so"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  HAS_CULA="yes"
-fi
-
-	as_ac_File=`$as_echo "ac_cv_file_${CULA_HOME}/lib/libcula.dylib" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ${CULA_HOME}/lib/libcula.dylib" >&5
-$as_echo_n "checking for ${CULA_HOME}/lib/libcula.dylib... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "${CULA_HOME}/lib/libcula.dylib"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  HAS_CULA="yes"
-fi
-
-	if test -z "${HAS_CULA}"; then
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"cula is not installed; gpuFastICA is disabled\"" >&5
-$as_echo "\"cula is not installed; gpuFastICA is disabled\"" >&6; }
-		HAS_CULA="no"
-		CULA_OBJS=""
-		LIBS="-L${CUDA_HOME}${CUDA_LIB_DIR} -lcublas"
-	else
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"yes -- using ${CULA_HOME}/lib for CULA libs\"" >&5
-$as_echo "\"yes -- using ${CULA_HOME}/lib for CULA libs\"" >&6; }
-		CULA_LIB_DIR="/lib"
-		CULA_OBJS="ica.o svd.o"
-		LIBS="-L${CULA_HOME}${CULA_LIB_DIR} -lcula -lcublas"
-	fi
-else
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: \"yes -- using ${CULA_HOME}/lib64 for CULA libs\"" >&5
-$as_echo "\"yes -- using ${CULA_HOME}/lib64 for CULA libs\"" >&6; }
-	HAS_CULA="yes"
-	CULA_LIB_DIR="/lib64"
-	CULA_OBJS="ica.o svd.o"
-	BLAS_LIBS=`"${R_HOME}/bin/R" CMD config BLAS_LIBS`
-	LIBS="-L${CULA_HOME}${CULA_LIB_DIR} -lcula -lcublas"
 fi
 
 DEVICEOPTS=""
 OBJS13="kendall.o"
-SVMDISABLED="FALSE"
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: determining host platform" >&5
 $as_echo "$as_me: determining host platform" >&6;}
@@ -2099,13 +1856,8 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 case "${host_os}" in
 	*darwin*)
-		if test -z "${CULA_LIB_DIR}"; then
-			RPATHFLAG="-rpath,${CUDA_HOME}${CUDA_LIB_DIR}"
-		else
-			RPATHFLAG="-rpath,${CULA_HOME}${CULA_LIB_DIR}"
-		fi
+		RPATHFLAG="-rpath,${CUDA_HOME}${CUDA_LIB_DIR}"
 		RPATHFLAG="${RPATHFLAG},'${R_LIB}'"
-		R_LIB=""
 		# Extract the first word of "sw_vers", so it can be a program name with args.
 set dummy sw_vers; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -2158,23 +1910,10 @@ fi
 			{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Unrecognised Darwin Architecture" >&5
 $as_echo "$as_me: WARNING: Unrecognised Darwin Architecture" >&2;}
 		fi
-
-		RCPP_INCLUDE=`Rscript -e 'Rcpp:::CxxFlags()'`
-		RCPP_LIB=`Rscript -e 'Rcpp:::LdFlags()' | sed s/i386/x86_64/g`
-
-		R_INCLUDE="${R_INCLUDE} ${RCPP_INCLUDE}"
-		R_LIB="${R_LIB} ${RCPP_LIB}"
 	;;
 esac
 
-
-
-
-
-
-
-
-
+LIBS="-L${CUDA_HOME}${CUDA_LIB_DIR} -lcublas"
 
 
 
@@ -2185,10 +1924,6 @@ esac
 
 
 ac_config_files="$ac_config_files src/Makefile"
-
-ac_config_files="$ac_config_files R/gpuFastICA.R"
-
-ac_config_files="$ac_config_files R/gpuSvd.R"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -2908,8 +2643,6 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
-    "R/gpuFastICA.R") CONFIG_FILES="$CONFIG_FILES R/gpuFastICA.R" ;;
-    "R/gpuSvd.R") CONFIG_FILES="$CONFIG_FILES R/gpuSvd.R" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
