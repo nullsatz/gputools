@@ -4,9 +4,6 @@ OBJS := rinterface.o mi.o sort.o granger.o qrdecomp.o correlation.o hcluster.o d
 
 OBJS13 := @OBJS13@ 
 
-CULA_OBJS := @CULA_OBJS@
-CULA_INCS := -I@CULA_HOME@/include
-
 R_HOME := $(shell R RHOME)
 
 #compiler/preprocessor options
@@ -23,17 +20,14 @@ NVCC := @CUDA_HOME@/bin/nvcc -gencode arch=compute_10,code=sm_10 -gencode arch=c
 
 all: $(TARGETS) 
 
-$(TARGETS): $(OBJS13) $(CULA_OBJS) $(OBJS)
-	$(NVCC) -shared $(LD_PARAMS) $(LIBS) $(OBJS13) $(CULA_OBJS) $(OBJS) -o $@
+$(TARGETS): $(OBJS13) $(OBJS)
+	$(NVCC) -shared $(LD_PARAMS) $(LIBS) $(OBJS13) $(OBJS) -o $@
 
 $(OBJS): %.o: %.$(EXT)
 	$(NVCC) -c $(INCS) $(PARAMS) $^ -o $@
 
 $(OBJS13): %.o: %.$(EXT)
 	$(NVCC) -c $(INCS) $(PARAMS) $^ -o $@
-
-$(CULA_OBJS): %.o: %.c
-	$(NVCC) -c $(INCS) $(CULA_INCS) $(PARAMS) $^ -o $@
 
 clean:
 	rm -rf *o

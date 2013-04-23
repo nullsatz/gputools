@@ -7,7 +7,5 @@ export(gpuCor,
 	gpuMatMult, gpuCrossprod, gpuTcrossprod,
 	getAucEstimate,
 	gpuMi,
-	gpuFastICA,
-	gpuSvd,
 	gpuLm, gpuLm.fit, gpuLsfit, gpuGlm, gpuGlm.fit,
 	chooseGpu, getGpuId)
