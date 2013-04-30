@@ -5,6 +5,7 @@ changes in gputools 0.28
 - fixed configure.ac mistakes
 - fixed gpuMatMult bugs
 - fixed missing R includes in Makefile
+- removed cula dependencies
 
 changes in gputools 0.27
 - removed LICENSE file and updated DESCRIPTION file

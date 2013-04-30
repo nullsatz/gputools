@@ -72,8 +72,8 @@ SEXP gpuMatMult(SEXP a, SEXP b) {
 	}
 
 	const double alpha = 1.0, beta = 0.0;
-	cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, rowsOpA, colsOpB, colsOpA, &alpha,
-		(const double *) gpua, rowsa, (const double *) gpub, rowsb,
+	cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, rowsOpA, colsOpB, colsOpA,
+        &alpha, (const double *) gpua, rowsa, (const double *) gpub, rowsb,
 		&beta, gpuc, rowsOpA);
 
     SEXP ab, dimab;

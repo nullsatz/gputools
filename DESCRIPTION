@@ -8,12 +8,10 @@ Depends: R (>= 2.8.0)
 SystemRequirements: 64 bit Linux, Nvidia's CUDA toolkit (>= release 2.3), a CUDA Device of Compute Capability 1.3 or higher
 Description: This package provides R interfaces to a handful of common
         statistical algorithms. These algorithms are implemented in
-        parallel using a mixture of Nvidia's CUDA language, Nvidia's
-        CUBLAS library, and EMI Photonics' CULA libraries. On a
-        computer equipped with an Nvidia GPU some of these functions may
-        be substantially more efficient than native R routines. Thanks
-        to Craig Stark at UC Irvine for donating time on his lab's Mac
-        hardware.
+        parallel using of Nvidia's CUDA SDK. On a computer equipped with
+        an Nvidia GPU some of these functions may be substantially more
+        efficient than native R routines. Thanks to Craig Stark at UC
+        Irvine for donating time on his lab's Mac hardware.
 License: GPL-3
 URL: https://github.com/nullsatz/gputools/wiki
 Repository: CRAN

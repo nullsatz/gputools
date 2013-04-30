@@ -8,7 +8,6 @@
 #include<distance.h>
 #include<granger.h>
 #include<hcluster.h>
-/* #include<lr.h> */
 #include<qrdecomp.h>
 #include<mi.h>
 #include<lsfit.h>
