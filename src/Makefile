@@ -11,8 +11,8 @@ INCS := -I. -I"$(CUDA_INC)" -I"$(R_INC)"
 PARAMS := $(DEVICEOPTS) -Xcompiler $(CPICFLAGS)
 
 #linker options
-LD_PARAMS := $(DEVICEOPTS) -Xlinker $(RPATHFLAG)
-LIBS :=  -L"$(R_LIB)" -L$(CUDA_LIB) -lcublas
+LD_PARAMS := $(DEVICEOPTS) -Xlinker $(RPATH) $(R_FRAMEWORK)
+LIBS :=  -L"$(R_LIB)" -L"$(CUDA_LIB)" -lcublas
 
 TARGETS := gputools.so
 
@@ -20,7 +20,7 @@ NVCC := $(CUDA_HOME)/bin/nvcc -gencode arch=compute_10,code=sm_10 -gencode arch=
 
 all: $(TARGETS) 
 
-$(TARGETS): $(OBJS13) $(OBJS)
+$(TARGETS): $(OBJS)
 	$(NVCC) -shared $(LD_PARAMS) $(LIBS) $(OBJS) -o $@
 
 $(OBJS): %.o: %.$(EXT)
