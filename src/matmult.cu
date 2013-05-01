@@ -9,6 +9,7 @@
 
 #include<R.h>
 #include<Rinternals.h>
+
 #include<matmult.h>
 
 SEXP gpuMatMult(SEXP a, SEXP b) {

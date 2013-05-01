@@ -1,8 +1,13 @@
+#include<R.h>
+#include<Rinternals.h>
+#include <R_ext/Rdynload.h>
+
 #include<stdio.h>
 #include<string.h>
 
 #include<cublas.h>
 
+#include<matmult.h>
 #include<correlation.h>
 #include<kendall.h>
 #include<distance.h>
@@ -12,10 +17,16 @@
 #include<mi.h>
 #include<lsfit.h>
 #include<cuseful.h>
-#include<R.h>
-#include<Rinternals.h>
 
 #include<rinterface.h>
+
+void R_init_mylib(DllInfo *info) {
+    R_CallMethodDef callMethods[]  = {
+        {"gpuMatMult", (DL_FUNC) &gpuMatMult, 2},
+        {NULL, NULL, 0}
+    };
+    R_registerRoutines(info, NULL, callMethods, NULL, NULL);
+}
 
 // whichObs = 0 means everything
 // whichObs = 1 means pairwiseComplete
