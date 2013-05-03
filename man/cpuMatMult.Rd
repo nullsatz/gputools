@@ -1,14 +1,14 @@
-\name{gpuMatMult}
-\alias{gpuMatMult}
-\title{Perform Matrix Multiplication with a GPU}
+\name{cpuMatMult}
+\alias{cpuMatMult}
+\title{Perform Matrix Multiplication}
 
 \description{
-	Performs matrix multiplication using a GPU.  This function is merely a 
-	wrapper for the CUBLAS cublasDgemm function.
+	Performs matrix multiplication using R's BLAS.  This function is merely a 
+	wrapper for the BLAS dgemm function.
 }
 
 \usage{
-	gpuMatMult(a, b)
+	cpuMatMult(a, b)
 }
 
 \arguments{
@@ -24,7 +24,7 @@
 \examples{
 matA <- matrix(runif(2*3), 2, 3)
 matB <- matrix(runif(3*4), 3, 4)
-gpuMatMult(matA, matB)
+cpuMatMult(matA, matB)
 }
 
 \keyword{array}

@@ -11,7 +11,7 @@ INCS := -I. -I"$(CUDA_INC)" -I"$(R_INC)"
 PARAMS := $(DEVICEOPTS) -Xcompiler $(CPICFLAGS)
 
 #linker options
-LD_PARAMS := $(DEVICEOPTS) -Xlinker $(RPATH) $(R_FRAMEWORK)
+LD_PARAMS := $(DEVICEOPTS) -Xlinker '$(RPATH) $(R_FRAMEWORK)'
 LIBS :=  -L"$(R_LIB)" -L"$(CUDA_LIB)" -lcublas
 
 TARGETS := gputools.so

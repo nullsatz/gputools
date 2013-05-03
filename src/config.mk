@@ -25,7 +25,8 @@ endif
 
 OS := $(shell uname -s)
 ifeq ($(OS), Darwin)
-    R_FRAMEWORK := -F"$(R_HOME)/.." -framework R
+    CUDA_LIB := $(CUDA_HOME)/lib
+    R_FRAMEWORK := -F "$(R_HOME)/.." -framework R
     RPATH := -rpath "$(CUDA_LIB)"
     ifeq ($(ARCH), x86_64)
         DEVICEOPTS := -m64

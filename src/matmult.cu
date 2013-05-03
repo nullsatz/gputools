@@ -9,26 +9,27 @@
 
 #include<R.h>
 #include<Rinternals.h>
+#include<R_ext/BLAS.h>
 
 #include<matmult.h>
 
 SEXP gpuMatMult(SEXP a, SEXP b) {
-	double
+    double
         * xa = REAL(a), * xb = REAL(b),
-		* gpua, * gpub, * gpuc;
+	* gpua, * gpub, * gpuc;
 
     SEXP
         dima = getAttrib(a, R_DimSymbol),
         dimb = getAttrib(b, R_DimSymbol);
 
-	int
-		rowsa = INTEGER(dima)[0], colsa = INTEGER(dima)[1],
-		rowsb = INTEGER(dimb)[0], colsb = INTEGER(dimb)[1];
+    int
+        rowsa = INTEGER(dima)[0], colsa = INTEGER(dima)[1],
+        rowsb = INTEGER(dimb)[0], colsb = INTEGER(dimb)[1];
 
-	cublasStatus_t stat;
-	cublasHandle_t handle;
+    cublasStatus_t stat;
+    cublasHandle_t handle;
 
-	cudaError_t cudaStat;
+    cudaError_t cudaStat;
 
 	cudaStat = cudaMalloc((void**) &gpua, rowsa * colsa * sizeof(double));
 	if (cudaStat != cudaSuccess) error("device memory allocation failed");
@@ -101,4 +102,44 @@ SEXP gpuMatMult(SEXP a, SEXP b) {
 	cublasDestroy(handle);
     UNPROTECT(2);
 	return ab;
+}
+
+SEXP cpuMatMult(SEXP a, SEXP b) {
+    double
+      * xa = REAL(a), * xb = REAL(b);
+
+    SEXP
+      dima = getAttrib(a, R_DimSymbol),
+      dimb = getAttrib(b, R_DimSymbol);
+
+    int
+      rowsa = INTEGER(dima)[0], colsa = INTEGER(dima)[1],
+      rowsb = INTEGER(dimb)[0], colsb = INTEGER(dimb)[1];
+
+
+//	cublasOperation_t opA = tpA ? CUBLAS_OP_T : CUBLAS_OP_N;
+//	cublasOperation_t opB = tpB ? CUBLAS_OP_T : CUBLAS_OP_N;
+//
+//	int rowsOpA = tpA ? colsa : rowsa;
+//	int colsOpA = tpA ? rowsa : colsa;
+//	int colsOpB = tpB ? rowsb : colsb;
+
+    const int
+        rowsOpA = rowsa, colsOpA = colsa, colsOpB = colsb;
+    const double
+        alpha = 1.0, beta = 0.0;
+
+    SEXP ab, dimab;
+    PROTECT(ab = allocVector(REALSXP, rowsOpA * colsOpB));
+    PROTECT(dimab = allocVector(INTSXP, 2));
+    INTEGER(dimab)[0] = rowsOpA; INTEGER(dimab)[1] = colsOpB;
+    setAttrib(ab, R_DimSymbol, dimab);
+
+    double * xab = REAL(ab);
+
+    F77_CALL(dgemm)("N", "N", &rowsOpA, &colsOpB, &colsOpA, &alpha, xa, &rowsa,
+	    xb, &rowsb, &beta, xab, &rowsOpA);
+
+    UNPROTECT(2);
+    return ab;
 }
