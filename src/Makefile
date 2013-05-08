@@ -12,7 +12,7 @@ PARAMS := $(DEVICEOPTS) -Xcompiler $(CPICFLAGS)
 
 #linker options
 LD_PARAMS := $(DEVICEOPTS) -Xlinker '$(RPATH) $(R_FRAMEWORK)'
-LIBS :=  -L"$(R_LIB)" -L"$(CUDA_LIB)" -lcublas
+LIBS :=  -L"$(R_LIB)" -L"$(CUDA_LIB)" -lcublas $(shell R CMD config BLAS_LIBS)
 
 TARGETS := gputools.so
 

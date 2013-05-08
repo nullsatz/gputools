@@ -7,7 +7,7 @@ R_LIB := $(R_HOME)/lib
 # replace these three lines with
 # CUDA_HOME := <path to your cuda install>
 ifndef CUDA_HOME
-    CUDA_HOME := /usr/local/cuda/5.0
+    CUDA_HOME := /usr/local/cuda
 endif
 
 # set CUDA_INC to CUDA header dir on your system
@@ -25,12 +25,12 @@ endif
 
 OS := $(shell uname -s)
 ifeq ($(OS), Darwin)
-    CUDA_LIB := $(CUDA_HOME)/lib
-    R_FRAMEWORK := -F "$(R_HOME)/.." -framework R
-    RPATH := -rpath "$(CUDA_LIB)"
     ifeq ($(ARCH), x86_64)
         DEVICEOPTS := -m64
     endif
+    CUDA_LIB := $(CUDA_HOME)/lib
+    R_FRAMEWORK := -F$(R_HOME)/.. -framework R
+    RPATH := -rpath $(CUDA_LIB)
 endif
 
 CPICFLAGS := $(shell R CMD config CPICFLAGS)

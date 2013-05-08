@@ -16,7 +16,7 @@
 SEXP gpuMatMult(SEXP a, SEXP b) {
     double
         * xa = REAL(a), * xb = REAL(b),
-	* gpua, * gpub, * gpuc;
+		* gpua, * gpub, * gpuc;
 
     SEXP
         dima = getAttrib(a, R_DimSymbol),
