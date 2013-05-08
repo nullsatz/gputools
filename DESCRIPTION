@@ -4,7 +4,7 @@ Title: A few GPU enabled functions
 Author: Josh Buckner <nullsatz@gmail.com>, Mark Seligman
         <mseligman@rapidbiologics.com>, Justin Wilson
 Maintainer: Josh Buckner <nullsatz@gmail.com>
-Depends: R (>= 2.8.0)
+Depends: R (>= 3.0.0)
 SystemRequirements: Nvidia's CUDA toolkit (>= release 5.0)
 Description: This package provides R interfaces to a handful of common
         functions implemented using the Nvidia CUDA toolkit. Some of the

@@ -1,22 +1,18 @@
 gputools
+
 =========
 
-Installation procedure outline:
-1. install nvidia's cuda capable video driver
-2. install nvidia's cuda toolkit
-3. install this package using R
-
-The package gputools attempts to follow the standard R package installation procedure. To install the package, you must first install nvidia's cuda toolkit (preferably version 2.3) available from
+To install the package, you must first install Nvidia's CUDA 5.0 toolkit available from
 
 http://www.nvidia.com/object/cuda_get.html
 
-You will need a cuda capability 1.3 or higher gpu and a cuda capable video driver. You can get the video driver from
+You will need a CUDA Capability 1.3 or higher GPU and a CUDA capable video driver. You can get the video driver from
 
 http://www.nvidia.com/Download/index.aspx
 
 =========
 
-Hints for easy installation:
+Installation Hints
 
 Set and export the environment variable CUDA_HOME. In most cases, something like this will do:
 
