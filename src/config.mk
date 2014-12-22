@@ -1,6 +1,11 @@
 # set R_HOME, R_INC, and R_LIB to the the R install dir,
 # the R header dir, and the R shared library dir on your system
-R_HOME := $(shell R RHOME)
+ifndef R
+	R := R
+endif
+ifndef R_HOME
+	R_HOME := $(shell $R RHOME)
+endif
 R_INC := $(R_HOME)/include
 R_LIB := $(R_HOME)/lib
 
