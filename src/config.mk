@@ -38,4 +38,4 @@ ifeq ($(OS), Darwin)
     RPATH := -rpath $(CUDA_LIB)
 endif
 
-CPICFLAGS := $(shell R CMD config CPICFLAGS)
+CPICFLAGS := $(shell $R CMD config CPICFLAGS)
