@@ -4,7 +4,7 @@ EXT := cu
 
 OBJS := rinterface.o mi.o sort.o granger.o qrdecomp.o correlation.o hcluster.o distance.o matmult.o lsfit.o kendall.o cuseful.o
 
-R_HOME := $(shell R RHOME)
+R_HOME := $(shell $R RHOME)
 
 #compiler/preprocessor options
 INCS := -I. -I"$(CUDA_INC)" -I"$(R_INC)"
