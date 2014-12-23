@@ -1,4 +1,4 @@
- set R_HOME, R_INC, and R_LIB to the the R install dir,
+# set R_HOME, R_INC, and R_LIB to the the R install dir,
 # the R header dir, and the R shared library dir on your system
 
 # R_HOME will be set in the R installation environment
