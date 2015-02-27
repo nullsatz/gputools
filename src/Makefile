@@ -21,12 +21,12 @@ NVCC := $(CUDA_HOME)/bin/nvcc -gencode arch=compute_20,code=sm_20 -gencode arch=
 all: $(TARGETS)
 
 $(TARGETS): $(OBJS)
-        $(NVCC) -shared $(LD_PARAMS) $(LIBS) $(OBJS) -o $@
+	$(NVCC) -shared $(LD_PARAMS) $(LIBS) $(OBJS) -o $@
 
 $(OBJS): %.o: %.$(EXT)
-        $(NVCC) -c $(INCS) $(PARAMS) $^ -o $@
+	$(NVCC) -c $(INCS) $(PARAMS) $^ -o $@
 
 clean:
-        rm -rf *o
+	rm -rf *o
 
 .PHONY: all clean
