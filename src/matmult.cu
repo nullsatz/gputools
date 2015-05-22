@@ -6,99 +6,140 @@
 #include<cublas_v2.h>
 
 #include<cuseful.h>
+
+#include<R.h>
+#include<Rinternals.h>
+#include<R_ext/BLAS.h>
+
 #include<matmult.h>
 
-RcppExport SEXP gpuMatMult(SEXP a, SEXP b) {
-	Rcpp::NumericMatrix xa(a);
-	Rcpp::NumericMatrix xb(b);
-
-	double
+SEXP gpuMatMult(SEXP a, SEXP b) {
+    double
+        * xa = REAL(a), * xb = REAL(b),
 		* gpua, * gpub, * gpuc;
 
-	int
-		rowsa = xa.nrow(), colsa = xa.ncol(),
-		rowsb = xb.nrow(), colsb = xb.ncol();
+    SEXP
+        dima = getAttrib(a, R_DimSymbol),
+        dimb = getAttrib(b, R_DimSymbol);
 
-	cublasStatus_t stat;
-	cublasHandle_t handle;
+    int
+        rowsa = INTEGER(dima)[0], colsa = INTEGER(dima)[1],
+        rowsb = INTEGER(dimb)[0], colsb = INTEGER(dimb)[1];
 
-	cudaError_t cudaStat;
+    cublasStatus_t stat;
+    cublasHandle_t handle;
 
-	cudaStat = cudaMalloc((void**) &gpua, rowsa * colsa * sizeof(double));
-	if (cudaStat != cudaSuccess) {
-		printf ("device memory allocation failed");
-		return NULL;
-	}  
+    cudaError_t cudaStat;
 
-	cudaStat = cudaMalloc((void**) &gpub, rowsb * colsb * sizeof(double));
-	if (cudaStat != cudaSuccess) {
-		printf ("device memory allocation failed");
-		return NULL;
-	}  
+    cudaStat = cudaMalloc((void**) &gpua, rowsa * colsa * sizeof(double));
+    if (cudaStat != cudaSuccess) error("device memory allocation failed");
 
-	cublasOperation_t opA = tpA ? CUBLAS_OP_T : CUBLAS_OP_N;
-	cublasOperation_t opB = tpB ? CUBLAS_OP_T : CUBLAS_OP_N;
+    cudaStat = cudaMalloc((void**) &gpub, rowsb * colsb * sizeof(double));
+    if (cudaStat != cudaSuccess) error("device memory allocation failed");
 
-	int rowsOpA = tpA ? colsa : rowsa;
-	int colsOpA = tpA ? rowsa : colsa;
-	int colsOpB = tpB ? rowsb : colsb;
+//	cublasOperation_t opA = tpA ? CUBLAS_OP_T : CUBLAS_OP_N;
+//	cublasOperation_t opB = tpB ? CUBLAS_OP_T : CUBLAS_OP_N;
+//
+//	int rowsOpA = tpA ? colsa : rowsa;
+//	int colsOpA = tpA ? rowsa : colsa;
+//	int colsOpB = tpB ? rowsb : colsb;
 
-	cudaStat = cudaMalloc((void**) &gpuc, rowsOpA * colsOpB * sizeof(double));
-	if (cudaStat != cudaSuccess) {
-		printf ("device memory allocation failed");
-		return NULL;
-	}  
+    int
+        rowsOpA = rowsa, colsOpA = colsa, colsOpB = colsb;
 
-	stat = cublasCreate(&handle);
-	if(stat != CUBLAS_STATUS_SUCCESS) {
-		printf("CUBLAS initialization failed\n");
-		return NULL;
-	}
+    cudaStat = cudaMalloc((void**) &gpuc, rowsOpA * colsOpB * sizeof(double));
+    if (cudaStat != cudaSuccess) error("device memory allocation failed");
 
-	stat = cublasSetMatrix(rowsa, colsa, sizeof(double), xa, rowsa,
-		gpua, rowsa);
-	if(stat != CUBLAS_STATUS_SUCCESS) {
-		printf("data download failed\n");
-		cudaFree(gpuc);
-		cudaFree(gpub);
-		cudaFree(gpua);
-		cublasDestroy(handle);
-		return NULL;
-	}
+    stat = cublasCreate(&handle);
+    if(stat != CUBLAS_STATUS_SUCCESS) error("CUBLAS initialization failed\n");
 
-	Rcpp::NumericMatrix xb(b);
-	stat = cublasSetMatrix(rowsb, colsb, sizeof(double), xb, rowsb,
-		gpub, rowsb);
-	if(stat != CUBLAS_STATUS_SUCCESS) {
-		printf("data download failed\n");
-		cudaFree(gpuc);
-		cudaFree(gpub);
-		cudaFree(gpua);
-		cublasDestroy(handle);
-		return NULL;
-	}
-
-	const double alpha = 1.0, beta = 0.0;
-	cublasDgemm(handle, opA, opB, rowsOpA, colsOpB, colsOpA, &alpha,
-		(const double *) gpua, rowsa, (const double *) gpub, rowsb,
-		&beta, gpuc, rowsOpA);
-
-	Rcpp::NumericMatrix xab(rowsa, colsb);
-	stat = cublasGetMatrix(rowsOpA, colsOpB, sizeof(double), gpuc, rowsOpA,
-		xab, rowsOpA);
-	if(stat != CUBLAS_STATUS_SUCCESS) {
-		printf("data upload failed\n");
-		cudaFree(gpuc);
-		cudaFree(gpub);
-		cudaFree(gpua);
-		cublasDestroy(handle);
-		return NULL;
-	}
-
-	cudaFree(gpua);
+    stat = cublasSetMatrix(rowsa, colsa, sizeof(double), xa, rowsa,
+        gpua, rowsa);
+    if(stat != CUBLAS_STATUS_SUCCESS) {
+        cudaFree(gpuc);
 	cudaFree(gpub);
-	cudaFree(gpuc);
-
+	cudaFree(gpua);
 	cublasDestroy(handle);
-	return xab;
+	error("data download failed\n");
+    }
+
+    stat = cublasSetMatrix(rowsb, colsb, sizeof(double), xb, rowsb,
+        gpub, rowsb);
+    if(stat != CUBLAS_STATUS_SUCCESS) {
+        cudaFree(gpuc);
+	cudaFree(gpub);
+	cudaFree(gpua);
+	cublasDestroy(handle);
+	error("data download failed\n");
+    }
+
+    const double alpha = 1.0, beta = 0.0;
+    cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, rowsOpA, colsOpB, colsOpA,
+        &alpha, (const double *) gpua, rowsa, (const double *) gpub, rowsb,
+	&beta, gpuc, rowsOpA);
+
+    SEXP ab, dimab;
+    PROTECT(ab = allocVector(REALSXP, rowsOpA * colsOpB));
+    PROTECT(dimab = allocVector(INTSXP, 2));
+    INTEGER(dimab)[0] = rowsOpA; INTEGER(dimab)[1] = colsOpB;
+    setAttrib(ab, R_DimSymbol, dimab);
+
+    double * xab = REAL(ab);
+    stat = cublasGetMatrix(rowsOpA, colsOpB, sizeof(double), gpuc, rowsOpA,
+        xab, rowsOpA);
+    if(stat != CUBLAS_STATUS_SUCCESS) {
+        cudaFree(gpuc);
+        cudaFree(gpub);
+	cudaFree(gpua);
+	cublasDestroy(handle);
+	error("data upload failed\n");
+    }
+
+    cudaFree(gpua);
+    cudaFree(gpub);
+    cudaFree(gpuc);
+
+    cublasDestroy(handle);
+    UNPROTECT(2);
+    return ab;
+}
+
+SEXP cpuMatMult(SEXP a, SEXP b) {
+    double
+        * xa = REAL(a), * xb = REAL(b);
+
+    SEXP
+        dima = getAttrib(a, R_DimSymbol),
+        dimb = getAttrib(b, R_DimSymbol);
+
+    int
+        rowsa = INTEGER(dima)[0], colsa = INTEGER(dima)[1],
+        rowsb = INTEGER(dimb)[0], colsb = INTEGER(dimb)[1];
+
+//	cublasOperation_t opA = tpA ? CUBLAS_OP_T : CUBLAS_OP_N;
+//	cublasOperation_t opB = tpB ? CUBLAS_OP_T : CUBLAS_OP_N;
+//
+//	int rowsOpA = tpA ? colsa : rowsa;
+//	int colsOpA = tpA ? rowsa : colsa;
+//	int colsOpB = tpB ? rowsb : colsb;
+
+    const int
+        rowsOpA = rowsa, colsOpA = colsa, colsOpB = colsb;
+    const double
+        alpha = 1.0, beta = 0.0;
+
+    SEXP ab, dimab;
+    PROTECT(ab = allocVector(REALSXP, rowsOpA * colsOpB));
+    PROTECT(dimab = allocVector(INTSXP, 2));
+    INTEGER(dimab)[0] = rowsOpA; INTEGER(dimab)[1] = colsOpB;
+    setAttrib(ab, R_DimSymbol, dimab);
+
+    double * xab = REAL(ab);
+
+    F77_CALL(dgemm)("N", "N", &rowsOpA, &colsOpB, &colsOpA,
+        &alpha, xa, &rowsa,
+        xb, &rowsb, &beta, xab, &rowsOpA);
+
+    UNPROTECT(2);
+    return ab;
 }

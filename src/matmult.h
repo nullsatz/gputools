@@ -1,4 +1,6 @@
-#include<Rcpp.h>
-using namespace Rcpp;
+#include<Rdefines.h>
 
-RcppExport SEXP gpuMatMult(SEXP a, SEXP b);
+extern "C" {
+    SEXP gpuMatMult(SEXP a, SEXP b);
+    SEXP cpuMatMult(SEXP a, SEXP b);
+}

@@ -86,11 +86,12 @@ else
 	else
 		R_INCLUDE="-I${R_INCLUDE}"
 	fi
-	if test -z "${R_LIB}"; then
-		R_LIB=`"${R_HOME}/bin/R" CMD config --ldflags`
-	else
-		R_LIB="-L${R_LIB} -lR"
-	fi
+	R_LIB=`"${R_HOME}/bin/R" CMD config --ldflags`
+#	if test -z "${R_LIB}"; then
+#		R_LIB=`"${R_HOME}/bin/R" CMD config --ldflags`
+#  else
+#    R_LIB="-L${R_LIB}"
+#	fi
 	AC_MSG_RESULT("using ${R_INCLUDE} for R header files")
 	AC_MSG_RESULT("using ${R_LIB} for R shared libraries")
 fi
@@ -154,14 +155,11 @@ case "${host_os}" in
 		else
 			AC_MSG_WARN([Unrecognised Darwin Architecture])
 		fi
-
-		RCPP_INCLUDE=`Rscript -e 'Rcpp:::CxxFlags()'`
-		RCPP_LIB=`Rscript -e 'Rcpp:::LdFlags()' | sed s/i386/x86_64/g`
-
-		R_INCLUDE="${R_INCLUDE} ${RCPP_INCLUDE}"
-		R_LIB="${R_LIB} ${RCPP_LIB}"
 	;;
 esac
+
+R_INCLUDE="${R_INCLUDE} ${RCPP_INCLUDE}"
+R_LIB="${R_LIB} ${RCPP_LIB}"
 
 AC_SUBST(LIBS)
 AC_SUBST(MISC_PARAMS)
