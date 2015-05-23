@@ -614,7 +614,6 @@ void SVRTrain(float * mexalpha, float * beta, float * y, float * x ,float C,
 	float kernelwidth, float eps, int m, int n, float StoppingCrit,
 	int * numSvs)
 {
-/*
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -927,14 +926,13 @@ void SVRTrain(float * mexalpha, float * beta, float * y, float * x ,float C,
 		if(mexalpha[k])
 			(*numSvs)++;
 	}
-*/
 }
 
 void SVMTrain(float *mexalpha,float* beta,float*y,float *x ,float C,
 	float kernelwidth, int m, int n, float StoppingCrit,
 	int * numSvs, int * numPosSvs)
 {
-/*    cudaEvent_t
+    cudaEvent_t
 		start, stop;
 
     cudaEventCreate(&start);
@@ -1223,7 +1221,6 @@ void SVMTrain(float *mexalpha,float* beta,float*y,float *x ,float C,
 				(*numPosSvs)++;
 		}
 	}
-*/
 }
 
 /*
