@@ -74,7 +74,7 @@ CFLAGS=`"${R_HOME}/bin/R" CMD config CFLAGS`
 CPPFLAGS=`"${R_HOME}/bin/R" CMD config CPPFLAGS`
 CPICFLAGS=`"${R_HOME}/bin/R" CMD config CPICFLAGS`
 
-LDFLAGS=`"${R_HOME}/bin/R" CMD config LDFLAGS`
+LDFLAGS=`"${R_HOME}/bin/R" CMD config --ldflags`
 
 AC_SUBST(NVCC)
 AC_SUBST(CUDA_HOME)

@@ -18,7 +18,7 @@ LDFLAGS = @LDFLAGS@
 
 #compiler/preprocessor options
 INCLUDES = -I. -I"$(CUDA_INCLUDE)" -I"$(R_INCLUDE)"
-LIBS =  -L"$(CUDA_LIB)" -lcublas -L"$(R_LIB)" -lR
+LIBS =  -L"$(CUDA_LIB)" -lcublas
 
 TARGETS := gputools.so
 
