@@ -31,7 +31,11 @@ AC_ARG_WITH([r],
     [specify the full path to the root of the R install directory, e.g. /usr/lib64/R]),
     [R_HOME="$withval"])
 if test -z "${R_HOME}"; then
-  R_HOME=`R RHOME`
+  : ${R_HOME=`R RHOME`}
+  if test -z "${R_HOME}"; then
+    echo "could not determine R_HOME"
+    exit 1
+  fi
 fi
 AC_MSG_RESULT("using ${R_HOME} for the root of the R install directory")
 
@@ -48,10 +52,17 @@ AC_ARG_WITH([r-lib],
   AC_HELP_STRING([--with-r-lib=r-lib],
     [specify the full path to your R shared libraries, e.g. /usr/lib64/R/lib]),
     [R_LIB="$withval"])
-if test -z "${R_INCLUDE}"; then
+if test -z "${R_LIB}"; then
   R_LIB="${R_HOME}/lib"
 fi
 AC_MSG_RESULT("using ${R_LIB} for R shared libraries")
+
+CC=`"${R_HOME}/bin/R" CMD config CC`
+CFLAGS=`"${R_HOME}/bin/R" CMD config CFLAGS`
+CPPFLAGS=`"${R_HOME}/bin/R" CMD config CPPFLAGS`
+CPICFLAGS=`"${R_HOME}/bin/R" CMD config CPICFLAGS`
+
+LDFLAGS=`"${R_HOME}/bin/R" CMD config LDFLAGS`
 
 AC_SUBST(NVCC)
 AC_SUBST(CUDA_HOME)
@@ -59,6 +70,13 @@ AC_SUBST(CUDA_HOME)
 AC_SUBST(R_HOME)
 AC_SUBST(R_INCLUDE)
 AC_SUBST(R_LIB)
+
+AC_SUBST(CC)
+AC_SUBST(CFLAGS)
+AC_SUBST(CPPFLAGS)
+AC_SUBST(CPICFLAGS)
+
+AC_SUBST(LDFLAGS)
 
 AC_CONFIG_FILES([src/Makefile])
 AC_OUTPUT

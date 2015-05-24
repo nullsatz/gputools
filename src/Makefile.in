@@ -9,19 +9,26 @@ R_HOME = @R_HOME@
 R_INCLUDE = @R_INCLUDE@
 R_LIB = @R_LIB@
 
+CC = @CC@
+CFLAGS = @CFLAGS@
+CPPFLAGS = @CPPFLAGS@
+CPICFLAGS = @CPICFLAGS@
+
+LDFLAGS = @LDFLAGS@
+
 #compiler/preprocessor options
 INCLUDES = -I. -I"$(CUDA_INCLUDE)" -I"$(R_INCLUDE)"
-LIBS =  -L"$(R_LIB)" -lR -L"$(CUDA_LIB)" -lcublas
+LIBS =  -L"$(CUDA_LIB)" -lcublas
 
 TARGETS := gputools.so
 
 all: $(TARGETS) 
 
 $(TARGETS): $(OBJS)
-	$(NVCC) -shared $(LIBS) $(OBJS) -o $@
+	$(NVCC) -shared -Xlinker "$(LDFLAGS)" $(LIBS) $(OBJS) -o $@
 
-$(OBJS): %.o: %.$(EXT)
-	$(NVCC) -c $(INCLUDES) $^ -o $@
+$(OBJS): %.o: %.cu
+	$(NVCC) -c -Xcompiler "$(CPICFLAGS) $(CPPFLAGS) $(CFLAGS)" $(INCLUDES) $^ -o $@
 
 clean:
 	rm -rf *o
