@@ -1,30 +1,27 @@
-include config.mk
+OBJS = rinterface.o mi.o sort.o granger.o qrdecomp.o correlation.o hcluster.o distance.o matmult.o lsfit.o kendall.o cuseful.o
 
-EXT := cu 
+NVCC = @NVCC@
+CUDA_HOME = @CUDA_HOME@
+CUDA_INCLUDE = $(CUDA_HOME)/include
+CUDA_LIB = $(CUDA_HOME)/lib
 
-OBJS := rinterface.o mi.o sort.o granger.o qrdecomp.o correlation.o hcluster.o distance.o matmult.o lsfit.o kendall.o cuseful.o
-
-R_HOME := $(shell R RHOME)
+R_HOME = @R_HOME@
+R_INCLUDE = @R_INCLUDE@
+R_LIB = @R_LIB@
 
 #compiler/preprocessor options
-INCS := -I. -I"$(CUDA_INC)" -I"$(R_INC)"
-PARAMS := $(DEVICEOPTS) -Xcompiler $(CPICFLAGS)
-
-#linker options
-LD_PARAMS := $(DEVICEOPTS) -Xlinker '$(RPATH) $(R_FRAMEWORK)'
-LIBS :=  -L"$(R_LIB)" -L"$(CUDA_LIB)" -lcublas $(shell R CMD config BLAS_LIBS)
+INCLUDES = -I. -I"$(CUDA_INCLUDE)" -I"$(R_INCLUDE)"
+LIBS =  -L"$(R_LIB)" -lR -L"$(CUDA_LIB)" -lcublas
 
 TARGETS := gputools.so
-
-NVCC := $(CUDA_HOME)/bin/nvcc -gencode arch=compute_10,code=sm_10 -gencode arch=compute_13,code=sm_13 -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30
 
 all: $(TARGETS) 
 
 $(TARGETS): $(OBJS)
-	$(NVCC) -shared $(LD_PARAMS) $(LIBS) $(OBJS) -o $@
+	$(NVCC) -shared $(LIBS) $(OBJS) -o $@
 
 $(OBJS): %.o: %.$(EXT)
-	$(NVCC) -c $(INCS) $(PARAMS) $^ -o $@
+	$(NVCC) -c $(INCLUDES) $^ -o $@
 
 clean:
 	rm -rf *o
