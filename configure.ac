@@ -24,6 +24,18 @@ if test -z "${CUDA_HOME}"; then
 fi
 AC_MSG_RESULT("using CUDA_HOME=${CUDA_HOME}")
 
+AC_MSG_CHECKING("location of CUDA libraries")
+AC_CHECK_FILE(["${CUDA_HOME}/lib/libcublas.so"],[CUDA_LIB="${CUDA_HOME}/lib"],[CUDA_LIB=""])
+if test -z "${CUDA_LIB}"; then
+  AC_CHECK_FILE(["${CUDA_HOME}/lib64/libcublas.so"],[CUDA_LIB="${CUDA_HOME}/lib64"],[CUDA_LIB=""])
+fi
+if test -z "${CUDA_LIB}"; then
+  AC_CHECK_FILE(["${CUDA_HOME}/lib/libcublas.dylib"],[CUDA_LIB="${CUDA_HOME}/lib"],[CUDA_LIB=""])
+fi
+if test -z "${CUDA_LIB}"; then
+  AC_CHECK_FILE(["${CUDA_HOME}/lib64/libcublas.dylib"],[CUDA_LIB="${CUDA_HOME}/lib64"],[CUDA_LIB=""])
+fi
+
 AC_MSG_CHECKING("R")
 
 AC_ARG_WITH([r],
@@ -66,6 +78,7 @@ LDFLAGS=`"${R_HOME}/bin/R" CMD config LDFLAGS`
 
 AC_SUBST(NVCC)
 AC_SUBST(CUDA_HOME)
+AC_SUBST(CUDA_LIB)
 
 AC_SUBST(R_HOME)
 AC_SUBST(R_INCLUDE)

@@ -15,7 +15,7 @@ cpuMatMult <- function(a, b) {
 	if (ncol(a) != nrow(b))
 		stop("error:  matrix dimensions mismatched for matrix multiplication")
         
-	.Call("cpuMatMult", a, b, PACKAGE='gputools')
+	a %*% b
 }
 
 gpuCrossprod <- function(a, b=NULL) {

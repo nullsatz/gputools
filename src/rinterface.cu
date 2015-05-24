@@ -23,7 +23,6 @@
 void R_init_mylib(DllInfo *info) {
     R_CallMethodDef callMethods[]  = {
         {"gpuMatMult", (DL_FUNC) &gpuMatMult, 2},
-        {"cpuMatMult", (DL_FUNC) &cpuMatMult, 2},
         {NULL, NULL, 0}
     };
     R_registerRoutines(info, NULL, callMethods, NULL, NULL);
