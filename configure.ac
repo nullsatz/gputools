@@ -69,12 +69,49 @@ if test -z "${R_LIB}"; then
 fi
 AC_MSG_RESULT("using ${R_LIB} for R shared libraries")
 
+AC_MSG_CHECKING([for rpath flag style])
+AC_PROG_CC([cc cl gcc])
+saved_cflags="${CFLAGS}"
+CFLAGS="-Wl,--rpath=."
+AC_LINK_IFELSE([AC_LANG_SOURCE([int main(){ return 0;}])],
+  [RPATH_FLAG=gnu],
+  [RPATH_FLAG=none])
+
+if test "x$RPATH_FLAG" = "xnone"; then
+  CFLAGS="-Wl,-rpath,."
+  AC_LINK_IFELSE([AC_LANG_SOURCE([int main(){ return 0;}])],
+    [RPATH_FLAG=llvm],
+    [RPATH_FLAG=none])
+fi
+CFLAGS="${saved_cflags}"
+AC_MSG_RESULT([rpath flag style... ${RPATH_FLAG}])
+
 CC=`"${R_HOME}/bin/R" CMD config CC`
 CFLAGS=`"${R_HOME}/bin/R" CMD config CFLAGS`
 CPPFLAGS=`"${R_HOME}/bin/R" CMD config CPPFLAGS`
 CPICFLAGS=`"${R_HOME}/bin/R" CMD config CPICFLAGS`
 
-LDFLAGS=`"${R_HOME}/bin/R" CMD config --ldflags`
+if test "x$RPATH_FLAG" = "xgnu"; then
+  RPATH="-Xlinker -rpath=${CUDA_LIB},-rpath=${R_LIB}"
+fi
+
+if test "x$RPATH_FLAG" = "xllvm"; then
+  RPATH="-Xlinker -rpath,${CUDA_LIB},-rpath,${R_LIB}"
+fi
+
+if test "x$RPATH_FLAG" = "xnone"; then
+  RPATH=""
+fi
+
+AC_CANONICAL_HOST
+case $host_os in
+  darwin* )
+    LDFLAGS="-L${R_LIB} -lR"
+    ;;
+  *)
+    LDFLAGS=""
+    ;;
+esac
 
 AC_SUBST(NVCC)
 AC_SUBST(CUDA_HOME)
@@ -89,6 +126,7 @@ AC_SUBST(CFLAGS)
 AC_SUBST(CPPFLAGS)
 AC_SUBST(CPICFLAGS)
 
+AC_SUBST(RPATH)
 AC_SUBST(LDFLAGS)
 
 AC_CONFIG_FILES([src/Makefile])

@@ -14,6 +14,7 @@ CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
 CPICFLAGS = @CPICFLAGS@
 
+RPATH = @RPATH@
 LDFLAGS = @LDFLAGS@
 
 #compiler/preprocessor options
@@ -25,7 +26,7 @@ TARGETS := gputools.so
 all: $(TARGETS) 
 
 $(TARGETS): $(OBJS)
-	$(NVCC) -shared -Xlinker "$(LDFLAGS)" $(LIBS) $(OBJS) -o $@
+	$(NVCC) -shared $(RPATH) $(LDFLAGS) $(LIBS) $(OBJS) -o $@
 
 $(OBJS): %.o: %.cu
 	$(NVCC) -c -Xcompiler "$(CPICFLAGS) $(CPPFLAGS) $(CFLAGS)" $(INCLUDES) $^ -o $@

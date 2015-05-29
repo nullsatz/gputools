@@ -8,6 +8,8 @@
 
 #include"cuseful.h"
 
+#include<string>
+
 #define HALF RAND_MAX/2
 
 void fatal(const char * msg)
@@ -113,7 +115,7 @@ void checkCudaError(const char * msg) {
 	}
 }
 
-char * cublasGetErrorString(cublasStatus err)
+std::string cublasGetErrorString(cublasStatus err)
 {
 	switch(err) {
 		case CUBLAS_STATUS_SUCCESS :
@@ -142,13 +144,13 @@ void checkCublasError(const char * msg)
 {
 	cublasStatus err = cublasGetError();
 	if(err != CUBLAS_STATUS_SUCCESS)
-		error("cublas error : %s : %s\n", msg, cublasGetErrorString(err));
+		error("cublas error : %s : %s\n", msg, cublasGetErrorString(err).c_str());
 }
 
 int hasCublasError(const char * msg)
 {
 	cublasStatus err = cublasGetError();
 	if(err != CUBLAS_STATUS_SUCCESS)
-		error("cublas error : %s : %s\n", msg, cublasGetErrorString(err));
+		error("cublas error : %s : %s\n", msg, cublasGetErrorString(err).c_str());
 	return 0;
 }
