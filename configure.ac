@@ -52,7 +52,7 @@ fi
 AC_MSG_RESULT("using ${R_HOME} for the root of the R install directory")
 
 AC_ARG_WITH([r-include],
-  AC_HELP_STRING([--with-r-include=r_include],
+  AC_HELP_STRING([--with-r-include=r-include],
     [specify the full path to your R header files, e.g. /usr/share/R/include]),
     [R_INCLUDE="$withval"])
 if test -z "${R_INCLUDE}"; then
