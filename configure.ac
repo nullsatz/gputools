@@ -64,10 +64,10 @@ AC_ARG_WITH([r-lib],
   AC_HELP_STRING([--with-r-lib=r-lib],
     [specify the full path to your R shared libraries, e.g. /usr/lib64/R/lib]),
     [R_LIB="$withval"])
-if test -z "${R_LIB}"; then
-  R_LIB="${R_HOME}/lib"
+if test -n "${R_LIB}"; then
+  AC_MSG_RESULT("using ${R_LIB} for R shared libraries")
+  R_LIB="-L\"${R_LIB}\" -lR"
 fi
-AC_MSG_RESULT("using ${R_LIB} for R shared libraries")
 
 AC_MSG_CHECKING([for rpath flag style])
 AC_PROG_CC([cc cl gcc])
