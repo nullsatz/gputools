@@ -92,11 +92,11 @@ CPPFLAGS=`"${R_HOME}/bin/R" CMD config CPPFLAGS`
 CPICFLAGS=`"${R_HOME}/bin/R" CMD config CPICFLAGS`
 
 if test "x$RPATH_FLAG" = "xgnu"; then
-  RPATH="-Xlinker -rpath=${CUDA_LIB},-rpath=${R_LIB}"
+  RPATH="-Xlinker -rpath=\"${CUDA_LIB}\""
 fi
 
 if test "x$RPATH_FLAG" = "xllvm"; then
-  RPATH="-Xlinker -rpath,${CUDA_LIB},-rpath,${R_LIB}"
+  RPATH="-Xlinker -rpath,\"${CUDA_LIB}\""
 fi
 
 if test "x$RPATH_FLAG" = "xnone"; then
@@ -106,7 +106,8 @@ fi
 AC_CANONICAL_HOST
 case $host_os in
   darwin* )
-    LDFLAGS="-L${R_LIB} -lR"
+    LDFLAGS=`R CMD config --ldflags`
+    LDFLAGS="-Xlinker \"${LDFLAGS}\""
     ;;
   *)
     LDFLAGS=""
