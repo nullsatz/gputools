@@ -2,34 +2,32 @@ gputools
 
 =========
 
-To install the package, you must first install Nvidia's CUDA 5.0 toolkit available from
+To install the package, you must first install Nvidia's CUDA Toolkit available from
 
-http://www.nvidia.com/object/cuda_get.html
+http://developer.nvidia.com/cuda-downloads
 
-You will need a CUDA Capability 1.3 or higher GPU and a CUDA capable video driver. You can get the video driver from
-
-http://www.nvidia.com/Download/index.aspx
+You will need an Nvidia GPU of compute capability >= 2.
 
 =========
 
-Installation Hints
+Installation
 
-Set and export the environment variable CUDA_HOME. In most cases, something like this will do:
+If the package installation fails with an error:
 
-export CUDA_HOME=/usr/local/cuda/5.0
+Set the environment variable CUDA_HOME to the root of your CUDA toolkit installation.
 
-See the CUDA installation documentation for more details.
+If that doesn't help, there are several 'configure options' that may be set from the command line:
 
-Set your LD_LIBRARY_PATH to include CUDA's library directory. In most cases, something like this will do:
+R CMD INSTALL --configure-args="<gputools configure options>" gputools_0.5.tar.gz
 
-export LD_LIBRARY_PATH=/usr/local/cuda/5.0/lib64:$LD_LIBRARY_PATH
+<gputools configure options> include:
+--with-nvcc=<path to nvcc>
+--with-cuda=<path to CUDA toolkit root>
+--with-r=<path to root of R install>
+--with-r-include=<path to R header files>
+--with-r-lib=<path to libR.so or libR.dylib>
 
-See the CUDA installation documentation for more details.
-
-Use R to install the source package. For example, if you cloned the git repo:
-
-R CMD build gputools && R CMD INSTALL gputools_0.28.tar.gz
-
-If all else fails, you can edit the file gputools/src/config.mk to suit your particular environment.
+For example:
+R CMD INSTALL --configure-args="--with-nvcc=/usr/local/cuda/bin/nvcc --with-r-lib=/usr/local/share/R/lib64" gputools_0.5.tar.gz
 
 Enjoy!

@@ -1,9 +1,10 @@
 Package: gputools
-Version: 0.28
+Version: 0.5
 Title: A few GPU enabled functions
-Author: Josh Buckner <nullsatz@gmail.com>, Mark Seligman
-        <mseligman@rapidbiologics.com>, Justin Wilson
-Maintainer: Josh Buckner <nullsatz@gmail.com>
+Authors@R: as.person(c(
+  "Josh Buckner <nullsatz@gmail.com> [aut, cre]",
+  "Mark Sligman <mseligman@suiji.org> [aut]",
+  "Justin Wilson [ctb]"))
 Depends: R (>= 3.0.0)
 SystemRequirements: Nvidia's CUDA toolkit (>= release 5.0)
 Description: This package provides R interfaces to a handful of common
@@ -12,6 +13,5 @@ Description: This package provides R interfaces to a handful of common
         Thanks to Craig Stark at UC Irvine for donating time on his lab's Mac.
 License: GPL-3
 URL: https://github.com/nullsatz/gputools/wiki
+BugReports: https://github.com/nullsatz/gputools/issues
 Repository: CRAN
-Date/Publication: 2011-11-03 21:30:47
-Packaged: 2011-11-03 16:47:34 UTC; bucknerj

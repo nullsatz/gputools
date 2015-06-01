@@ -1,6 +1,9 @@
 gputools changes
 =================
 
+changes in gputools 0.5
+- switched back to autotools options
+
 changes in gputools 0.28
 - updated installation procedure
 - updated OSX compatibility
