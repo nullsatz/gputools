@@ -1,5 +1,5 @@
 Package: gputools
-Version: 0.5
+Version: 1.0
 Title: A few GPU enabled functions
 Authors@R: as.person(c(
   "Josh Buckner <nullsatz@gmail.com> [aut, cre]",
