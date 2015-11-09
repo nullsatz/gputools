@@ -1,13 +1,13 @@
 Package: gputools
 Version: 1.0
-Title: A few GPU enabled functions
-Authors@R: as.person(c(
-  "Josh Buckner <nullsatz@gmail.com> [aut, cre]",
-  "Mark Sligman <mseligman@suiji.org> [aut]",
-  "Justin Wilson [ctb]"))
+Title: A Few GPU Enabled Functions
+Authors@R: c(person("Josh", "Buckner", email = "nullsatz@gmail.com",
+                    role = c("aut", "cre")),
+  person("Mark", "Seligman", email = "mseligman@suiji.org", role = "aut"),
+  person("Justin", "Wilson", role = "ctb"))
 Depends: R (>= 3.0.0)
 SystemRequirements: Nvidia's CUDA toolkit (>= release 5.0)
-Description: This package provides R interfaces to a handful of common
+Description: Provides R interfaces to a handful of common
         functions implemented using the Nvidia CUDA toolkit. Some of the
         functions require at least GPU Compute Capability 1.3. 
         Thanks to Craig Stark at UC Irvine for donating time on his lab's Mac.

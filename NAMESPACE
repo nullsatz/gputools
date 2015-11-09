@@ -1,4 +1,5 @@
 useDynLib(gputools)
+
 export(gpuCor, 
 	gpuTtest,
 	gpuQr, gpuSolve,
@@ -8,3 +9,15 @@ export(gpuCor,
 	gpuMi,
 	gpuLm, gpuLm.fit, gpuLsfit, gpuGlm, gpuGlm.fit,
 	chooseGpu, getGpuId)
+
+importFrom("stats",
+  ".getXlevels",
+  "as.dist",
+  "complete.cases",
+  "gaussian",
+  "is.empty.model",
+  "model.extract",
+  "model.matrix",
+  "model.offset",
+  "model.response",
+  "model.weights")

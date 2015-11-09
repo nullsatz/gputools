@@ -12,7 +12,10 @@
 \title{Least squares fit using GPU--enabled QR decomposition}
 
 \usage{
-gpuLsfit(x, y, wt=NULL, intercept=TRUE, useSingle = TRUE, tolerance=gpuLm.defaultTol(useSingle), yname=NULL)
+gpuLsfit(x, y,
+  wt = NULL, intercept = TRUE, useSingle = TRUE,
+  tolerance=gpuLm.defaultTol(useSingle),
+  yname = NULL)
 }
 
 \description{
