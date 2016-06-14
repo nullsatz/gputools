@@ -8,7 +8,10 @@ AC_ARG_WITH([nvcc],
     [NVCC="$withval"])
 if test -z "${NVCC}"; then
   AC_MSG_RESULT("environment variable NVCC not set")
-  AC_CHECK_PROG([NVCC], [nvcc], [nvcc], [/usr/local/cuda/bin/nvcc])
+  AC_PATH_PROG(NVCC, nvcc, "no")
+  AS_IF([test "x$NVCC" = "xno"],[
+    AC_MSG_ERROR([NVCC compiler not found!])
+  ])
 fi
 CUDA_BIN_DIR=`AS_DIRNAME(["$NVCC"])`
 AC_MSG_RESULT("using NVCC=${NVCC}")
