@@ -29,7 +29,7 @@ $(TARGETS): $(OBJS)
 	$(NVCC) -shared $(RPATH) $(LDFLAGS) $(LIBS) $(OBJS) -o $@
 
 $(OBJS): %.o: %.cu
-	$(NVCC) -c -Xcompiler "$(CPICFLAGS) $(CPPFLAGS) $(CFLAGS)" $(INCLUDES) $^ -o $@
+	$(NVCC) -c -Xcompiler "$(CPICFLAGS) $(CPPFLAGS) $(CFLAGS)" -D_FORCE_INLINES $(INCLUDES) $^ -o $@
 
 clean:
 	rm -rf *o
