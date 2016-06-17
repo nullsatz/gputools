@@ -1,50 +1,60 @@
-AC_INIT([gputools], 0.3)
+AC_INIT([gputools], 1.1)
 AC_CONFIG_AUX_DIR([tools])
-
-AC_MSG_CHECKING("CUDA compiler")
-AC_ARG_WITH([nvcc],
-  AC_HELP_STRING([--with-nvcc=nvcc],
-    [specify a CUDA compiler, e.g. /usr/local/cuda/bin/nvcc]),
-    [NVCC="$withval"])
-if test -z "${NVCC}"; then
-  AC_MSG_RESULT("environment variable NVCC not set")
-  AC_PATH_PROG(NVCC, nvcc, "no")
-  AS_IF([test "x$NVCC" = "xno"],[
-    AC_MSG_ERROR([NVCC compiler not found!])
-  ])
-fi
-CUDA_BIN_DIR=`AS_DIRNAME(["$NVCC"])`
-AC_MSG_RESULT("using NVCC=${NVCC}")
-
-AC_MSG_CHECKING("root of the CUDA install directory")
-AC_ARG_WITH([cuda],
-  AC_HELP_STRING([--with-cuda=cuda],
-    [specify the root of your cuda install, e.g. /usr/local/cuda]),
-    [CUDA_HOME="$withval"])
-if test -z "${CUDA_HOME}"; then
-  AC_MSG_RESULT("environment variable CUDA_HOME not set")
-  CUDA_HOME=`AS_DIRNAME(["$CUDA_BIN_DIR"])`
-fi
-AC_MSG_RESULT("using CUDA_HOME=${CUDA_HOME}")
-
-AC_MSG_CHECKING("location of CUDA libraries")
-AC_CHECK_FILE(["${CUDA_HOME}/lib/libcublas.so"],[CUDA_LIB="${CUDA_HOME}/lib"],[CUDA_LIB=""])
-if test -z "${CUDA_LIB}"; then
-  AC_CHECK_FILE(["${CUDA_HOME}/lib64/libcublas.so"],[CUDA_LIB="${CUDA_HOME}/lib64"],[CUDA_LIB=""])
-fi
-if test -z "${CUDA_LIB}"; then
-  AC_CHECK_FILE(["${CUDA_HOME}/lib/libcublas.dylib"],[CUDA_LIB="${CUDA_HOME}/lib"],[CUDA_LIB=""])
-fi
-if test -z "${CUDA_LIB}"; then
-  AC_CHECK_FILE(["${CUDA_HOME}/lib64/libcublas.dylib"],[CUDA_LIB="${CUDA_HOME}/lib64"],[CUDA_LIB=""])
-fi
-
-AC_MSG_CHECKING("R")
 
 AC_ARG_WITH([r],
   AC_HELP_STRING([--with-r=r],
     [specify the full path to the root of the R install directory, e.g. /usr/lib64/R]),
     [R_HOME="$withval"])
+
+AC_ARG_WITH([r-include],
+  AC_HELP_STRING([--with-r-include=r-include],
+    [specify the full path to your R header files, e.g. /usr/share/R/include]),
+    [R_INCLUDE="$withval"])
+
+AC_ARG_WITH([r-lib],
+  AC_HELP_STRING([--with-r-lib=r-lib],
+    [specify the full path to your R shared libraries, e.g. /usr/lib64/R/lib]),
+    [R_LIB="$withval"])
+
+AC_ARG_WITH([cuda],
+  AC_HELP_STRING([--with-cuda=cuda],
+    [specify the root of your cuda install, e.g. /usr/local/cuda]),
+    [CUDA_HOME="$withval"])
+
+AC_ARG_WITH([nvcc],
+  AC_HELP_STRING([--with-nvcc=nvcc],
+    [specify a CUDA compiler, e.g. /usr/local/cuda/bin/nvcc]),
+    [NVCC="$withval"])
+
+AC_ARG_WITH([cuda-include],
+  AC_HELP_STRING([--with-cuda-include=cuda-include],
+    [specify the location of the CUDA header files, e.g. /usr/local/cuda/include]),
+    [CUDA_INCLUDE="$withval"])
+
+AC_ARG_WITH([cuda-lib],
+  AC_HELP_STRING([--with-cuda-lib=cuda-lib],
+    [specify the location of the CUDA shared libraries, e.g. /usr/local/cuda/lib64]),
+    [CUDA_LIB="$withval"])
+
+AC_MSG_CHECKING("the cuda compiler nvcc")
+AC_PATH_PROG([NVCC], [nvcc],
+             ["no"],
+             [$PATH$PATH_SEPARATOR/usr/local/cuda/bin$PATH_SEPARATOR$CUDA_HOME/bin])
+AS_IF([test "x$NVCC" = "xno"],
+      [AC_MSG_ERROR(["NVCC compiler not found! Try --with-nvcc=/usr/local/cuda/bin/nvcc"])
+
+AS_IF([test "x$R_INCLUDE" != "x"],
+      [EXTRA_INCLUDE=" -I${R_INCLUDE} "])
+AS_IF([test "x$R_LIB" != "x"],
+      [EXTRA_LIB=" -L${R_LIB} "])
+
+AS_IF([test "x$CUDA_INCLUDE" != "x"],
+      [EXTRA_INCLUDE=" -I${CUDA_INCLUDE} "])
+AS_IF([test "x$CUDA_LIB" != "x"],
+      [EXTRA_LIB=" -L${CUDA_LIB} "])
+
+AC_MSG_CHECKING("R")
+
 if test -z "${R_HOME}"; then
   : ${R_HOME=`R RHOME`}
   if test -z "${R_HOME}"; then
@@ -54,19 +64,11 @@ if test -z "${R_HOME}"; then
 fi
 AC_MSG_RESULT("using ${R_HOME} for the root of the R install directory")
 
-AC_ARG_WITH([r-include],
-  AC_HELP_STRING([--with-r-include=r-include],
-    [specify the full path to your R header files, e.g. /usr/share/R/include]),
-    [R_INCLUDE="$withval"])
 if test -z "${R_INCLUDE}"; then
   R_INCLUDE="${R_HOME}/include"
 fi
 AC_MSG_RESULT("using ${R_INCLUDE} for R header files")
 
-AC_ARG_WITH([r-lib],
-  AC_HELP_STRING([--with-r-lib=r-lib],
-    [specify the full path to your R shared libraries, e.g. /usr/lib64/R/lib]),
-    [R_LIB="$withval"])
 if test -n "${R_LIB}"; then
   AC_MSG_RESULT("using ${R_LIB} for R shared libraries")
   R_LIB="-L\"${R_LIB}\" -lR"
@@ -117,13 +119,17 @@ case $host_os in
     ;;
 esac
 
-AC_SUBST(NVCC)
-AC_SUBST(CUDA_HOME)
-AC_SUBST(CUDA_LIB)
-
 AC_SUBST(R_HOME)
 AC_SUBST(R_INCLUDE)
 AC_SUBST(R_LIB)
+
+AC_SUBST(NVCC)
+AC_SUBST(CUDA_HOME)
+AC_SUBST(CUDA_INCLUDE)
+AC_SUBST(CUDA_LIB)
+
+AC_SUBST(EXTRA_INCLUDES)
+AC_SUBST(EXTRA_LIBS)
 
 AC_SUBST(CC)
 AC_SUBST(CFLAGS)

@@ -18,8 +18,8 @@ RPATH = @RPATH@
 LDFLAGS = @LDFLAGS@
 
 #compiler/preprocessor options
-INCLUDES = -I. -I"$(CUDA_INCLUDE)" -I"$(R_INCLUDE)"
-LIBS = -L"$(CUDA_LIB)" -lcublas $(R_LIB)
+INCLUDES = -I. -I"$(CUDA_INCLUDE)" -I"$(R_INCLUDE)" @EXTRA_INCLUDES@
+LIBS = -L"$(CUDA_LIB)" -lcublas $(R_LIB) @EXTRA_LIBS@
 
 TARGETS = gputools.so
 
