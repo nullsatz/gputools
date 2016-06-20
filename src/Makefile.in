@@ -1,35 +1,31 @@
 OBJS = rinterface.o mi.o sort.o granger.o qrdecomp.o correlation.o hcluster.o distance.o matmult.o lsfit.o kendall.o cuseful.o
 
 NVCC = @NVCC@
-CUDA_HOME = @CUDA_HOME@
-CUDA_INCLUDE = $(CUDA_HOME)/include
-CUDA_LIB = @CUDA_LIB@
 
-R_HOME = @R_HOME@
-R_INCLUDE = @R_INCLUDE@
-R_LIB = @R_LIB@
-
-CC = @CC@
-CFLAGS = @CFLAGS@
-CPPFLAGS = @CPPFLAGS@
 CPICFLAGS = @CPICFLAGS@
-
 RPATH = @RPATH@
-LDFLAGS = @LDFLAGS@
 
 #compiler/preprocessor options
-INCLUDES = -I. -I"$(CUDA_INCLUDE)" -I"$(R_INCLUDE)" @EXTRA_INCLUDES@
-LIBS = -L"$(CUDA_LIB)" -lcublas $(R_LIB) @EXTRA_LIBS@
+EXTRA_INCLUDES = @EXTRA_INCLUDES@
+EXTRA_LIBS = @EXTRA_LIBS@
+
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@
+
+EXTRA_CFLAGS = @EXTRA_CFLAGS@
+EXTRA_CPPFLAGS = @EXTRA_CPPFLAGS@
+
+EXTRA_LDFLAGS = @EXTRA_LDFLAGS@
 
 TARGETS = gputools.so
 
 all: $(TARGETS) 
 
 $(TARGETS): $(OBJS)
-	$(NVCC) -shared $(RPATH) $(LDFLAGS) $(LIBS) $(OBJS) -o $@
+	$(NVCC) -shared $(RPATH) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LIBS) $(EXTRA_LIBS) $(OBJS) -o $@
 
 $(OBJS): %.o: %.cu
-	$(NVCC) -c -Xcompiler "$(CPICFLAGS) $(CPPFLAGS) $(CFLAGS)" -D_FORCE_INLINES $(INCLUDES) $^ -o $@
+	$(NVCC) -c -Xcompiler "$(CPICFLAGS) $(CPPFLAGS) $(EXTRA_CPPFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)" -D_FORCE_INLINES -I. $(INCLUDES) $(EXTRA_INCLUDES) $^ -o $@
 
 clean:
 	rm -rf *o
