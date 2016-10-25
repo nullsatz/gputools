@@ -1,9 +1,10 @@
 Package: gputools
-Version: 1.0
+Version: 1.1
 Title: A Few GPU Enabled Functions
 Authors@R: c(person("Josh", "Buckner", email = "nullsatz@gmail.com",
                     role = c("aut", "cre")),
   person("Mark", "Seligman", email = "mseligman@suiji.org", role = "aut"),
+  person("Fan", "Meng", email = "mengf@umich.edu", role = "aut"),
   person("Justin", "Wilson", role = "ctb"))
 Depends: R (>= 3.0.0)
 SystemRequirements: Nvidia's CUDA toolkit (>= release 5.0)
