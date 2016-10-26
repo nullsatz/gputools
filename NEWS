@@ -1,6 +1,11 @@
 gputools changes
 =================
 
+changes in gputools 1.1
+- this is a point release intended to trial cuda run-time compilation (nvrtc)
+  it is only used for the kendall correlation option of gpuCor
+  but nvrtc will be used for all cuda kernel code in future releases
+
 changes in gputools 0.5
 - switched back to autotools options
 
