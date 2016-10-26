@@ -62,13 +62,7 @@ void masterKendall(const float * x,  size_t nx,
         NULL,                    // headers
         NULL));                  // includeNames
 
-  // Compile the program for compute_30
-  const char *opts[] =
-    { "--gpu-architecture=compute_30"
-    };
-  nvrtcResult compileResult = nvrtcCompileProgram(prog, // prog
-      1,     // numOptions
-      opts); // options
+  nvrtcResult compileResult = nvrtcCompileProgram(prog, 0, NULL);
   if (compileResult != NVRTC_SUCCESS) error("cuda kernel compile failed");
 
   //  Obtain PTX from the program.
@@ -82,15 +76,18 @@ void masterKendall(const float * x,  size_t nx,
   NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
 
   //  Load the generated PTX and get a handle to the SAXPY kernel.
-  CUdevice cuDevice;
-  CUcontext context;
-  CUmodule module;
-  CUfunction kernel;
+//  CUdevice cuDevice;
+//  CUcontext context;
 
   CUDA_SAFE_CALL(cuInit(0));
-  CUDA_SAFE_CALL(cuDeviceGet(&cuDevice, 0));
-  CUDA_SAFE_CALL(cuCtxCreate(&context, 0, cuDevice));
+
+//  CUDA_SAFE_CALL(cuDeviceGet(&cuDevice, 0));
+//  CUDA_SAFE_CALL(cuCtxCreate(&context, 0, cuDevice));
+
+  CUmodule module;
   CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
+
+  CUfunction kernel;
   CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, "gpuKendall"));
 
   // execute kendall kernel
@@ -118,5 +115,5 @@ void masterKendall(const float * x,  size_t nx,
   checkCudaError("copying results from gpu and cleaning up");
 
   CUDA_SAFE_CALL(cuModuleUnload(module));
-  CUDA_SAFE_CALL(cuCtxDestroy(context));
+//  CUDA_SAFE_CALL(cuCtxDestroy(context));
 }
