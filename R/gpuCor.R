@@ -12,7 +12,7 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
 
 	n <- nx * ny
 
-    methods <- c("pearson", "kendall")
+  methods <- c("pearson", "kendall")
 	method <- pmatch(method, methods, -1)
 	if(is.na(method)) {
 		stop("invalid correlation method")
@@ -49,9 +49,14 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
 			warning("NA handling for Kendall's is not yet supported. Defaulting to using everything. Sorry for any inconvenience.")
 		}
 
+    filename <- system.file("cuda", 'kendall.cu', package = 'gputools')
+    kernel_src <- readChar(filename, file.info(filename)$size)
+
 		a <- .C("RgpuKendall",
 			as.single(x), nx, as.single(y), ny, 
-			size, result = double(nx*ny), PACKAGE = "gputools")
+			size, result = double(nx*ny),
+      kernel_src,
+      PACKAGE = "gputools")
 
 		pairs <- matrix(size, nx, ny)
 		return(list(coefficients = matrix(a$result, nx, ny), pairs = pairs))

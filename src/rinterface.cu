@@ -120,9 +120,10 @@ void RpermHostKendall(const float * X, const int * nx, const float * Y,
 }
 
 void RgpuKendall(const float * X, const int * nx, const float * Y, 
-	const int * ny, const int * sampleSize, double * answers)
+                 const int * ny, const int * sampleSize, double * answers,
+                 const char ** kernel_src)
 {
-	masterKendall(X, *nx, Y, *ny, *sampleSize, answers);
+  masterKendall(X, *nx, Y, *ny, *sampleSize, answers, kernel_src[0]);
 }
 /*
 void dlr(const int * numParams, const int * numObs, const float * obs,

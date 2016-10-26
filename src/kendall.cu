@@ -1,58 +1,34 @@
-#include<cuseful.h>
-#include<kendall.h>
+#include "cuseful.h"
+#include "R.h"
+#include "kendall.h"
+#include "nvrtc.h"
+#include "cuda.h"
 
 #define NUMTHREADS 16
-#define THREADWORK 32
 
-__global__ void gpuKendall(const float * a, size_t na, 
-	const float * b, size_t nb, size_t sampleSize, double * results) 
-{
-	size_t 
-		i, j, tests, 
-		tx = threadIdx.x, ty = threadIdx.y, 
-		bx = blockIdx.x, by = blockIdx.y,
-		rowa = bx * sampleSize, rowb = by * sampleSize;
-	float 
-		discordant, concordant = 0.f, 
-		numer, denom;
+#define NVRTC_SAFE_CALL(x)                                        \
+  do {                                                            \
+    nvrtcResult result = x;                                       \
+    if (result != NVRTC_SUCCESS) {                                \
+      error("\nerror: %d failed with error %s\n", x,              \
+            nvrtcGetErrorString(result));                         \
+    }                                                             \
+  } while(0)
 
-	__shared__ float threadSums[NUMTHREADS*NUMTHREADS];
+#define CUDA_SAFE_CALL(x)                                         \
+  do {                                                            \
+    CUresult result = x;                                          \
+    if (result != CUDA_SUCCESS) {                                 \
+      const char *msg;                                            \
+      cuGetErrorName(result, &msg);                               \
+      error("\nerror: %d failed with error %s\n", x, msg);        \
+    }                                                             \
+  } while(0)
 
-	for(i = tx; i < sampleSize; i += NUMTHREADS) {
-		for(j = i+1+ty; j < sampleSize; j += NUMTHREADS) {
-			tests = ((a[rowa+j] >  a[rowa+i]) && (b[rowb+j] >  b[rowb+i]))
-				+ ((a[rowa+j] <  a[rowa+i]) && (b[rowb+j] <  b[rowb+i])) 
-				+ ((a[rowa+j] == a[rowa+i]) && (b[rowb+j] == b[rowb+i])); 
-			concordant = concordant + (float)tests;
-		}
-	}
-	threadSums[tx*NUMTHREADS+ty] = concordant;
-
-	__syncthreads();
-	for(i = NUMTHREADS >> 1; i > 0; i >>= 1) {
-		if(ty < i) 
-			threadSums[tx*NUMTHREADS+ty] += threadSums[tx*NUMTHREADS+ty+i];
-		__syncthreads();
-	}
-	// if(ty == 0) {
-		for(i = NUMTHREADS >> 1; i > 0; i >>= 1) {
-			if((tx < i) && (ty == 0))
-				threadSums[tx*NUMTHREADS] += threadSums[(tx+i)*NUMTHREADS];
-			__syncthreads();
-		}
-	// }
-
-	if((tx == 0) && (ty == 0)) {
-		concordant = threadSums[0];
-		denom = (float)sampleSize;
-		denom = (denom * (denom - 1.f)) / 2.f; discordant = denom - concordant;
-		numer = concordant - discordant;
-		results[by*na+bx] = ((double)numer)/((double)denom);
-	}
-}
-
-__host__ void masterKendall(const float * x,  size_t nx, 
-	const float * y, size_t ny, size_t sampleSize, double * results) 
+void masterKendall(const float * x,  size_t nx, 
+  const float * y, size_t ny,
+  size_t sampleSize, double * results,
+  const char * kernel_src)
 {
 	size_t 
 		outputLength = nx * ny, outputBytes = outputLength*sizeof(double),
@@ -65,8 +41,6 @@ __host__ void masterKendall(const float * x,  size_t nx,
 	dim3
 		initGrid(nx, ny), initBlock(NUMTHREADS, NUMTHREADS);
 
-	checkDoubleCapable("Your device doesn't support double precision arithmetic, so the Kendall functionality is disabled.  Sorry for any inconvenience.");
-
 	cudaMalloc((void **)&gpux, xBytes);
 	cudaMalloc((void **)&gpuy, yBytes);
 	checkCudaError("input vector space allocation");
@@ -78,12 +52,71 @@ __host__ void masterKendall(const float * x,  size_t nx,
 	cudaMalloc((void **)&gpuResults, outputBytes);
 	checkCudaError("allocation of space for result matrix");
 
-	gpuKendall<<<initGrid, initBlock>>>(gpux, nx, gpuy, ny, sampleSize, 
-		gpuResults);
-	checkCudaError("executing gpu kernel");
+  nvrtcProgram prog;
 
-	cudaFree(gpux); cudaFree(gpuy);
-	cudaMemcpy(results, gpuResults, outputBytes, cudaMemcpyDeviceToHost);
-	cudaFree(gpuResults);
-	checkCudaError("copying results from gpu and cleaning up");
+  NVRTC_SAFE_CALL(
+      nvrtcCreateProgram(&prog,  // prog
+        kernel_src,              // buffer
+        "kendall",               // name
+        0,                       // numHeaders
+        NULL,                    // headers
+        NULL));                  // includeNames
+
+  // Compile the program for compute_30
+  const char *opts[] =
+    { "--gpu-architecture=compute_30"
+    };
+  nvrtcResult compileResult = nvrtcCompileProgram(prog, // prog
+      1,     // numOptions
+      opts); // options
+  if (compileResult != NVRTC_SUCCESS) error("cuda kernel compile failed");
+
+  //  Obtain PTX from the program.
+  size_t ptxSize;
+  NVRTC_SAFE_CALL(nvrtcGetPTXSize(prog, &ptxSize));
+
+  char *ptx = new char[ptxSize];
+  NVRTC_SAFE_CALL(nvrtcGetPTX(prog, ptx));
+
+  //  Destroy the program.
+  NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
+
+  //  Load the generated PTX and get a handle to the SAXPY kernel.
+  CUdevice cuDevice;
+  CUcontext context;
+  CUmodule module;
+  CUfunction kernel;
+
+  CUDA_SAFE_CALL(cuInit(0));
+  CUDA_SAFE_CALL(cuDeviceGet(&cuDevice, 0));
+  CUDA_SAFE_CALL(cuCtxCreate(&context, 0, cuDevice));
+  CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
+  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, "gpuKendall"));
+
+  // execute kendall kernel
+  void *args[] =
+    { &gpux
+    , &nx
+    , &gpuy
+    , &ny
+    , &sampleSize
+    , &gpuResults
+    };
+
+  CUDA_SAFE_CALL(
+    cuLaunchKernel(kernel,
+      nx, ny, 1,                  // grid dim
+      NUMTHREADS, NUMTHREADS, 1,  // block dim
+      0, NULL,                    // shared mem and stream
+      args, 0));                  // arguments
+  CUDA_SAFE_CALL(cuCtxSynchronize());
+
+  cudaFree(gpux);
+  cudaFree(gpuy);
+  cudaMemcpy(results, gpuResults, outputBytes, cudaMemcpyDeviceToHost);
+  cudaFree(gpuResults);
+  checkCudaError("copying results from gpu and cleaning up");
+
+  CUDA_SAFE_CALL(cuModuleUnload(module));
+  CUDA_SAFE_CALL(cuCtxDestroy(context));
 }

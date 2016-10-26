@@ -35,4 +35,5 @@ void permHostKendall(const float * a, size_t na, const float * b, size_t nb,
 	size_t sampleSize, double * results);
 
 void masterKendall(const float * x,  size_t nx, const float * y, size_t ny, 
-	size_t sampleSize, double * results);
+                   size_t sampleSize, double * results,
+                   const char * kernel_code);

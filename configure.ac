@@ -72,7 +72,7 @@ AS_IF([test "x$R_LIB" != "x"],
 AS_IF([test "x$CUDA_INCLUDE" != "x"],
       [EXTRA_INCLUDES="${EXTRA_INCLUDES} -I${CUDA_INCLUDE} "])
 AS_IF([test "x$CUDA_LIB" != "x"],
-      [EXTRA_LIBS="${EXTRA_LIBS} -L${CUDA_LIB} -lcublas "])
+      [EXTRA_LIBS="${EXTRA_LIBS} -L${CUDA_LIB} -lcublas -lnvrtc -lcuda "])
 
 AC_MSG_CHECKING([for rpath flag style])
 AC_PROG_CC([cc cl gcc])
@@ -124,7 +124,7 @@ esac
 EXTRA_LDFLAGS="${RPATH} ${DARWIN_LDFLAGS} ${EXTRA_LDFLAGS}"
 
 if test "x$CUDA_LIB" = "x"; then
-  EXTRA_LIBS="${EXTRA_LIBS} -lcublas"
+  EXTRA_LIBS="${EXTRA_LIBS} -lcublas -lnvrtc -lcuda "
 fi
 
 AC_SUBST(NVCC)
