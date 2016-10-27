@@ -3,27 +3,9 @@
 #include "kendall.h"
 #include "nvrtc.h"
 #include "cuda.h"
+#include "cudaUtils.h"
 
 #define NUMTHREADS 16
-
-#define NVRTC_SAFE_CALL(x)                                        \
-  do {                                                            \
-    nvrtcResult result = x;                                       \
-    if (result != NVRTC_SUCCESS) {                                \
-      error("\nerror: %d failed with error %s\n", x,              \
-            nvrtcGetErrorString(result));                         \
-    }                                                             \
-  } while(0)
-
-#define CUDA_SAFE_CALL(x)                                         \
-  do {                                                            \
-    CUresult result = x;                                          \
-    if (result != CUDA_SUCCESS) {                                 \
-      const char *msg;                                            \
-      cuGetErrorName(result, &msg);                               \
-      error("\nerror: %d failed with error %s\n", x, msg);        \
-    }                                                             \
-  } while(0)
 
 void masterKendall(const float * x,  size_t nx, 
   const float * y, size_t ny,
@@ -52,45 +34,6 @@ void masterKendall(const float * x,  size_t nx,
 	cudaMalloc((void **)&gpuResults, outputBytes);
 	checkCudaError("allocation of space for result matrix");
 
-  nvrtcProgram prog;
-
-  NVRTC_SAFE_CALL(
-      nvrtcCreateProgram(&prog,  // prog
-        kernel_src,              // buffer
-        "kendall",               // name
-        0,                       // numHeaders
-        NULL,                    // headers
-        NULL));                  // includeNames
-
-  nvrtcResult compileResult = nvrtcCompileProgram(prog, 0, NULL);
-  if (compileResult != NVRTC_SUCCESS) error("cuda kernel compile failed");
-
-  //  Obtain PTX from the program.
-  size_t ptxSize;
-  NVRTC_SAFE_CALL(nvrtcGetPTXSize(prog, &ptxSize));
-
-  char *ptx = new char[ptxSize];
-  NVRTC_SAFE_CALL(nvrtcGetPTX(prog, ptx));
-
-  //  Destroy the program.
-  NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
-
-  //  Load the generated PTX and get a handle to the SAXPY kernel.
-//  CUdevice cuDevice;
-//  CUcontext context;
-
-  CUDA_SAFE_CALL(cuInit(0));
-
-//  CUDA_SAFE_CALL(cuDeviceGet(&cuDevice, 0));
-//  CUDA_SAFE_CALL(cuCtxCreate(&context, 0, cuDevice));
-
-  CUmodule module;
-  CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
-
-  CUfunction kernel;
-  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, "gpuKendall"));
-
-  // execute kendall kernel
   void *args[] =
     { &gpux
     , &nx
@@ -99,21 +42,15 @@ void masterKendall(const float * x,  size_t nx,
     , &sampleSize
     , &gpuResults
     };
-
-  CUDA_SAFE_CALL(
-    cuLaunchKernel(kernel,
-      nx, ny, 1,                  // grid dim
-      NUMTHREADS, NUMTHREADS, 1,  // block dim
-      0, NULL,                    // shared mem and stream
-      args, 0));                  // arguments
-  CUDA_SAFE_CALL(cuCtxSynchronize());
+  int
+    gridDim[3] = {nx, ny, 1},
+    blockDim[3] = {NUMTHREADS, NUMTHREADS, 1};
+  cudaCompileLaunch(kernel_src, "gpuKendall", args,
+      gridDim, blockDim); 
 
   cudaFree(gpux);
   cudaFree(gpuy);
   cudaMemcpy(results, gpuResults, outputBytes, cudaMemcpyDeviceToHost);
   cudaFree(gpuResults);
   checkCudaError("copying results from gpu and cleaning up");
-
-  CUDA_SAFE_CALL(cuModuleUnload(module));
-//  CUDA_SAFE_CALL(cuCtxDestroy(context));
 }
