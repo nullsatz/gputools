@@ -110,11 +110,12 @@ if test "x$RPATH_FLAG" = "xnone"; then
   RPATH=""
 fi
 fi
-
+ 
 AC_CANONICAL_HOST
 case $host_os in
   darwin* )
     DARWIN_LDFLAGS=`R CMD config --ldflags`
+    DARWIN_LDFLAGS="-Xlinker \"${DARWIN_LDFLAGS} -framework CUDA\""
     ;;
   *)
     DARWIN_LDFLAGS=""
