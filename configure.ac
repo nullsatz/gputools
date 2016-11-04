@@ -98,24 +98,25 @@ EXTRA_CPPFLAGS=`"${R_HOME}/bin/R" CMD config CPPFLAGS`
 
 RPATH=""
 if test "x$CUDA_LIB" != "x"; then
+
 if test "x$RPATH_FLAG" = "xgnu"; then
-  RPATH="-rpath=\"${CUDA_LIB}\""
+  RPATH="-rpath=${CUDA_LIB}"
 fi
 
 if test "x$RPATH_FLAG" = "xllvm"; then
-  RPATH="-rpath,\"${CUDA_LIB}\""
+  RPATH="-rpath ${CUDA_LIB}"
 fi
 
 if test "x$RPATH_FLAG" = "xnone"; then
   RPATH=""
 fi
+
 fi
  
 AC_CANONICAL_HOST
 case $host_os in
   darwin* )
-    DARWIN_LDFLAGS=`R CMD config --ldflags`
-    DARWIN_LDFLAGS="-Xlinker \"${DARWIN_LDFLAGS} -framework CUDA\""
+    DARWIN_LDFLAGS="`R CMD config --ldflags` -framework CUDA"
     ;;
   *)
     DARWIN_LDFLAGS=""
@@ -125,8 +126,19 @@ esac
 EXTRA_LDFLAGS="${RPATH} ${DARWIN_LDFLAGS} ${EXTRA_LDFLAGS}"
 
 if test "x$CUDA_LIB" = "x"; then
-  EXTRA_LIBS="${EXTRA_LIBS} -lcublas -lnvrtc -lcuda "
+  cuda_dir=`AS_DIRNAME(["$NVCC"])`
+  cuda_dir=`AS_DIRNAME(["$cuda_dir"])`
+  AC_CHECK_FILE(["$cuda_dir/lib"],
+                [CUDA_LIB="-L${cuda_dir}/lib"])
+  if test "x${CUDA_LIB}" = "x"; then
+    AC_CHECK_FILE(["$cuda_dir/lib64"],
+                  [CUDA_LIB="-L${cuda_dir}/lib64"])
+  else
+    AC_CHECK_FILE(["$cuda_dir/lib64"],
+                  [CUDA_LIB="${CUDA_LIB} -L${cuda_dir}/lib64"])
+  fi
 fi
+EXTRA_LIBS="${EXTRA_LIBS} ${CUDA_LIB} -lcublas -lnvrtc -lcuda "
 
 AC_SUBST(NVCC)
 

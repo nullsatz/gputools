@@ -22,7 +22,7 @@ TARGETS = gputools.so
 all: $(TARGETS) 
 
 $(TARGETS): $(OBJS)
-	$(NVCC) -shared $(RPATH) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LIBS) $(EXTRA_LIBS) $(OBJS) -o $@
+	$(NVCC) -shared -Xlinker "$(RPATH) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LIBS) $(EXTRA_LIBS)" $(OBJS) -o $@
 
 $(OBJS): %.o: %.cu
 	$(NVCC) -c -Xcompiler "$(CPICFLAGS) $(CPPFLAGS) $(EXTRA_CPPFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)" -D_FORCE_INLINES -I. $(INCLUDES) $(EXTRA_INCLUDES) $^ -o $@
