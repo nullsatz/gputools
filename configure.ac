@@ -96,6 +96,15 @@ CPICFLAGS=`"${R_HOME}/bin/R" CMD config CPICFLAGS`
 EXTRA_CFLAGS=`"${R_HOME}/bin/R" CMD config CFLAGS`
 EXTRA_CPPFLAGS=`"${R_HOME}/bin/R" CMD config CPPFLAGS`
 
+if test "x$CUDA_LIB" = "x"; then
+  cuda_dir=`AS_DIRNAME(["$NVCC"])`
+  cuda_dir=`AS_DIRNAME(["$cuda_dir"])`
+  AC_CHECK_FILE(["$cuda_dir/lib"],
+                [CUDA_LIB="${cuda_dir}/lib"])
+  AC_CHECK_FILE(["$cuda_dir/lib64"],
+                [CUDA_LIB="${cuda_dir}/lib64"])
+fi
+
 RPATH=""
 if test "x$CUDA_LIB" != "x"; then
 
@@ -123,22 +132,8 @@ case $host_os in
     ;;
 esac
 
-EXTRA_LDFLAGS="${RPATH} ${DARWIN_LDFLAGS} ${EXTRA_LDFLAGS}"
-
-if test "x$CUDA_LIB" = "x"; then
-  cuda_dir=`AS_DIRNAME(["$NVCC"])`
-  cuda_dir=`AS_DIRNAME(["$cuda_dir"])`
-  AC_CHECK_FILE(["$cuda_dir/lib"],
-                [CUDA_LIB="-L${cuda_dir}/lib"])
-  if test "x${CUDA_LIB}" = "x"; then
-    AC_CHECK_FILE(["$cuda_dir/lib64"],
-                  [CUDA_LIB="-L${cuda_dir}/lib64"])
-  else
-    AC_CHECK_FILE(["$cuda_dir/lib64"],
-                  [CUDA_LIB="${CUDA_LIB} -L${cuda_dir}/lib64"])
-  fi
-fi
-EXTRA_LIBS="${EXTRA_LIBS} ${CUDA_LIB} -lcublas -lnvrtc -lcuda "
+EXTRA_LDFLAGS="${DARWIN_LDFLAGS} ${EXTRA_LDFLAGS}"
+EXTRA_LIBS="${EXTRA_LIBS} -L${CUDA_LIB} -lcublas -lnvrtc -lcuda "
 
 AC_SUBST(NVCC)
 
