@@ -8,13 +8,6 @@
 
 #define NUM_THREADS 32
 
-// Space for the vector data
-__constant__ float * distance_vg_a_d;
-__constant__ float * distance_vg_b_d;
-
-// Space for the resulting distance
-__device__ float * distance_d_d;
-
 __global__ void euclidean_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
 				 const float * vg_b, size_t pitch_b, size_t n_b,
 				 size_t k,
@@ -823,7 +816,14 @@ void distance(const float * vg_a, size_t pitch_a, size_t n_a,
 		pitch_a_d, pitch_b_d, pitch_d_d;
 	int same = (vg_a == vg_b); // are the two sets of vectors the same?
 
-   	// Allocate space for the vectors and distances on the gpu
+  // Space for the vector data
+  float * distance_vg_a_d;
+  float * distance_vg_b_d;
+
+  // Space for the resulting distance
+  float * distance_d_d;
+
+  // Allocate space for the vectors and distances on the gpu
 	cudaMallocPitch((void**)&distance_vg_a_d, &pitch_a_d, k * sizeof(float), 
 		n_a);
 	cudaMemcpy2D(distance_vg_a_d, pitch_a_d, vg_a, pitch_a, k * sizeof(float), 
@@ -847,6 +847,7 @@ void distance(const float * vg_a, size_t pitch_a, size_t n_a,
 
 		distance_device(distance_vg_a_d, pitch_a_d, n_a, distance_vg_b_d, 
 			pitch_b_d, n_b, k, distance_d_d, pitch_d_d, method, p);
+	  cudaFree(distance_vg_b_d);
 	}
 	checkCudaError("distance function : kernel invocation");
 	// Copy the result back to cpu land now that gpu work is done
@@ -856,7 +857,6 @@ void distance(const float * vg_a, size_t pitch_a, size_t n_a,
     
 	// Free allocated space
 	cudaFree(distance_vg_a_d);
-	cudaFree(distance_vg_b_d);
 	cudaFree(distance_d_d);
 }
 
