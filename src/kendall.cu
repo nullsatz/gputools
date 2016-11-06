@@ -21,7 +21,7 @@ void masterKendall(const float * x,  size_t nx,
 	double
 		* gpuResults;
 	dim3
-		initGrid(nx, ny), initBlock(NUMTHREADS, NUMTHREADS);
+		grid(nx, ny), block(NUMTHREADS, NUMTHREADS);
 
 	cudaMalloc((void **)&gpux, xBytes);
 	cudaMalloc((void **)&gpuy, yBytes);
@@ -42,11 +42,8 @@ void masterKendall(const float * x,  size_t nx,
     , &sampleSize
     , &gpuResults
     };
-  int
-    gridDim[3] = {nx, ny, 1},
-    blockDim[3] = {NUMTHREADS, NUMTHREADS, 1};
   cudaCompileLaunch(kernel_src, "gpuKendall", args,
-      gridDim, blockDim); 
+      grid, block);
 
   cudaFree(gpux);
   cudaFree(gpuy);

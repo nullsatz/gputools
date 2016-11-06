@@ -30,9 +30,12 @@ void R_init_mylib(DllInfo *info) {
 
 // whichObs = 0 means everything
 // whichObs = 1 means pairwiseComplete
-void rpmcc(const int * whichObs, const float * samplesA, const int * numSamplesA,
-	const float * samplesB, const int * numSamplesB, const int * sampleSize,
-	float * numPairs, float * correlations, float * signifs)
+void rpmcc(const int * whichObs,
+           const float * samplesA, const int * numSamplesA,
+           const float * samplesB, const int * numSamplesB,
+           const int * sampleSize,
+           float * numPairs, float * correlations, float * signifs,
+           const char ** kernel_src)
 {
 	UseObs myObs;
 	switch(*whichObs) {
@@ -45,8 +48,12 @@ void rpmcc(const int * whichObs, const float * samplesA, const int * numSamplesA
 		default:
 			fatal("unknown use method");
 	}
-	pmcc(myObs, samplesA, *numSamplesA, samplesB, *numSamplesB, *sampleSize,
-		numPairs, correlations, signifs);
+	pmcc(myObs,
+             samplesA, *numSamplesA,
+             samplesB, *numSamplesB,
+             *sampleSize,
+             numPairs, correlations, signifs,
+             kernel_src[0]);
 }
 
 void rformatInput(const int * images, 
@@ -80,9 +87,9 @@ void rgetDevice(int * device) {
 }
 
 void rtestT(const float * pairs, const float * coeffs, const int * n, 
-	float * ts) 
+	float * ts, const char ** kernelSrc) 
 {
-	testSignif(pairs, coeffs, (size_t) *n, ts);
+	testSignif(pairs, coeffs, (size_t) *n, ts, kernelSrc[0]);
 }
 
 void rhostT(const float * pairs, const float * coeffs, const int * n, 
@@ -95,16 +102,18 @@ void rSignifFilter(const double * data, int * rows, double * results) {
 	*rows = signifFilter(data, (size_t) *rows, results);
 }
 
-void gSignifFilter(const float * data, int * rows, float * results) {
-	*rows = gpuSignifFilter(data, (size_t) *rows, results);
+void gSignifFilter(const float * data, int * rows, float * results,
+    const char ** kernelSrc) {
+	*rows = gpuSignifFilter(data, (size_t) *rows, results,
+      kernelSrc[0]);
 }
 
 void RcublasPMCC(const float * samplesA, const int * numSamplesA,
 	const float * samplesB, const int * numSamplesB, const int * sampleSize,
-	float * correlations)
+	float * correlations, const char ** kernelSrc)
 {
 	cublasPMCC(samplesA, *numSamplesA, samplesB, *numSamplesB, *sampleSize, 
-		correlations);
+		correlations, kernelSrc[0]);
 }
 
 void RhostKendall(const float * X, const float * Y, const int * n, 

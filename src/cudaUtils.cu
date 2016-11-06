@@ -3,8 +3,20 @@
 #include "cuda.h"
 #include "cudaUtils.h"
 
-void cudaCompileLaunch(const char * kernelSrc, const char * kernelName,
-    void * args[], int gridDim[3], int blockDim[3])
+// Obtain compilation log from the program.
+void printCompileLog(nvrtcProgram &prog) {
+  size_t logSize;
+  NVRTC_SAFE_CALL(nvrtcGetProgramLogSize(prog, &logSize));
+  char * log = new char[logSize];
+  NVRTC_SAFE_CALL(nvrtcGetProgramLog(prog, log));
+  warning(log);
+  delete[] log;
+}
+
+void cudaCompileLaunch(const char * kernelSrc,
+                       const char * kernelName,
+                       void * args[],
+                       const dim3 &gridDim, const dim3 &blockDim)
 {
   nvrtcProgram prog;
   NVRTC_SAFE_CALL(
@@ -16,7 +28,10 @@ void cudaCompileLaunch(const char * kernelSrc, const char * kernelName,
         NULL));                  // includeNames
 
   nvrtcResult compileResult = nvrtcCompileProgram(prog, 0, NULL);
-  if (compileResult != NVRTC_SUCCESS) error("cuda kernel compile failed");
+  if (compileResult != NVRTC_SUCCESS) {
+    printCompileLog(prog);
+    error("\ncuda kernel compile failed");
+  }
 
   //  Obtain PTX from the program.
   size_t ptxSize;
@@ -39,8 +54,8 @@ void cudaCompileLaunch(const char * kernelSrc, const char * kernelName,
 
   CUDA_SAFE_CALL(
     cuLaunchKernel(kernel,
-      gridDim[0], gridDim[1], gridDim[2],    // grid dim
-      blockDim[0], blockDim[1], blockDim[2], // block dim
+      gridDim.x, gridDim.y, gridDim.z,    // grid dim
+      blockDim.x, blockDim.y, blockDim.z, // block dim
       0, NULL,                    // shared mem and stream
       args, 0));                  // arguments
   CUDA_SAFE_CALL(cuCtxSynchronize());

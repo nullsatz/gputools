@@ -22,4 +22,4 @@
   } while(0)
 
 void cudaCompileLaunch(const char * kernelSrc, const char * kernelName,
-    void * args[], int gridDim[3], int blockDim[3]);
+    void * args[], const dim3 &gridDim, const dim3 &blockDim);
