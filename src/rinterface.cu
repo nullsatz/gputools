@@ -185,7 +185,8 @@ hc_method getClusterEnum(const char * methodStr)
 
 void Rdistclust(const char ** distmethod, const char ** clustmethod, 
 	const float * points, const int * numPoints, const int * dim,
-	int * merge, int * order, float * val)
+                int * merge, int * order, float * val,
+                const char ** kernelSrc)
 {
 	dist_method dmeth = getDistEnum(*distmethod); 
 	hc_method hcmeth = getClusterEnum(*clustmethod); 
@@ -194,7 +195,8 @@ void Rdistclust(const char ** distmethod, const char ** clustmethod,
 	float * gpuDistances = NULL;
 
 	distanceLeaveOnGpu(dmeth, 2.f, points, *dim, *numPoints, 
-		&gpuDistances, &dpitch);
+                           &gpuDistances, &dpitch,
+                           kernelSrc[0]);
 
 	size_t len = (*numPoints) - 1;
 	float 
@@ -215,13 +217,15 @@ void Rdistclust(const char ** distmethod, const char ** clustmethod,
 }
 
 void Rdistances(const float * points, const int * numPoints, const int * dim,
-	float * distances, const char ** method, const float *p)
+                float * distances, const char ** method, const float *p,
+                const char ** kernelSrc)
 {
 	dist_method nummethod = getDistEnum(*method); 
 
 	distance(points, (*dim)*sizeof(float), *numPoints, points, 
-		(*dim)*sizeof(float), *numPoints, *dim, distances, 
-		(*numPoints)*sizeof(float), nummethod, *p);
+                 (*dim)*sizeof(float), *numPoints, *dim, distances, 
+                 (*numPoints)*sizeof(float), nummethod, *p,
+                 kernelSrc[0]);
 }
 
 void Rhcluster(const float * distMat, const int * numPoints, 

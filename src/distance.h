@@ -29,7 +29,8 @@ void distance(const float * vg_a, size_t pitch_a, size_t n_a,
 	      size_t k,
 	      float * d, size_t pitch_d,
 	      dist_method method,
-	      float p = 2.0);
+	      float p,
+              const char * kernelSrc);
 
 /* This function should be used to calculate a distance matrix when 
  * the data is already stored on the GPU.  vg_a, vg_b, and
@@ -41,7 +42,8 @@ void distance_device(const float * vg_a, size_t pitch_a, size_t n_a,
 		     size_t k,
 		     float * d, size_t pitch_d,
 		     dist_method method,
-		     float p = 2.0);
+		     float p,
+                     const char * kernelSrc);
 
 /* This function is analogous to distance_device except that it
  * will run on a CPU.  Storage for d is not allocated in this function.
@@ -55,7 +57,8 @@ void distance_host(const float * vg_a, size_t pitch_a, size_t n_a,
 
 void distanceLeaveOnGpu(dist_method method, float p, const float * points, 
 	size_t dim, size_t numPoints, float ** gpuDistances, 
-	size_t * pitchDistances);
+                        size_t * pitchDistances,
+                        const char * kernelSrc);
 
 
 #endif // DISTANCE_H
