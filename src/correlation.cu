@@ -14,7 +14,7 @@
 #define NUMTHREADS 16
 #define THREADWORK 32
 
-__host__ void testSignif(const float * goodPairs, const float * coeffs, 
+void testSignif(const float * goodPairs, const float * coeffs, 
                          size_t n, float * tscores,
                          const char * kernelSrc)
 {
