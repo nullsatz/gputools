@@ -31,7 +31,7 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
     }
 
     if(methods[method] == "pearson") {
-        filename <- system.file("cuda", 'correlation.cu', package = 'gputools')
+        filename <- system.file('cuda', 'correlation.cu', package = 'gputools')
         kernelSrc <- readChar(filename, file.info(filename)$size)
 
         answer <- .C("rpmcc", NAOK=TRUE,

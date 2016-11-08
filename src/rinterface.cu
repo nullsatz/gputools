@@ -134,28 +134,20 @@ void RgpuKendall(const float * X, const int * nx, const float * Y,
 {
   masterKendall(X, *nx, Y, *ny, *sampleSize, answers, kernel_src[0]);
 }
-/*
-void dlr(const int * numParams, const int * numObs, const float * obs,
-	float * outcomes, float * coeffs, const float * epsilon, 
-	const float * ridge, const int * maxiter) {
 
-	logRegression(*numParams, *numObs, obs, outcomes, coeffs, *epsilon, 
-		*ridge, *maxiter);
-}
-*/
-void rgpuGranger(const int * rows, const int * cols, const float * y, 
-	const int * p, float * fStats, float * pValues)
+void rgpuGranger(const int * rows, const int * cols, const float * y,
+                 const int * p, float * fStats, float * pValues,
+                 const char ** kernelSrc)
 {
-
-	granger(*rows, *cols, y, *p, fStats, pValues);
+  granger(*rows, *cols, y, *p, fStats, pValues, kernelSrc[0]);
 }
 
 void rgpuGrangerXY(const int * rows, const int * colsx, const float * x, 
-	const int * colsy, const float * y, const int * p, 
-	float * fStats, float * pValues) 
+                   const int * colsy, const float * y, const int * p, 
+                   float * fStats, float * pValues,
+                   const char ** kernelSrc)
 {
-
-	grangerxy(*rows, *colsx, x, *colsy, y, *p, fStats, pValues);
+  grangerxy(*rows, *colsx, x, *colsy, y, *p, fStats, pValues, kernelSrc[0]);
 }
 
 dist_method getDistEnum(const char * methodStr)
@@ -163,7 +155,7 @@ dist_method getDistEnum(const char * methodStr)
 	if(0 == strcmp(methodStr,"maximum"))	return MAXIMUM;
 	if(0 == strcmp(methodStr,"manhattan"))	return MANHATTAN;
 	if(0 == strcmp(methodStr,"canberra"))	return CANBERRA;
-	if(0 == strcmp(methodStr,"binary"))		return BINARY;
+	if(0 == strcmp(methodStr,"binary"))     return BINARY;
 	if(0 == strcmp(methodStr,"minkowski"))	return MINKOWSKI;
 //	if(0 == strcmp(methodStr,"dot"))		return DOT;
 	return EUCLIDEAN;

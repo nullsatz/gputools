@@ -46,10 +46,12 @@ extern "C" {
                    const char ** kernel_src);
 
   void rgpuGranger(const int * rows, const int * colsy, const float * y, 
-                   const int * p, float * fStats, float * pValues);
+                   const int * p, float * fStats, float * pValues,
+                   const char ** kernelSrc);
   void rgpuGrangerXY(const int * rows, const int * colsx, const float * x, 
                      const int * colsy, const float * y, const int * p, 
-                     float * fStats, float * pValues);
+                     float * fStats, float * pValues,
+                     const char ** kernelSrc);
 
   void Rdistclust(const char ** distmethod, const char ** clustmethod, 
                   const float * points, const int * numPoints, const int * dim,
