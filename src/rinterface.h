@@ -54,12 +54,14 @@ extern "C" {
   void Rdistclust(const char ** distmethod, const char ** clustmethod, 
                   const float * points, const int * numPoints, const int * dim,
                   int * merge, int * order, float * val,
-                  const char ** kernelSrc);
+                  const char ** distKernels,
+                  const char ** clustKernels);
   void Rdistances(const float * points, const int * numPoints, 
                   const int * dim, float * distances, const char ** method,
                   const float * p, const char ** kernelSrc);
   void Rhcluster(const float * distMat, const int * numPoints, 
-                 int * merge, int * order, float * val, const char ** method);
+                 int * merge, int * order, float * val, const char ** method,
+                 const char ** kernelSrc);
 
   void RgetQRDecomp(int * rows, int * cols, float * a, float * q, int * pivot,
                     int * rank);

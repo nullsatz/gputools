@@ -186,7 +186,7 @@ hc_method getClusterEnum(const char * methodStr)
 void Rdistclust(const char ** distmethod, const char ** clustmethod, 
 	const float * points, const int * numPoints, const int * dim,
                 int * merge, int * order, float * val,
-                const char ** kernelSrc)
+                const char ** distKernels, const char ** clustKernels)
 {
 	dist_method dmeth = getDistEnum(*distmethod); 
 	hc_method hcmeth = getClusterEnum(*clustmethod); 
@@ -196,7 +196,7 @@ void Rdistclust(const char ** distmethod, const char ** clustmethod,
 
 	distanceLeaveOnGpu(dmeth, 2.f, points, *dim, *numPoints, 
                            &gpuDistances, &dpitch,
-                           kernelSrc[0]);
+                           distKernels[0]);
 
 	size_t len = (*numPoints) - 1;
 	float 
@@ -208,7 +208,11 @@ void Rdistclust(const char ** distmethod, const char ** clustmethod,
 	presup = Calloc(len, int);
 
 	hclusterPreparedDistances(gpuDistances, dpitch, *numPoints, 
-		presub, presup, val, hcmeth, lambda, beta);
+                                  presub, presup,
+                                  val,
+                                  hcmeth,
+                                  lambda, beta,
+                                  clustKernels[0]);
 
 	formatClustering(len, presub, presup, merge, order);
 
@@ -229,7 +233,9 @@ void Rdistances(const float * points, const int * numPoints, const int * dim,
 }
 
 void Rhcluster(const float * distMat, const int * numPoints, 
-	int * merge, int * order, float * val, const char ** method)
+               int * merge, int * order, float * val,
+               const char ** method,
+               const char ** kernelSrc)
 {
 	hc_method nummethod = getClusterEnum(*method); 
 	
@@ -238,13 +244,14 @@ void Rhcluster(const float * distMat, const int * numPoints,
 	float lambda = 0.5;
 	float beta = 0.5;
 	int 
-		* presub, * presup;
+          * presub, * presup;
 
 	presub = Calloc(len, int);
 	presup = Calloc(len, int);
 
 	hcluster(distMat, pitch, *numPoints, presub, presup, val, nummethod,
-		lambda, beta);
+                 lambda, beta,
+                 kernelSrc[0]);
 
 	formatClustering(len, presub, presup, merge, order);
 

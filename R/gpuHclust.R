@@ -71,6 +71,9 @@ gpuHclust <- function(distances, method = "complete")
         }
     }
 
+    filename <- system.file("cuda", 'hcluster.cu', package = 'gputools')
+    clustKernels <- readChar(filename, file.info(filename)$size)
+    
     numpoints <- n
     a <- .C("Rhcluster",
             as.single(as.matrix(distances)),
@@ -78,7 +81,7 @@ gpuHclust <- function(distances, method = "complete")
             merge = integer(2*(numpoints-1)),
             order = integer(numpoints),
             val = single(numpoints-1),
-            method,
+            method, clustKernels,
             PACKAGE='gputools')
 
     merge <- matrix(a$merge, numpoints-1, 2)
@@ -126,8 +129,11 @@ gpuDistClust <- function(points, distmethod = "euclidean",
     nump <- nrow(points)
 
     filename <- system.file("cuda", 'distance.cu', package = 'gputools')
-    kernelSrc <- readChar(filename, file.info(filename)$size)
+    distKernels <- readChar(filename, file.info(filename)$size)
 
+    filename <- system.file("cuda", 'hcluster.cu', package = 'gputools')
+    clustKernels <- readChar(filename, file.info(filename)$size)
+    
     a <- .C("Rdistclust",
             distmethod, clustmethod,
             as.single(t(points)),
@@ -136,7 +142,7 @@ gpuDistClust <- function(points, distmethod = "euclidean",
             merge = integer(2*(nump-1)),
             order = integer(nump),
             val = single(nump-1),
-            kernelSrc,
+            distKernels, clustKernels,
             PACKAGE='gputools')
 
     merge <- matrix(a$merge, nump-1, 2)
