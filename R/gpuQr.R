@@ -10,6 +10,9 @@ gpuQr <- function(x, tol = 1e-07) {
 
 	mode(x) <- 'single'
 
+        filename <- system.file('cuda', 'qrdecomp.cu', package = 'gputools')
+        kernelSrc <- readChar(filename, file.info(filename)$size)
+
 	res <- .C("rGetQRDecompRR",
 		as.integer(n),
 		as.integer(p),
@@ -18,6 +21,7 @@ gpuQr <- function(x, tol = 1e-07) {
 		pivot = as.integer(0L:(p-1)),
 		qraux = double(p),
 		rank = integer(1L),
+                kernelSrc,
 		PACKAGE='gputools'
 	)[c('qr', 'pivot', 'qraux', 'rank')]
 

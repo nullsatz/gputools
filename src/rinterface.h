@@ -30,7 +30,7 @@ extern "C" {
               float * ts); 
   void rSignifFilter(const double * data, int * rows, double * results);
   void gSignifFilter(const float * data, int * rows, float * results,
-      const char ** kernelSrc);
+                     const char ** kernelSrc);
 
   void RcublasPMCC(const float * samplesA, const int * numSamplesA,
                    const float * samplesB, const int * numSamplesB, 
@@ -66,13 +66,14 @@ extern "C" {
                  const char ** kernelSrc);
 
   void RgetQRDecomp(int * rows, int * cols, float * a, float * q, int * pivot,
-                    int * rank);
+                    int * rank, const char ** kernelSrc);
   void RqrSolver(int * rows, int * cols, float * matX, float * vectY, 
-                 float * vectB);
+                 float * vectB, const char ** kernelSrc);
 
   void rGetQRDecompRR(const int * rows, const int * cols,
                       const double * tol, float * x, int * pivot,
-                      double * qraux, int * rank);
+                      double * qraux, int * rank,
+                      const char ** kernelSrc);
 
   void rGetInverseFromQR(const int * rows, const int * cols, const float * q,
                          const float * r, float * inverse);
@@ -87,7 +88,8 @@ extern "C" {
 
   void RgpuLSFit(float *X, int *n, int *p, float *Y, int *nY,
                  double *tol, float *coeffs, float *resids, float *effects,
-                 int *rank, int *pivot, double * qrAux, int useSingle);
+                 int *rank, int *pivot, double * qrAux, int useSingle,
+                 const char ** kernelSrc);
 
   void setDevice(int * device);
 }

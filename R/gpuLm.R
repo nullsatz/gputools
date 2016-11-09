@@ -202,6 +202,9 @@ gpuLm.fit <- function (x, y, w = NULL, offset = NULL, method = "qr",
 	mode(coef) <- "single"
 	mode(resid) <- "single"
 
+        filename <- system.file('cuda', 'qrdecomp.cu', package = 'gputools')
+        kernelSrc <- readChar(filename, file.info(filename)$size)
+
 	z <- .C("RgpuLSFit", PACKAGE="gputools",
 		qr = qr, n = as.integer(n), p = as.integer(p),
 		yIn, ny = as.integer(ny),
@@ -209,7 +212,8 @@ gpuLm.fit <- function (x, y, w = NULL, offset = NULL, method = "qr",
 		coefficients = coef, residuals = resid,
 		effects = yIn,
 		rank = integer(1L), pivot = as.integer(0L:(p-1)),
-		qraux = qraux, useSingle)[c('qr', 'n', 'p', 'ny', 'tol',
+		qraux = qraux, useSingle,
+                kernelSrc)[c('qr', 'n', 'p', 'ny', 'tol',
 			'coefficients', 'residuals', 'effects', 'rank', 'pivot',
 			'qraux')]
 
@@ -389,6 +393,9 @@ gpuLsfit <- function(x, y, wt=NULL, intercept=TRUE, useSingle = TRUE,
     mode(coef) <- "single"
     mode(resid) <- "single"
 
+    filename <- system.file('cuda', 'qrdecomp.cu', package = 'gputools')
+    kernelSrc <- readChar(filename, file.info(filename)$size)
+
     z <- .C("RgpuLSFit", PACKAGE="gputools",
 		qr = qr, n = as.integer(nrx), p = as.integer(ncx),
 		yIn, ny = as.integer(ncy),
@@ -396,7 +403,8 @@ gpuLsfit <- function(x, y, wt=NULL, intercept=TRUE, useSingle = TRUE,
 		coefficients = coef, residuals = resid,
 		effects = drop(yIn),
 		rank = integer(1L), pivot = as.integer(0L:(ncx-1)),
-		qraux = qraux, useSingle)[c('qr', 'n', 'p', 'ny', 'tol',
+		qraux = qraux, useSingle,
+                kernelSrc)[c('qr', 'n', 'p', 'ny', 'tol',
 			'coefficients', 'residuals', 'effects', 'rank', 'pivot',
 			'qraux')]
 
@@ -707,6 +715,9 @@ gpuGlm.fit <-
 	mode(resid) <- "single"
         mode(effects) <- "single"
 
+        filename <- system.file('cuda', 'qrdecomp.cu', package = 'gputools')
+        kernelSrc <- readChar(filename, file.info(filename)$size)
+
 	fit <- .C("RgpuLSFit", PACKAGE="gputools",
 		qr = qr, n = as.integer(ngoodobs), p = as.integer(nvars),
 		yIn, ny = as.integer(1L),
@@ -714,7 +725,8 @@ gpuGlm.fit <-
 		coefficients = coef, residuals = resid,
 		effects = effects,
 		rank = integer(1L), pivot = as.integer(0L:(nvars-1)),
-		qraux = qraux, useSingle=useSingle)[c('qr', 'n', 'p', 'ny', 'tol',
+		qraux = qraux, useSingle=useSingle,
+                kernelSrc)[c('qr', 'n', 'p', 'ny', 'tol',
 			'coefficients', 'residuals', 'effects', 'rank', 'pivot',
 			'qraux')]
 

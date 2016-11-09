@@ -20,8 +20,9 @@ int alignBlock(int length, unsigned blockExp) {
 }
 
 void gpuLSFitF(float * X, int rows, int cols, float * Y, int yCols,
-	double tol, float * coeffs, float * resids, float * effects,
-	int * rank, int * pivot, double * qrAux)
+               double tol, float * coeffs, float * resids, float * effects,
+               int * rank, int * pivot, double * qrAux,
+               const char * kernelSrc)
 {
 	const int
 		fbytes = sizeof(float);
@@ -44,10 +45,10 @@ void gpuLSFitF(float * X, int rows, int cols, float * Y, int yCols,
 	cudaMemset2D(dQR, cols * fbytes, 0.f, cols * fbytes, stride); 
 	cublasSetMatrix(rows, cols, fbytes, X, rows, dQR, stride);
 
-        // On return we have dQR in pivoted, packed QR form.
-        //
-        getQRDecompBlocked(rows, cols, tol, dQR, 1 << blockExp,
-          stride, pivot, qrAux, rank);
+  // On return we have dQR in pivoted, packed QR form.
+  
+  getQRDecompBlocked(rows, cols, tol, dQR, 1 << blockExp,
+                     stride, pivot, qrAux, rank, kernelSrc);
 	cublasGetMatrix(rows, cols, fbytes, dQR, stride, X, rows);
 
 	if(*rank > 0)
@@ -69,7 +70,7 @@ void gpuLSFitD(double *X, int n, int p, double *Y, int nY,
 
 // Fills in the coefficients, residuals and effects matrices.
 //
-__host__ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
+void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 	int yCols, float *coeffs, float *resids, float *effects)
 {
 	const int
