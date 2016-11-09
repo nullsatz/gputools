@@ -22,4 +22,5 @@
   } while(0)
 
 void cudaCompileLaunch(const char * kernelSrc, const char * kernelName,
-    void * args[], const dim3 &gridDim, const dim3 &blockDim);
+                       void * args[], const dim3 &gridDim, const dim3 &blockDim,
+                       cudaStream_t stream = NULL);

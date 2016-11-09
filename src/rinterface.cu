@@ -425,10 +425,10 @@ void rSolveFromQR(const int * rows, const int * cols, const float * q, const flo
 
 void rBSplineMutualInfo(int * nBins, int * splineOrder, int * nsamples,
 	int * rowsA, const float * A, int * rowsB, const float * B, 
-	float * mutualInfo)
+                        float * mutualInfo, const char ** kernelSrc)
 {
 	bSplineMutualInfo(*nBins, *splineOrder, *nsamples, *rowsA, A, *rowsB, B,
-		mutualInfo);
+                          mutualInfo, kernelSrc[0]);
 }
 
 // Interface for R functions requiring least-squares computations.

@@ -16,7 +16,8 @@ void printCompileLog(nvrtcProgram &prog) {
 void cudaCompileLaunch(const char * kernelSrc,
                        const char * kernelName,
                        void * args[],
-                       const dim3 &gridDim, const dim3 &blockDim)
+                       const dim3 &gridDim, const dim3 &blockDim,
+                       cudaStream_t stream)
 {
   nvrtcProgram prog;
   NVRTC_SAFE_CALL(
@@ -56,7 +57,7 @@ void cudaCompileLaunch(const char * kernelSrc,
     cuLaunchKernel(kernel,
       gridDim.x, gridDim.y, gridDim.z,    // grid dim
       blockDim.x, blockDim.y, blockDim.z, // block dim
-      0, NULL,                    // shared mem and stream
+      0, stream,                    // shared mem and stream
       args, 0));                  // arguments
   CUDA_SAFE_CALL(cuCtxSynchronize());
 

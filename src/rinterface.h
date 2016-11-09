@@ -82,7 +82,8 @@ extern "C" {
   void rBSplineMutualInfo(int * nBins, int * splineOrder, int * nsamples,
                           int * rowsA, const float * A,
                           int * rowsB, const float * B, 
-                          float * mutualInfo);
+                          float * mutualInfo,
+                          const char ** kernelSrc);
 
   void RgpuLSFit(float *X, int *n, int *p, float *Y, int *nY,
                  double *tol, float *coeffs, float *resids, float *effects,
