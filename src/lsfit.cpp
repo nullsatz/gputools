@@ -1,11 +1,14 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<cublas.h>
-#include<R.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <algorithm>
 
-#include"cuseful.h"
-#include"lsfit.h"
+#include "cublas.h"
+
+#include "R.h"
+
+#include "cuseful.h"
+#include "lsfit.h"
 #include "qrdecomp.h"
 
 // Copyright 2009, Mark Seligman at Rapid Biologics, LLC.  All rights
@@ -77,7 +80,7 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 		fbytes = sizeof(float);
         // Used by effects, residual computations.
 	//
-	int maxIdx = min(rank, rows - 1);
+	int maxIdx = std::min(rank, rows - 1);
 
 	float
 		* diags = Calloc(rank * fbytes, float),

@@ -1,12 +1,14 @@
-#include<Rmath.h>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
 #include<math.h>
-#include<cuseful.h>
-#include<granger.h>
 
+#include "Rmath.h"
+#include "cuda_runtime_api.h"
+
+#include "cuseful.h"
 #include "cudaUtils.h"
+#include "granger.h"
 
 #define max(a, b) ((a > b)?a:b)
 

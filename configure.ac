@@ -1,152 +1,98 @@
-AC_INIT([gputools], 1.1)
-AC_CONFIG_AUX_DIR([tools])
+AC_INIT([gputools], 1.2) dnl package name, version
 
-AC_ARG_WITH([r],
-  AC_HELP_STRING([--with-r=r],
-    [path to r install directory, e.g. /usr/lib64/R]),
-    [R_HOME="$withval"])
-
-AC_ARG_WITH([r-include],
-  AC_HELP_STRING([--with-r-include=r-include],
-    [path to r header files, e.g. /usr/share/R/include]),
-    [R_INCLUDE="$withval"])
-
-AC_ARG_WITH([r-lib],
-  AC_HELP_STRING([--with-r-lib=r-lib],
-    [path to r libs, e.g. /usr/lib64/R/lib]),
-    [R_LIB="$withval"])
-
-AC_ARG_WITH([cuda],
-  AC_HELP_STRING([--with-cuda=cuda],
-    [path to cuda toolkit, e.g. /usr/local/cuda]),
-    [CUDA_HOME="$withval"])
-
-AC_ARG_WITH([nvcc],
-  AC_HELP_STRING([--with-nvcc=nvcc],
-    [path of cuda compiler, e.g. /usr/local/cuda/bin/nvcc]),
-    [NVCC="$withval"])
-
+dnl Select an optional include path, from a configure option
+dnl or from an environment variable.
 AC_ARG_WITH([cuda-include],
-  AC_HELP_STRING([--with-cuda-include=cuda-include],
-    [path to cuda header files, e.g. /usr/local/cuda/include]),
-    [CUDA_INCLUDE="$withval"])
-
-AC_ARG_WITH([cuda-lib],
-  AC_HELP_STRING([--with-cuda-lib=cuda-lib],
-    [path to cuda libs, e.g. /usr/local/cuda/lib64]),
-    [CUDA_LIB="$withval"])
-
-AC_MSG_CHECKING("the cuda compiler nvcc")
-AC_PATH_PROG([NVCC], [nvcc],
-             ["no"],
-             [$PATH$PATH_SEPARATOR/usr/local/cuda/bin$PATH_SEPARATOR$CUDA_HOME/bin])
-AS_IF([test "x$NVCC" = "xno"],
-      [AC_MSG_ERROR(["nvcc compiler not found! Try --with-nvcc=/usr/local/cuda/bin/nvcc"])])
-
-
-AC_MSG_CHECKING("R")
-
-if test -z "${R_HOME}"; then
-  : ${R_HOME=`R RHOME`}
-  if test -z "${R_HOME}"; then
-    echo "could not determine R_HOME"
-    exit 1
+      AC_HELP_STRING([--with-cuda-include=INCLUDE_PATH],
+         [the location of CUDA header files]),
+      [cuda_include_path=$withval])
+CUDA_CPPFLAGS="-I."
+if test [ -n "${cuda_include_path}" ] ; then
+   CUDA_CPPFLAGS="-I. -I${cuda_include_path}"
+else
+  if test [ -n "${CUDA_INCLUDE}" ] ; then
+     CUDA_CPPFLAGS="-I. -I${CUDA_INCLUDE}"
+     cuda_include_path="${CUDA_INCLUDE}"
   fi
 fi
-AC_MSG_RESULT("using ${R_HOME} for the root of the R install directory")
 
-if test -z "${R_INCLUDE}"; then
-  R_INCLUDE="${R_HOME}/include"
-fi
-AC_MSG_RESULT("using ${R_INCLUDE} for R header files")
-
-if test -n "${R_LIB}"; then
-  AC_MSG_RESULT("using ${R_LIB} for R shared libraries")
-fi
-
-AS_IF([test "x$R_INCLUDE" != "x"],
-      [EXTRA_INCLUDES="${EXTRA_INCLUDES} -I${R_INCLUDE} "])
-AS_IF([test "x$R_LIB" != "x"],
-      [EXTRA_LIBS="${EXTRA_LIBS} -L${R_LIB} -lR "])
-
-AS_IF([test "x$CUDA_INCLUDE" != "x"],
-      [EXTRA_INCLUDES="${EXTRA_INCLUDES} -I${CUDA_INCLUDE} "])
-AS_IF([test "x$CUDA_LIB" != "x"],
-      [EXTRA_LIBS="${EXTRA_LIBS} -L${CUDA_LIB} -lcublas -lnvrtc -lcuda "])
-
-AC_MSG_CHECKING([for rpath flag style])
-AC_PROG_CC([cc cl gcc])
-saved_cflags="${CFLAGS}"
-CFLAGS="-Wl,--rpath=."
-AC_LINK_IFELSE([AC_LANG_SOURCE([int main(){ return 0;}])],
-  [RPATH_FLAG=gnu],
-  [RPATH_FLAG=none])
-
-if test "x$RPATH_FLAG" = "xnone"; then
-  CFLAGS="-Wl,-rpath,."
-  AC_LINK_IFELSE([AC_LANG_SOURCE([int main(){ return 0;}])],
-    [RPATH_FLAG=llvm],
-    [RPATH_FLAG=none])
-fi
-CFLAGS="${saved_cflags}"
-AC_MSG_RESULT([rpath flag style... ${RPATH_FLAG}])
-
-CPICFLAGS=`"${R_HOME}/bin/R" CMD config CPICFLAGS`
-
-EXTRA_CFLAGS=`"${R_HOME}/bin/R" CMD config CFLAGS`
-EXTRA_CPPFLAGS=`"${R_HOME}/bin/R" CMD config CPPFLAGS`
-
-if test "x$CUDA_LIB" = "x"; then
-  cuda_dir=`AS_DIRNAME(["$NVCC"])`
-  cuda_dir=`AS_DIRNAME(["$cuda_dir"])`
-  AC_CHECK_FILE(["$cuda_dir/lib"],
-                [CUDA_LIB="${cuda_dir}/lib"])
-  AC_CHECK_FILE(["$cuda_dir/lib64"],
-                [CUDA_LIB="${cuda_dir}/lib64"])
+dnl ditto for a library path
+AC_ARG_WITH([cuda-lib],
+      AC_HELP_STRING([--with-cuda-lib=LIB_PATH],
+         [the location of CUDA libraries]),
+      [cuda_lib_path=$withval])
+if test [ -n "${cuda_lib_path}" ] ; then
+   LIBS="-L${cuda_lib_path} ${LIBS}"
+else
+  if test [ -n "${CUDA_LIBS}" ] ; then
+     LIBS="-L${CUDA_LIBS} ${LIBS}"
+     cuda_lib_path="${CUDA_LIBS}"
+  fi
 fi
 
-RPATH=""
-if test "x$CUDA_LIB" != "x"; then
+dnl Now find the compiler and compiler flags to use
+: ${R_HOME=`R RHOME`}
+if test -z "${R_HOME}"; then
+  echo "could not determine R_HOME"
+  exit 1
+fi
+CXX=`"${R_HOME}/bin/R" CMD config CXX`
+CPP=`"${R_HOME}/bin/R" CMD config CPP`
+CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
+CPPFLAGS=`"${R_HOME}/bin/R" CMD config CPPFLAGS`
+AC_PROG_CXX
+AC_PROG_CPP
 
-if test "x$RPATH_FLAG" = "xgnu"; then
-  RPATH="-rpath=${CUDA_LIB}"
+if test [ -n "${cuda_include_path}" ] ; then
+  OLD_CPPFLAGS=${CPPFLAGS}
+  CPPFLAGS="-I${cuda_include_path} ${CPPFLAGS}"
 fi
 
-if test "x$RPATH_FLAG" = "xllvm"; then
-  RPATH="-rpath ${CUDA_LIB}"
+AC_MSG_WARN([${CPPFLAGS}])
+
+AC_CHECK_HEADER([cuda.h], , [HAS_CUDA_H=no])
+AC_CHECK_HEADER([nvrtc.h], , [HAS_NVRTC_H=no])
+
+if test [ -n "${cuda_include_path}" ] ; then
+  CPPFLAGS=${OLD_CPPFLAGS}
 fi
 
-if test "x$RPATH_FLAG" = "xnone"; then
-  RPATH=""
+if test [ "${HAS_CUDA_H}" = no ] ; then
+  AC_MSG_ERROR("CUDA header cuda.h not found")
 fi
 
+if test [ "${HAS_NVRTC_H}" = no ] ; then
+  AC_MSG_ERROR("CUDA header nvrtc.h not found")
 fi
- 
-AC_CANONICAL_HOST
-case $host_os in
-  darwin* )
-    DARWIN_LDFLAGS="`R CMD config --ldflags` -framework CUDA"
-    ;;
-  *)
-    DARWIN_LDFLAGS=""
-    ;;
-esac
 
-EXTRA_LDFLAGS="${DARWIN_LDFLAGS} ${EXTRA_LDFLAGS}"
-EXTRA_LIBS="${EXTRA_LIBS} -L${CUDA_LIB} -lcublas -lnvrtc -lcuda "
+if test [ -n "${cuda_lib_path}" ] ; then
+  OLD_LDFLAGS=${LDFLAGS}
+  LDFLAGS="-L${cuda_lib_path} ${LDFLAGS}"
+fi
 
-AC_SUBST(NVCC)
+dnl search for a library containing a CUDA function
+AC_SEARCH_LIBS([cuGetErrorName], [cuda], ,
+  AC_MSG_ERROR("no cuda driver library found"))
 
-AC_SUBST(EXTRA_CFLAGS)
-AC_SUBST(EXTRA_CPPFLAGS)
-AC_SUBST(EXTRA_LDFLAGS)
+dnl search for a library containing a CUDA function
+AC_SEARCH_LIBS([cudaMalloc], [cudart], ,
+  AC_MSG_ERROR("no cuda runtime api library found"))
 
-AC_SUBST(EXTRA_INCLUDES)
-AC_SUBST(EXTRA_LIBS)
+dnl search for a library containing a CUDA function
+AC_SEARCH_LIBS([nvrtcCreateProgram], [nvrtc], ,
+  AC_MSG_ERROR("no nvrtc library found"))
 
-AC_SUBST(CPICFLAGS)
+dnl search for a library containing a CUDA function
+AC_SEARCH_LIBS([cublasSetMatrix], [cublas], ,
+  AC_MSG_ERROR("no cublas library found"))
 
-AC_SUBST(RPATH)
+if test [ -n "${cuda_lib_path}" ] ; then
+  LDFLAGS=${OLD_LDFLAGS}
+fi
 
-AC_CONFIG_FILES([src/Makefile])
+dnl substitute CUDA_CPPFLAGS and LIBS
+AC_SUBST(CUDA_CPPFLAGS)
+AC_SUBST(LIBS)
+dnl and do substitution in the src/Makevars.in
+AC_CONFIG_FILES([src/Makevars])
 AC_OUTPUT

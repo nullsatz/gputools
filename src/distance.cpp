@@ -1,10 +1,13 @@
-#include<R.h>
-#include<Rinternals.h>
-
 #include<stdio.h>
 #include<string.h>
-#include<cuseful.h>
-#include<distance.h>
+
+#include "R.h"
+#include "Rinternals.h"
+
+#include "cuda_runtime_api.h"
+
+#include "cuseful.h"
+#include "distance.h"
 
 #include "cudaUtils.h"
 

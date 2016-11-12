@@ -1,8 +1,10 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<cublas.h>
-#include<R.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <algorithm>
+
+#include "cublas.h"
+#include "R.h"
 
 #include"cuseful.h"
 #include"qrdecomp.h"
@@ -721,12 +723,11 @@ void getQRDecompBlocked(int rows, int cols, double tol,
         // Rank-one update of the remainder of the block, "B":
         // u = Beta B^t v
         //
-        cublasSgemv('T', rowsk, min(blockSize,colsk), (float) Beta[colIdx], pdQRBlock, stride, pdVcol, 1, 0.f, du, 1);
+        cublasSgemv('T', rowsk, std::min(blockSize,colsk), (float) Beta[colIdx], pdQRBlock, stride, pdVcol, 1, 0.f, du, 1);
                                        
         // B = B + v u^t
         //
-        cublasSger(rowsk, min(blockSize,colsk), 1.0f, pdVcol, 1, du, 1, pdQRBlock,
-                   stride);
+        cublasSger(rowsk, std::min(blockSize,colsk), 1.0f, pdVcol, 1, du, 1, pdQRBlock, stride);
       }
     }
 
