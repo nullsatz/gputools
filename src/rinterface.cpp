@@ -1,24 +1,24 @@
-#include<R.h>
-#include<Rinternals.h>
-#include <R_ext/Rdynload.h>
-
 #include<stdio.h>
 #include<string.h>
 
-#include<cublas.h>
+#include "cublas.h"
 
-#include<matmult.h>
-#include<correlation.h>
-#include<kendall.h>
-#include<distance.h>
-#include<granger.h>
-#include<hcluster.h>
-#include<qrdecomp.h>
-#include<mi.h>
-#include<lsfit.h>
-#include<cuseful.h>
+#include "R.h"
+#include "Rinternals.h"
+#include  "R_ext/Rdynload.h"
 
-#include<rinterface.h>
+#include "correlation.h"
+#include "cuseful.h"
+#include "distance.h"
+#include "granger.h"
+#include "hcluster.h"
+#include "kendall.h"
+#include "lsfit.h"
+#include "matmult.h"
+#include "mi.h"
+#include "qrdecomp.h"
+
+#include "rinterface.h"
 
 void R_init_mylib(DllInfo *info) {
   R_CallMethodDef callMethods[]  = {
