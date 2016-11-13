@@ -89,14 +89,13 @@ AC_SEARCH_LIBS([cublasSetMatrix], [cublas], ,
 
 if test [ -n "${cuda_lib_path}" ] ; then
   LDFLAGS=${OLD_LDFLAGS}
-  LIBS="${LIB} -Wl,-rpath-link=${cuda_lib_path}"
   AC_CANONICAL_HOST
   case $host_os in
     darwin* )
-      LIBS="${LIB} -Wl,-rpath,${cuda_lib_path}"
+      LIBS="${LIBS} -Wl,-rpath,${cuda_lib_path}"
       ;;
     * )
-      LIBS="${LIB} -Wl,-rpath=${cuda_lib_path}"
+      LIBS="${LIBS} -Wl,-rpath=${cuda_lib_path}"
       ;;
   esac
 fi
