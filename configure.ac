@@ -1,4 +1,5 @@
 AC_INIT([gputools], 1.2) dnl package name, version
+AC_CONFIG_AUX_DIR([tools])
 
 dnl Select an optional include path, from a configure option
 dnl or from an environment variable.
@@ -88,6 +89,16 @@ AC_SEARCH_LIBS([cublasSetMatrix], [cublas], ,
 
 if test [ -n "${cuda_lib_path}" ] ; then
   LDFLAGS=${OLD_LDFLAGS}
+  LIBS="${LIB} -Wl,-rpath-link=${cuda_lib_path}"
+  AC_CANONICAL_HOST
+  case $host_os in
+    darwin* )
+      LIBS="${LIB} -Wl,-rpath,${cuda_lib_path}"
+      ;;
+    * )
+      LIBS="${LIB} -Wl,-rpath=${cuda_lib_path}"
+      ;;
+  esac
 fi
 
 dnl substitute CUDA_CPPFLAGS and LIBS
