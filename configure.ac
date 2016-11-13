@@ -51,8 +51,19 @@ fi
 
 AC_MSG_WARN([${CPPFLAGS}])
 
-AC_CHECK_HEADER([cuda.h], , [HAS_CUDA_H=no])
-AC_CHECK_HEADER([nvrtc.h], , [HAS_NVRTC_H=no])
+AC_CHECK_HEADER([cuda.h], [HAS_CUDA_H=yes], [HAS_CUDA_H=no])
+AC_CHECK_HEADER([nvrtc.h], [HAS_NVRTC_H=yes], [HAS_NVRTC_H=no])
+
+if test [ "${HAS_CUDA_H}" = "no" ] ; then
+   if test [ -d "/usr/local/cuda/include" ] ; then
+      CPPFLAGS="-I/usr/local/cuda/include ${OLD_CPPFLAGS}"
+      AC_CHECK_HEADER([cuda.h], [HAS_CUDA_H=yes], [HAS_CUDA_H=no])
+      if test [ "${HAS_CUDA_H}" = "yes" ] ; then
+         cuda_include_path=/usr/local/cuda/include
+         CUDA_CPPFLAGS="-I. -I${cuda_include_path}"
+      fi
+   fi
+fi
 
 if test [ -n "${cuda_include_path}" ] ; then
   CPPFLAGS=${OLD_CPPFLAGS}
@@ -72,20 +83,59 @@ if test [ -n "${cuda_lib_path}" ] ; then
 fi
 
 dnl search for a library containing a CUDA function
-AC_SEARCH_LIBS([cuGetErrorName], [cuda], ,
-  AC_MSG_ERROR("no cuda driver library found"))
+AC_SEARCH_LIBS([cuGetErrorName], [cuda],
+  [HAS_CUDA_LIB=yes],
+  [HAS_CUDA_LIB=no])
 
 dnl search for a library containing a CUDA function
-AC_SEARCH_LIBS([cudaMalloc], [cudart], ,
-  AC_MSG_ERROR("no cuda runtime api library found"))
+AC_SEARCH_LIBS([cudaMalloc], [cudart],
+  [HAS_CUDART_LIB=yes],
+  [HAS_CUDART_LIB=no])
 
 dnl search for a library containing a CUDA function
-AC_SEARCH_LIBS([nvrtcCreateProgram], [nvrtc], ,
-  AC_MSG_ERROR("no nvrtc library found"))
+AC_SEARCH_LIBS([nvrtcCreateProgram], [nvrtc],
+  [HAS_NVRTC_LIB=yes],
+  [HAS_NVRTC_LIB=no])
 
 dnl search for a library containing a CUDA function
-AC_SEARCH_LIBS([cublasSetMatrix], [cublas], ,
-  AC_MSG_ERROR("no cublas library found"))
+AC_SEARCH_LIBS([cublasSetMatrix], [cublas],
+  [HAS_CUBLAS_LIB=yes],
+  [HAS_CUBLAS_LIB=no])
+
+if test [ "${HAS_NVRTC_LIB}" = "no" ] ; then
+  default_lib_dir=no
+  if test [ -d "/usr/local/cuda/lib64" ] ; then
+    default_lib_dir=/usr/local/cuda/lib64
+  fi
+  
+  if test [ "${default_lib_dir}" = "no" ] ; then
+    if test [ -d "/usr/local/cuda/lib" ] ; then
+      default_lib_dir=/usr/local/cuda/lib
+    fi
+  fi
+  
+  if test [ "${default_lib_dir}" != "no" ] ; then
+    LDFLAGS="-L${default_lib_dir} ${OLD_LDFLAGS}"
+
+    AC_SEARCH_LIBS([cuGetErrorName], [cuda],
+      [HAS_CUDA_LIB=yes],
+      [HAS_CUDA_LIB=no])
+    AC_SEARCH_LIBS([cudaMalloc], [cudart],
+      [HAS_CUDART_LIB=yes],
+      [HAS_CUDART_LIB=no])
+    AC_SEARCH_LIBS([nvrtcCreateProgram], [nvrtc],
+      [HAS_NVRTC_LIB=yes],
+      [HAS_NVRTC_LIB=no])
+    AC_SEARCH_LIBS([cublasSetMatrix], [cublas],
+      [HAS_CUBLAS_LIB=yes],
+      [HAS_CUBLAS_LIB=no])
+  fi
+  
+  if test [ "${HAS_NVRTC_LIB}" = "yes" ] ; then
+    cuda_lib_path="${default_lib_dir}"
+    LIBS="-L${cuda_lib_path} ${LIBS}"
+  fi
+fi
 
 if test [ -n "${cuda_lib_path}" ] ; then
   LDFLAGS=${OLD_LDFLAGS}
