@@ -4,16 +4,21 @@ AC_CONFIG_AUX_DIR([tools])
 dnl Select an optional include path, from a configure option
 dnl or from an environment variable.
 AC_ARG_WITH([cuda-include],
-      AC_HELP_STRING([--with-cuda-include=INCLUDE_PATH],
-         [the location of CUDA header files]),
-      [cuda_include_path=$withval])
+  AC_HELP_STRING([--with-cuda-include=INCLUDE_PATH],
+    [the location of CUDA header files]),
+  [cuda_include_path=$withval])
 CUDA_CPPFLAGS="-I."
 if test [ -n "${cuda_include_path}" ] ; then
-   CUDA_CPPFLAGS="-I. -I${cuda_include_path}"
+  CUDA_CPPFLAGS="-I. -I${cuda_include_path}"
 else
   if test [ -n "${CUDA_INCLUDE}" ] ; then
      CUDA_CPPFLAGS="-I. -I${CUDA_INCLUDE}"
      cuda_include_path="${CUDA_INCLUDE}"
+  else
+    if test [ -d "/usr/local/cuda/include" ] ; then
+      CUDA_CPPFLAGS="-I. -I/usr/local/cuda/include"
+      cuda_include_path="/usr/local/cuda/include"
+    fi
   fi
 fi
 
@@ -28,6 +33,16 @@ else
   if test [ -n "${CUDA_LIBS}" ] ; then
      LIBS="-L${CUDA_LIBS} ${LIBS}"
      cuda_lib_path="${CUDA_LIBS}"
+  else
+    if test [ -d "/usr/local/cuda/lib64" ] ; then
+      LIBS="-L/usr/local/cuda/lib64 ${LIBS}"
+      cuda_lib_path="/usr/local/cuda/lib64"
+    else
+      if test [ -d "/usr/local/cuda/lib" ] ; then
+        LIBS="-L/usr/local/cuda/lib ${LIBS}"
+        cuda_lib_path="/usr/local/cuda/lib"
+      fi
+    fi
   fi
 fi
 
