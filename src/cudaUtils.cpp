@@ -161,34 +161,7 @@ void cudaLaunch(std::string kernelName,
                 const dim3 &gridDim, const dim3 &blockDim,
                 cudaStream_t stream)
 {
-  nvrtcProgram prog;
-  const char * kernelSrc = (*cudaKernels)[kernelName];
-  NVRTC_SAFE_CALL(
-      nvrtcCreateProgram(&prog,  // prog
-        kernelSrc,               // buffer
-        kernelName.c_str(),      // name
-        0,                       // numHeaders
-        NULL,                    // headers
-        NULL));                  // includeNames
-
-  nvrtcResult compileResult = nvrtcCompileProgram(prog, 0, NULL);
-  if (compileResult != NVRTC_SUCCESS) {
-    printCompileLog(prog);
-    error("\ncuda kernel compile failed");
-  }
-
-  //  Obtain PTX from the program.
-  size_t ptxSize;
-  NVRTC_SAFE_CALL(nvrtcGetPTXSize(prog, &ptxSize));
-
-  char * ptx = Calloc(ptxSize, char);
-  NVRTC_SAFE_CALL(nvrtcGetPTX(prog, ptx));
-
-  //  Destroy the program.
-  NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
-
-  //  Load the generated PTX and get a handle to the SAXPY kernel.
-  CUDA_SAFE_CALL(cuInit(0));
+  const char * ptx = (*cudaKernels)[kernelName];
 
   CUmodule module;
   CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
@@ -205,5 +178,4 @@ void cudaLaunch(std::string kernelName,
   CUDA_SAFE_CALL(cuCtxSynchronize());
 
   CUDA_SAFE_CALL(cuModuleUnload(module));
-  Free(ptx);
 }
