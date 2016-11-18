@@ -6,8 +6,10 @@
 #include "nvrtc.h"
 #include "cuda.h"
 
-#include "cudaKernels.h"
 #include "cudaUtils.h"
+
+std::map<std::string, const char *> * cudaKernels;
+std::vector<char *> ptxToFree;
 
 // Obtain compilation log from the program.
 void printCompileLog(nvrtcProgram &prog) {
@@ -100,8 +102,6 @@ std::vector<std::string> & getFileKernels(std::string file)
   }
   return(*kernels);
 }
-
-std::vector<char *> ptxToFree;
 
 extern "C"
 void cuCompile(const int * numFiles,
