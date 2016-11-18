@@ -26,12 +26,9 @@ gpuMi <- function(x, y = NULL, bins = 2, splineOrder = 1)
 		row_labels <- colnames(y)
 	}
         
-        filename <- system.file('cuda', 'mi.cu', package = 'gputools')
-        kernelSrc <- readChar(filename, file.info(filename)$size)
-
 	mi <- .C("rBSplineMutualInfo", bins, splineOrder, nsamples, na, a, 
                  nb, b, mi = single(nb * na),
-                 kernelSrc, PACKAGE='gputools')$mi
+                 PACKAGE='gputools')$mi
 	mi <- matrix(mi, nb, na)
 	rownames(mi) <- row_labels
 	colnames(mi) <- colnames(x)

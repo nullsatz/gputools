@@ -18,15 +18,12 @@ gpuDist <- function(points, method = "euclidean", p = 2.0)
     points <- as.matrix(points)
     numPoints <- nrow(points)
 
-    filename <- system.file("cuda", 'distance.cu', package = 'gputools')
-    kernelSrc <- readChar(filename, file.info(filename)$size)
-
     a <- .C("Rdistances",
             as.single(t(points)),
             as.integer(numPoints),
             as.integer(ncol(points)),
             d = single(numPoints * numPoints),
-            method, as.single(p), kernelSrc,
+            method, as.single(p),
             PACKAGE='gputools')
 
     d <- as.dist(matrix(a$d, numPoints, numPoints))
@@ -70,9 +67,6 @@ gpuHclust <- function(distances, method = "complete")
             warning("dissimilarities of improper length")
         }
     }
-
-    filename <- system.file("cuda", 'hcluster.cu', package = 'gputools')
-    clustKernels <- readChar(filename, file.info(filename)$size)
     
     numpoints <- n
     a <- .C("Rhcluster",
@@ -81,7 +75,7 @@ gpuHclust <- function(distances, method = "complete")
             merge = integer(2*(numpoints-1)),
             order = integer(numpoints),
             val = single(numpoints-1),
-            method, clustKernels,
+            method,
             PACKAGE='gputools')
 
     merge <- matrix(a$merge, numpoints-1, 2)
@@ -128,12 +122,6 @@ gpuDistClust <- function(points, distmethod = "euclidean",
     points <- as.matrix(points)
     nump <- nrow(points)
 
-    filename <- system.file("cuda", 'distance.cu', package = 'gputools')
-    distKernels <- readChar(filename, file.info(filename)$size)
-
-    filename <- system.file("cuda", 'hcluster.cu', package = 'gputools')
-    clustKernels <- readChar(filename, file.info(filename)$size)
-    
     a <- .C("Rdistclust",
             distmethod, clustmethod,
             as.single(t(points)),
@@ -142,7 +130,6 @@ gpuDistClust <- function(points, distmethod = "euclidean",
             merge = integer(2*(nump-1)),
             order = integer(nump),
             val = single(nump-1),
-            distKernels, clustKernels,
             PACKAGE='gputools')
 
     merge <- matrix(a$merge, nump-1, 2)

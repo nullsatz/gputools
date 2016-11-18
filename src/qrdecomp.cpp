@@ -36,7 +36,7 @@ void swap(int i, int j, int * array)
 // pivot stores the permutation of the cols of da, pre-allocate host mem
 //              using pivot, you can recover P, or at least mimic it's action
 void getQRDecomp(int rows, int cols, float * dq, float * da, 
-                 int * pivot, const char * kernelSrc)
+                 int * pivot)
 {
   int
     nblocks, nthreads = NTHREADS,
@@ -90,28 +90,28 @@ void getQRDecomp(int rows, int cols, float * dq, float * da,
     void * argsGCN[] = {
       &rowsk, &colsk, &dak, &rows, &dColNorms
     };
-    cudaCompileLaunch(kernelSrc, "getColNorms", argsGCN,
+    cudaLaunch("getColNorms", argsGCN,
                       gridGCN, blockGCN);
 
     dim3 gridFM(1), blockFM(nblocks);
     void * argsFM[] = {
       &colsk, &dColNorms, &nthreads, &dMaxIndex
     };
-    cudaCompileLaunch(kernelSrc, "gpuFindMax", argsFM,
+    cudaLaunch("gpuFindMax", argsFM,
                       gridFM, blockFM);
 
     dim3 gridSC(nRowBlocks), blockSC(nthreads);
     void * argsSC[] = {
       &rows, &da, &k, &dMaxIndex, &dPivot
     };
-    cudaCompileLaunch(kernelSrc, "gpuSwapCol", argsSC,
+    cudaLaunch("gpuSwapCol", argsSC,
                       gridSC, blockSC);
 
     dim3 gridHV(1), blockHV(nthreads);
     void * argsHV[] = {
       &rowsk, &dak, &dv
     };
-    cudaCompileLaunch(kernelSrc, "makeHVector", argsHV,
+    cudaLaunch("makeHVector", argsHV,
                       gridHV, blockHV);
 
     // dH will hold I - beta*v*v^t
@@ -165,8 +165,7 @@ int find(int n, int * array, int toFind)
 // vectY has length rows
 // vectB has length cols
 // please allocate space for vectB before calling qrlsSolver
-void qrSolver(int rows, int cols, float * matX, float * vectY, float * vectB,
-              const char * kernelSrc)
+void qrSolver(int rows, int cols, float * matX, float * vectY, float * vectB)
 {
   int * pivot;
   float * matQ;
@@ -175,7 +174,7 @@ void qrSolver(int rows, int cols, float * matX, float * vectY, float * vectB,
   cublasAlloc(rows * rows, sizeof(float), (void **)&matQ);
   checkCublasError("qrSolver");
 
-  getQRDecomp(rows, cols, matQ, matX, pivot, kernelSrc);
+  getQRDecomp(rows, cols, matQ, matX, pivot);
 
   // compute the vector Q^t * Y
   // vectQtY[i] = dotProduct(Q's col i, Y)
@@ -200,8 +199,7 @@ void qrSolver(int rows, int cols, float * matX, float * vectY, float * vectB,
 // vectY has length rows
 // vectB has length cols
 // please allocate space for vectB before calling qrlsSolver
-void qrSolver2(int rows, int cols, float * dX, float * dY, float * dB,
-               const char * kernelSrc)
+void qrSolver2(int rows, int cols, float * dX, float * dY, float * dB)
 {
   int 
     * pivot,
@@ -222,7 +220,7 @@ void qrSolver2(int rows, int cols, float * dX, float * dY, float * dB,
   cublasScopy(rows*cols, dX, 1, dQR, 1);
   checkCublasError("qrSolver2:");
 
-  getQRDecompRR(rows, cols, 0.00001, dQR, pivot, qrAux, &rank, kernelSrc);
+  getQRDecompRR(rows, cols, 0.00001, dQR, pivot, qrAux, &rank);
   checkCublasError("qrSolver2:");
 
   hostIdent = (float *) Calloc(cols * cols, float);
@@ -405,8 +403,7 @@ void qrdecompMGS(int rows, int cols, float * da, float * dq, float * dr,
 // from the behavior of R's qr() command.
 //
 void getQRDecompRR(int rows, int cols, double tol, float * dQR,
-                            int * pivot, double * qrAux, int * rank,
-                            const char * kernelSrc)
+                   int * pivot, double * qrAux, int * rank)
 {
   // Copyright 2009, Mark Seligman at Rapid Biologics, LLC.  All rights
   // reserved.
@@ -447,7 +444,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
   void * argsCN[] = {
     &rows, &cols, &dQR, &rows, &dColNorms
   };
-  cudaCompileLaunch(kernelSrc, "getColNorms", argsCN, grid, block);
+  cudaLaunch("getColNorms", argsCN, grid, block);
 
   int
     maxRank = rows > cols ? cols : rows;
@@ -555,7 +552,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
         void * argsUp[] = {
           &colsUp, &diag1, &dcnk1
         };
-        cudaCompileLaunch(kernelSrc, "UpdateHHNorms", argsUp, grid, block);
+        cudaLaunch("UpdateHHNorms", argsUp, grid, block);
       }
       else
         qrAux[k] = v1Abs;  // The bottom row is not scaled
@@ -590,10 +587,9 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
 // QR decomp of matrix da:  Q*A*P=R, equiv A*P = Q^t * R
 //
 void getQRDecompBlocked(int rows, int cols, double tol,
-                                 float * dQR,
-                                 int blockSize, int stride, int * pivot,
-                                 double * qrAux, int * rank,
-                                 const char * kernelSrc)
+                        float * dQR,
+                        int blockSize, int stride, int * pivot,
+                        double * qrAux, int * rank)
 {
   // Copyright 2009, Mark Seligman at Rapid Biologics, LLC.  All rights
   // reserved.
@@ -637,7 +633,7 @@ void getQRDecompBlocked(int rows, int cols, double tol,
   void * argsCN[] = {
     &rows, &cols, &dQR, &stride, &dColNorms
   };
-  cudaCompileLaunch(kernelSrc, "getColNorms", argsCN, grid, block);
+  cudaLaunch("getColNorms", argsCN, grid, block);
 
   int maxIdx = cublasIsamax(cols, dColNorms, 1)-1;
   float maxNorm = cublasSnrm2(rows, dQR + stride * maxIdx, 1);

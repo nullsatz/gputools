@@ -19,14 +19,12 @@ void hcluster(const float * dist, size_t dist_pitch, size_t n,
               int * sub, int * sup,
               float * val,
               hc_method method,
-              float lambda = 0.5, float beta = 0.5,
-              const char * kernelSrc = "");
+              float lambda = 0.5, float beta = 0.5);
 
 void hclusterPreparedDistances(float * gpuDist, size_t pitch_dist_d, size_t n,
                                int * sub, int * sup,
                                float * val,
                                hc_method method,
-                               float lambda, float beta,
-                               const char * kernelSrc);
+                               float lambda, float beta);
 
 #endif // HCLUSTER_H

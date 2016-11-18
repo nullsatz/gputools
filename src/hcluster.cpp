@@ -1,10 +1,12 @@
-#include<stdio.h>
-#include<string.h>
-#include<math_constants.h>
-#include<cuseful.h>
-#include<R.h>
-#include<hcluster.h>
+#include <stdio.h>
+#include <string.h>
+#include <string>
 
+#include "R.h"
+
+#include "math_constants.h"
+#include "cuseful.h"
+#include "hcluster.h"
 #include "cudaUtils.h"
 
 #define NUM_THREADS 32
@@ -12,8 +14,7 @@
 
 void hcluster(const float * dist, size_t dist_pitch, size_t n,
               int * sub, int * sup, float * val, hc_method method,
-              float lambda, float beta,
-              const char * kernelSrc)
+              float lambda, float beta)
 {
   // Allocate space for the distance matrix
   size_t pitch_dist_d;
@@ -30,8 +31,7 @@ void hcluster(const float * dist, size_t dist_pitch, size_t n,
   hclusterPreparedDistances(hcluster_dist_d, pitch_dist_d, n,
                             sub, sup,
                             val,
-                            method, lambda, beta,
-                            kernelSrc);
+                            method, lambda, beta);
 
   cudaFree(hcluster_dist_d);
   checkCudaError("hcluster : cudaFree");
@@ -41,8 +41,7 @@ void hclusterPreparedDistances(float * gpuDist, size_t pitch_dist_d, size_t n,
                                int * sub, int * sup,
                                float * val,
                                hc_method method,
-                               float lambda, float beta,
-                               const char * kernelSrc)
+                               float lambda, float beta)
 {
   float
     * hcluster_count_d, // Number of elements in each cluster
@@ -87,10 +86,10 @@ void hclusterPreparedDistances(float * gpuDist, size_t pitch_dist_d, size_t n,
   };
 
   // Convert 0 on the diagonal to infinity
-  cudaCompileLaunch(kernelSrc, "convert_kernel", convertArgs, grid1, block1);
+  cudaLaunch("convert_kernel", convertArgs, grid1, block1);
   checkCudaError("hcluster : convert kernel");
 
-  const char * func;
+  std::string func;
   switch(method) {
   case COMPLETE:
     func = "complete_kernel";
@@ -163,20 +162,20 @@ void hclusterPreparedDistances(float * gpuDist, size_t pitch_dist_d, size_t n,
     // Find the minimum of each column
     for(size_t row_offset = 0; row_offset < n; row_offset += NUM_BLOCKS) {
       findMin1Args[6] = &row_offset;
-      cudaCompileLaunch(kernelSrc, "find_min1_kernel", findMin1Args,
+      cudaLaunch("find_min1_kernel", findMin1Args,
                         grid0, block0);
     }
                 
     // Find overall winner; update arrays sub, sup, val, count
     findMin2Args[7] = &iter;
-    cudaCompileLaunch(kernelSrc, "find_min2_kernel", findMin2Args,
+    cudaLaunch("find_min2_kernel", findMin2Args,
                       grid1, block1);
 
     // Update the distance matrix
     funcArgs[7] = &iter;
     for(size_t col_offset = 0; col_offset < n; col_offset += skip) {
       funcArgs[8] = &col_offset;
-      cudaCompileLaunch(kernelSrc, func, funcArgs, grid0, block0);
+      cudaLaunch(func, funcArgs, grid0, block0);
     }
   }
   checkCudaError("hcluster : method kernel calls");

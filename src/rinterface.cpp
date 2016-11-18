@@ -34,8 +34,7 @@ void rpmcc(const int * whichObs,
            const float * samplesA, const int * numSamplesA,
            const float * samplesB, const int * numSamplesB,
            const int * sampleSize,
-           float * numPairs, float * correlations, float * signifs,
-           const char ** kernel_src)
+           float * numPairs, float * correlations, float * signifs)
 {
   UseObs myObs;
   switch(*whichObs) {
@@ -52,8 +51,7 @@ void rpmcc(const int * whichObs,
        samplesA, *numSamplesA,
        samplesB, *numSamplesB,
        *sampleSize,
-       numPairs, correlations, signifs,
-       kernel_src[0]);
+       numPairs, correlations, signifs);
 }
 
 void rformatInput(const int * images, 
@@ -87,9 +85,9 @@ void rgetDevice(int * device) {
 }
 
 void rtestT(const float * pairs, const float * coeffs, const int * n, 
-            float * ts, const char ** kernelSrc) 
+            float * ts)
 {
-  testSignif(pairs, coeffs, (size_t) *n, ts, kernelSrc[0]);
+  testSignif(pairs, coeffs, (size_t) *n, ts);
 }
 
 void rhostT(const float * pairs, const float * coeffs, const int * n, 
@@ -102,18 +100,17 @@ void rSignifFilter(const double * data, int * rows, double * results) {
   *rows = signifFilter(data, (size_t) *rows, results);
 }
 
-void gSignifFilter(const float * data, int * rows, float * results,
-                   const char ** kernelSrc) {
-  *rows = gpuSignifFilter(data, (size_t) *rows, results,
-                          kernelSrc[0]);
+void gSignifFilter(const float * data, int * rows, float * results) {
+  *rows = gpuSignifFilter(data, (size_t) *rows, results);
 }
 
 void RcublasPMCC(const float * samplesA, const int * numSamplesA,
-                 const float * samplesB, const int * numSamplesB, const int * sampleSize,
-                 float * correlations, const char ** kernelSrc)
+                 const float * samplesB, const int * numSamplesB,
+                 const int * sampleSize,
+                 float * correlations)
 {
   cublasPMCC(samplesA, *numSamplesA, samplesB, *numSamplesB, *sampleSize, 
-             correlations, kernelSrc[0]);
+             correlations);
 }
 
 void RhostKendall(const float * X, const float * Y, const int * n, 
@@ -129,25 +126,22 @@ void RpermHostKendall(const float * X, const int * nx, const float * Y,
 }
 
 void RgpuKendall(const float * X, const int * nx, const float * Y, 
-                 const int * ny, const int * sampleSize, double * answers,
-                 const char ** kernel_src)
+                 const int * ny, const int * sampleSize, double * answers)
 {
-  masterKendall(X, *nx, Y, *ny, *sampleSize, answers, kernel_src[0]);
+  masterKendall(X, *nx, Y, *ny, *sampleSize, answers);
 }
 
 void rgpuGranger(const int * rows, const int * cols, const float * y,
-                 const int * p, float * fStats, float * pValues,
-                 const char ** kernelSrc)
+                 const int * p, float * fStats, float * pValues)
 {
-  granger(*rows, *cols, y, *p, fStats, pValues, kernelSrc[0]);
+  granger(*rows, *cols, y, *p, fStats, pValues);
 }
 
 void rgpuGrangerXY(const int * rows, const int * colsx, const float * x, 
                    const int * colsy, const float * y, const int * p, 
-                   float * fStats, float * pValues,
-                   const char ** kernelSrc)
+                   float * fStats, float * pValues)
 {
-  grangerxy(*rows, *colsx, x, *colsy, y, *p, fStats, pValues, kernelSrc[0]);
+  grangerxy(*rows, *colsx, x, *colsy, y, *p, fStats, pValues);
 }
 
 dist_method getDistEnum(const char * methodStr)
@@ -177,8 +171,7 @@ hc_method getClusterEnum(const char * methodStr)
 
 void Rdistclust(const char ** distmethod, const char ** clustmethod, 
                 const float * points, const int * numPoints, const int * dim,
-                int * merge, int * order, float * val,
-                const char ** distKernels, const char ** clustKernels)
+                int * merge, int * order, float * val)
 {
   dist_method dmeth = getDistEnum(*distmethod); 
   hc_method hcmeth = getClusterEnum(*clustmethod); 
@@ -187,8 +180,7 @@ void Rdistclust(const char ** distmethod, const char ** clustmethod,
   float * gpuDistances = NULL;
 
   distanceLeaveOnGpu(dmeth, 2.f, points, *dim, *numPoints, 
-                     &gpuDistances, &dpitch,
-                     distKernels[0]);
+                     &gpuDistances, &dpitch);
 
   size_t len = (*numPoints) - 1;
   float 
@@ -203,8 +195,7 @@ void Rdistclust(const char ** distmethod, const char ** clustmethod,
                             presub, presup,
                             val,
                             hcmeth,
-                            lambda, beta,
-                            clustKernels[0]);
+                            lambda, beta);
 
   formatClustering(len, presub, presup, merge, order);
 
@@ -213,21 +204,18 @@ void Rdistclust(const char ** distmethod, const char ** clustmethod,
 }
 
 void Rdistances(const float * points, const int * numPoints, const int * dim,
-                float * distances, const char ** method, const float *p,
-                const char ** kernelSrc)
+                float * distances, const char ** method, const float *p)
 {
   dist_method nummethod = getDistEnum(*method); 
 
   distance(points, (*dim)*sizeof(float), *numPoints, points, 
            (*dim)*sizeof(float), *numPoints, *dim, distances, 
-           (*numPoints)*sizeof(float), nummethod, *p,
-           kernelSrc[0]);
+           (*numPoints)*sizeof(float), nummethod, *p);
 }
 
 void Rhcluster(const float * distMat, const int * numPoints, 
                int * merge, int * order, float * val,
-               const char ** method,
-               const char ** kernelSrc)
+               const char ** method)
 {
   hc_method nummethod = getClusterEnum(*method); 
         
@@ -242,8 +230,7 @@ void Rhcluster(const float * distMat, const int * numPoints,
   presup = Calloc(len, int);
 
   hcluster(distMat, pitch, *numPoints, presub, presup, val, nummethod,
-           lambda, beta,
-           kernelSrc[0]);
+           lambda, beta);
 
   formatClustering(len, presub, presup, merge, order);
 
@@ -305,7 +292,7 @@ void depthFirst(const int len, const int * merge, int level, int * otop,
 }
 
 void RgetQRDecomp(int * rows, int * cols, float * a, float * q, int * pivot,
-                  int * rank, const char ** kernelSrc)
+                  int * rank)
 {
 
   int
@@ -318,7 +305,7 @@ void RgetQRDecomp(int * rows, int * cols, float * a, float * q, int * pivot,
   cublasAlloc(m*m, fbytes, (void **)&dq);
   cublasSetMatrix(m, n, fbytes, a, m, da, m);
 
-  getQRDecomp(m, n, dq, da, pivot, kernelSrc[0]);
+  getQRDecomp(m, n, dq, da, pivot);
 
   cublasGetMatrix(m, n, fbytes, da, m, a, m);
   cublasGetMatrix(m, m, fbytes, dq, m, q, m);
@@ -342,7 +329,7 @@ void RgetQRDecomp(int * rows, int * cols, float * a, float * q, int * pivot,
 // solve for B:  XB=Y where B and Y are vectors and X is a matrix of
 // dimension rows x cols
 void RqrSolver(int * rows, int * cols, float * matX, float * vectY, 
-               float * vectB, const char ** kernelSrc)
+               float * vectB)
 {
   int
     fbytes = sizeof(float),
@@ -359,7 +346,7 @@ void RqrSolver(int * rows, int * cols, float * matX, float * vectY,
   cublasSetVector(m, fbytes, vectY, 1, dY, 1);
   checkCublasError("RqrSolver: line 84");
 
-  qrSolver(m, n, dX, dY, dB, kernelSrc[0]);
+  qrSolver(m, n, dX, dY, dB);
 
   cublasFree(dX);
   cublasFree(dY);
@@ -372,8 +359,7 @@ void RqrSolver(int * rows, int * cols, float * matX, float * vectY,
 
 void rGetQRDecompRR(const int * rows, const int * cols,
                     const double * tol, float * x, int * pivot,
-                    double * qraux, int * rank,
-                    const char ** kernelSrc)
+                    double * qraux, int * rank)
 {
   float * dQR;
   cudaMalloc((void **) &dQR, (*rows) * (*cols) * sizeof(float));
@@ -382,8 +368,7 @@ void rGetQRDecompRR(const int * rows, const int * cols,
   cudaMemcpy(dQR, x, (*rows) * (*cols) * sizeof(float),
              cudaMemcpyHostToDevice);
 
-  getQRDecompRR(*rows, *cols, *tol, dQR, pivot, qraux, rank,
-                kernelSrc[0]);
+  getQRDecompRR(*rows, *cols, *tol, dQR, pivot, qraux, rank);
 
   cudaMemcpy(x, dQR, (*rows) * (*cols) * sizeof(float),
              cudaMemcpyDeviceToHost);
@@ -428,23 +413,23 @@ void rSolveFromQR(const int * rows, const int * cols, const float * q, const flo
 }
 
 void rBSplineMutualInfo(int * nBins, int * splineOrder, int * nsamples,
-                        int * rowsA, const float * A, int * rowsB, const float * B, 
-                        float * mutualInfo, const char ** kernelSrc)
+                        int * rowsA, const float * A,
+                        int * rowsB, const float * B, 
+                        float * mutualInfo)
 {
   bSplineMutualInfo(*nBins, *splineOrder, *nsamples, *rowsA, A, *rowsB, B,
-                    mutualInfo, kernelSrc[0]);
+                    mutualInfo);
 }
 
 // Interface for R functions requiring least-squares computations.
 //
 void RgpuLSFit(float *X, int *n, int *p, float *Y, int *nY,
                double *tol, float *coeffs, float *resids, float *effects,
-               int *rank, int *pivot, double * qrAux, int useSingle,
-               const char ** kernelSrc)
+               int *rank, int *pivot, double * qrAux, int useSingle)
 {
   if (useSingle) {
     gpuLSFitF(X, *n, *p, Y, *nY, *tol, coeffs, resids, effects,
-              rank, pivot, qrAux, kernelSrc[0]);
+              rank, pivot, qrAux);
   }
   else {
     //    gpuLSFitD(X, *n, *p, Y, *nY, *tol, coeffs, resids, effects, rank, pivot, qrAux);

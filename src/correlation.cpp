@@ -15,8 +15,7 @@
 #define THREADWORK 32
 
 void testSignif(const float * goodPairs, const float * coeffs, 
-                         size_t n, float * tscores,
-                         const char * kernelSrc)
+                size_t n, float * tscores)
 {
   size_t
     fbytes = sizeof(float), size = n*fbytes;
@@ -41,7 +40,7 @@ void testSignif(const float * goodPairs, const float * coeffs,
     &n,
     &gpuTs
   };
-  cudaCompileLaunch(kernelSrc, "gpuSignif", args, tgrid, tblock);
+  cudaLaunch("gpuSignif", args, tgrid, tblock);
 
   cudaMemcpy(tscores, gpuTs, size, cudaMemcpyDeviceToHost);
   cudaFree(gpuPairs);
@@ -68,8 +67,7 @@ void pmcc(UseObs whichObs,
     const float * vectsa, size_t na,
     const float * vectsb, size_t nb,
     size_t dim, float * numPairs, float * correlations,
-    float * signifs,
-    const char * kernelSrc)
+          float * signifs)
 {
   size_t 
     fbytes = sizeof(float);
@@ -126,22 +124,22 @@ void pmcc(UseObs whichObs,
 
   switch(whichObs) {
   case pairwiseComplete:
-    cudaCompileLaunch(kernelSrc, "gpuMeans", argsMeans, grid, block);
+    cudaLaunch("gpuMeans", argsMeans, grid, block);
     cudaThreadSynchronize();
 
-    cudaCompileLaunch(kernelSrc, "gpuSD", argsSD, grid, block);
+    cudaLaunch("gpuSD", argsSD, grid, block);
     cudaThreadSynchronize();
 
-    cudaCompileLaunch(kernelSrc, "gpuPMCC", argsPMCC, grid, block);
+    cudaLaunch("gpuPMCC", argsPMCC, grid, block);
     break;
   default:
-    cudaCompileLaunch(kernelSrc, "gpuMeansNoTest", argsMeans, grid, block);
+    cudaLaunch("gpuMeansNoTest", argsMeans, grid, block);
     cudaThreadSynchronize();
 
-    cudaCompileLaunch(kernelSrc, "gpuSDNoTest", argsSD, grid, block);
+    cudaLaunch("gpuSDNoTest", argsSD, grid, block);
     cudaThreadSynchronize();
     
-    cudaCompileLaunch(kernelSrc, "gpuPMCCNoTest", argsPMCC, grid, block);
+    cudaLaunch("gpuPMCCNoTest", argsPMCC, grid, block);
   }
 
   cudaMemcpy(correlations, gpuCorrelations, na*nb*fbytes, 
@@ -338,8 +336,7 @@ size_t signifFilter(const double * data, size_t rows, double * results)
   return rowcount;
 }
 
-void updateSignifs(const float * data, size_t n, float * results,
-    const char * kernelSrc)
+void updateSignifs(const float * data, size_t n, float * results)
 {
   size_t
     fbytes = sizeof(float), size = n*fbytes,
@@ -361,7 +358,7 @@ void updateSignifs(const float * data, size_t n, float * results,
   void * args[] = {
     &gpuData, &n, &gpuResults
   };
-  cudaCompileLaunch(kernelSrc, "dUpdateSignif", args, tgrid, tblock);
+  cudaLaunch("dUpdateSignif", args, tgrid, tblock);
   checkCudaError("updateSignifs function : trouble executing kernel on gpu");
 
   cudaMemcpy(results, gpuResults, outsize, cudaMemcpyDeviceToHost);
@@ -370,8 +367,7 @@ void updateSignifs(const float * data, size_t n, float * results,
   checkCudaError("updateSignifs function : trouble reading from gpu");
 }
 
-size_t gpuSignifFilter(const float * data, size_t rows, float * results,
-    const char * kernelSrc)
+size_t gpuSignifFilter(const float * data, size_t rows, float * results)
 {
   size_t 
     i, rowbytes = 6*sizeof(float),
@@ -379,7 +375,7 @@ size_t gpuSignifFilter(const float * data, size_t rows, float * results,
 
   if(results == NULL) error("signifFilter : no ram set aside for results\n");
 
-  updateSignifs(data, rows, results, kernelSrc);
+  updateSignifs(data, rows, results);
 
   for(i = 0; i < rows; i++) {
     inrow = i*6;
@@ -393,9 +389,10 @@ size_t gpuSignifFilter(const float * data, size_t rows, float * results,
   return rowcount;
 }
 
-void cublasPMCC(const float * sampsa, size_t numSampsA, const float * sampsb, 
-                size_t numSampsB, size_t sampSize, float * res,
-                const char * kernelSrc)
+void cublasPMCC(const float * sampsa, size_t numSampsA,
+                const float * sampsb, size_t numSampsB,
+                size_t sampSize,
+                float * res)
 {
   int 
     same = (sampsa == sampsb);
@@ -458,7 +455,7 @@ void cublasPMCC(const float * sampsa, size_t numSampsA, const float * sampsb,
       &gpub,
       &gpubRecipSD
     };
-    cudaCompileLaunch(kernelSrc, "noNAsPmccMeans", args, dimGrid, dimBlock);
+    cudaLaunch("noNAsPmccMeans", args, dimGrid, dimBlock);
         
     for(size_t i = 0; i < sampSize; i++) // subtract mean
       cublasSaxpy(numSampsB, -1.f, gpubRecipSD, 1, gpub+i, sampSize);

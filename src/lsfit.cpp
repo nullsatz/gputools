@@ -24,8 +24,7 @@ int alignBlock(int length, unsigned blockExp) {
 
 void gpuLSFitF(float * X, int rows, int cols, float * Y, int yCols,
                double tol, float * coeffs, float * resids, float * effects,
-               int * rank, int * pivot, double * qrAux,
-               const char * kernelSrc)
+               int * rank, int * pivot, double * qrAux)
 {
 	const int
 		fbytes = sizeof(float);
@@ -51,7 +50,7 @@ void gpuLSFitF(float * X, int rows, int cols, float * Y, int yCols,
   // On return we have dQR in pivoted, packed QR form.
   
   getQRDecompBlocked(rows, cols, tol, dQR, 1 << blockExp,
-                     stride, pivot, qrAux, rank, kernelSrc);
+                     stride, pivot, qrAux, rank);
 	cublasGetMatrix(rows, cols, fbytes, dQR, stride, X, rows);
 
 	if(*rank > 0)

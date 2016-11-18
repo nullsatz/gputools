@@ -14,23 +14,20 @@ gpuGranger <- function(x, y=NULL, lag)
 
     lag <- as.integer(lag)
 
-    filename <- system.file('cuda', 'granger.cu', package = 'gputools')
-    kernelSrc <- readChar(filename, file.info(filename)$size)
-
     if(is.null(y)) {
         colsy <- colsx
         cRetVal <- .C("rgpuGranger",
                       as.integer(rows), as.integer(colsx), as.single(x), lag, 
-                      fStats = single(colsx*colsy), pValues = single(colsx*colsy),
-                      kernelSrc,
+                      fStats = single(colsx*colsy),
+                      pValues = single(colsx*colsy),
                       PACKAGE='gputools')
     } else {
         colsy <- ncol(y)
         cRetVal <- .C("rgpuGrangerXY",
                       as.integer(rows), as.integer(colsx), as.single(x), 
                       as.integer(colsy), as.single(y), lag, 
-                      fStats = single(colsx*colsy), pValues = single(colsx*colsy),
-                      kernelSrc,
+                      fStats = single(colsx*colsy),
+                      pValues = single(colsx*colsy),
                       PACKAGE='gputools')
     }
     fStats <- matrix(cRetVal$fStats, colsx, colsy)

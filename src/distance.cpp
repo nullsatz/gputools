@@ -1,5 +1,6 @@
-#include<stdio.h>
-#include<string.h>
+#include <stdio.h>
+#include <string.h>
+#include <string>
 
 #include "R.h"
 #include "Rinternals.h"
@@ -209,8 +210,7 @@ void distance_device(const float * vg_a_d, size_t pitch_a, size_t n_a,
                      const float * vg_b_d, size_t pitch_b, size_t n_b,
                      size_t k,
                      float * d_d, size_t pitch_d,
-                     dist_method method, float p,
-                     const char * kernelSrc)
+                     dist_method method, float p)
 {
   dim3 block(NUM_THREADS, 1, 1);
   dim3 grid(n_a, n_b, 1);
@@ -228,7 +228,7 @@ void distance_device(const float * vg_a_d, size_t pitch_a, size_t n_a,
     &d_d, &pitch_d, &p
   };
 
-  const char * kernelName;
+  std::string kernelName;
   
   switch(method) {  // Calculate the distance
   case EUCLIDEAN:
@@ -253,15 +253,14 @@ void distance_device(const float * vg_a_d, size_t pitch_a, size_t n_a,
     kernelName = "";
     error("unknown distance method");
   }
-  cudaCompileLaunch(kernelSrc, kernelName, args, grid, block);
+  cudaLaunch(kernelName, args, grid, block);
 }
 
 void distance(const float * vg_a, size_t pitch_a, size_t n_a,
               const float * vg_b, size_t pitch_b, size_t n_b,
               size_t k,
               float * d, size_t pitch_d,
-              dist_method method, float p,
-              const char * kernelSrc)
+              dist_method method, float p)
 {
   size_t 
     pitch_a_d, pitch_b_d, pitch_d_d;
@@ -289,8 +288,7 @@ void distance(const float * vg_a, size_t pitch_a, size_t n_a,
                     distance_vg_a_d, pitch_a_d, n_a,
                     k,
                     distance_d_d, pitch_d_d,
-                    method, p,
-                    kernelSrc);
+                    method, p);
   else { // vg_b is a different set of pnts so store it on gpu too
     cudaMallocPitch((void**)&distance_vg_b_d, &pitch_b_d, 
                     k * sizeof(float), n_b);
@@ -303,8 +301,7 @@ void distance(const float * vg_a, size_t pitch_a, size_t n_a,
                     distance_vg_b_d, pitch_b_d, n_b,
                     k,
                     distance_d_d, pitch_d_d,
-                    method, p,
-                    kernelSrc);
+                    method, p);
     cudaFree(distance_vg_b_d);
   }
   checkCudaError("distance function : kernel invocation");
@@ -320,8 +317,7 @@ void distance(const float * vg_a, size_t pitch_a, size_t n_a,
 
 void distanceLeaveOnGpu(dist_method method, float p, const float * points, 
                         size_t dim, size_t numPoints, 
-                        float ** gpuDistances, size_t * pitchDistances, // outputs
-                        const char * kernelSrc)
+                        float ** gpuDistances, size_t * pitchDistances) // outputs
 {
   size_t pitchPoints;
   float * dPoints;
@@ -340,7 +336,7 @@ void distanceLeaveOnGpu(dist_method method, float p, const float * points,
                   dPoints, pitchPoints, numPoints,
                   dim,
                   *gpuDistances, *pitchDistances, 
-                  method, p, kernelSrc);
+                  method, p);
   checkCudaError("distance on gpu func : kernel invocation");
         
   // clean up resources

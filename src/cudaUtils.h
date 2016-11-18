@@ -1,6 +1,8 @@
 #ifndef _CUDAUTILS_H_
 #define _CUDAUTILS_H_
 
+#include <string>
+
 #include "R.h"
 #include "nvrtc.h"
 #include "cuda_runtime_api.h"
@@ -24,10 +26,9 @@
     }                                                           \
   } while(0)
 
-void cudaCompileLaunch(const char * kernelSrc,
-                       const char * kernelName,
-                       void * args[],
-                       const dim3 &gridDim, const dim3 &blockDim,
-                       cudaStream_t stream = NULL);
+void cudaLaunch(std::string kernelName,
+                void * args[],
+                const dim3 &gridDim, const dim3 &blockDim,
+                cudaStream_t stream = NULL);
 
 #endif /* _CUDAUTILS_H_ */

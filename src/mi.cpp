@@ -33,8 +33,7 @@ static int initKnots(int nbins, int order, float ** knots) {
 void bSplineMutualInfo(int nbins, int order, int nsamples,
                        int nx, const float * x,
                        int ny, const float * y,
-                       float * out_mi,
-                       const char * kernelSrc)
+                       float * out_mi)
 {
   size_t
     pitch[2], pitch_bins[2],
@@ -93,7 +92,7 @@ void bSplineMutualInfo(int nbins, int order, int nsamples,
       dx + i,
       &xpitch
     };
-    cudaCompileLaunch(kernelSrc, "scale", scaleArgs,
+    cudaLaunch("scale", scaleArgs,
                       grid, block, stream[i]);
 
     size_t pitch_bins_i = pitch_bins[i] / sizeof(float);
@@ -105,7 +104,7 @@ void bSplineMutualInfo(int nbins, int order, int nsamples,
       dbins + i,
       &pitch_bins_i
     };
-    cudaCompileLaunch(kernelSrc, "get_bin_scores", gbsArgs,
+    cudaLaunch("get_bin_scores", gbsArgs,
                       grid, block, stream[i]);
 
     void * entropyArgs[] = {
@@ -116,7 +115,7 @@ void bSplineMutualInfo(int nbins, int order, int nsamples,
       &pitch_bins_i,
       dentropy + i
     };
-    cudaCompileLaunch(kernelSrc, "get_entropy", entropyArgs,
+    cudaLaunch("get_entropy", entropyArgs,
                       grid, block, stream[i]);
   }
   checkCudaError("bSplineMutualInfoSingle: 3");
@@ -145,7 +144,7 @@ void bSplineMutualInfo(int nbins, int order, int nsamples,
     &ny, dbins + 1, pitch_bins + 1, dentropy + 1,
     &dmi, &dpitch_mi
   };
-  cudaCompileLaunch(kernelSrc, "get_mi", miArgs, gridDim, blockDim);
+  cudaLaunch("get_mi", miArgs, gridDim, blockDim);
   checkCudaError("bSplineMutualInfoSingle: 4");
 
   for(int i = 0; i < 2; i++)

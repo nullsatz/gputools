@@ -33,8 +33,7 @@ void getPValues(int rows, int cols, const float * fStats, int p, int embedRows,
 }
 
 void granger(int rows, int cols, const float * y, int p, 
-             float * fStats, float * pValues,
-             const char * kernelSrc)
+             float * fStats, float * pValues)
 {
   if(cols < 2) {
     fatal("The Granger test needs at least 2 variables.\n");
@@ -131,7 +130,7 @@ void granger(int rows, int cols, const float * y, int p,
     &restricted,
     &restrictedDim
   };
-  cudaCompileLaunch(kernelSrc, "getRestricted", restArgs, dimRGrid, dimRBlock);
+  cudaLaunch("getRestricted", restArgs, dimRGrid, dimRBlock);
   if( hasCudaError("granger: getRestricted kernel execution") ) return;
 
   cudaFree(rQ);
@@ -159,7 +158,7 @@ void granger(int rows, int cols, const float * y, int p,
     &unrestricted,
     &unrestrictedDim
   };
-  cudaCompileLaunch(kernelSrc, "getUnrestricted", unrestArgs, dimUnrGrid, dimUnrBlock);
+  cudaLaunch("getUnrestricted", unrestArgs, dimUnrGrid, dimUnrBlock);
   if( hasCudaError("granger : getUnRestricted kernel execution") ) return;
 
   cudaFree(unrQ);
@@ -184,7 +183,7 @@ void granger(int rows, int cols, const float * y, int p,
     &unrdata, &unrdataDim,
     &dfStats
   };
-  cudaCompileLaunch(kernelSrc, "ftest", ftestArgs, dimUnrGrid, dimUnrBlock); 
+  cudaLaunch("ftest", ftestArgs, dimUnrGrid, dimUnrBlock); 
   if( hasCudaError("granger : ftest kernel execution") ) return;
 
   cudaMemcpy(fStats, dfStats, resultSize, cudaMemcpyDeviceToHost);
@@ -203,8 +202,7 @@ void granger(int rows, int cols, const float * y, int p,
 }
 
 void grangerxy(int rows, int colsx, const float * x, int colsy, 
-               const float * y, int p, float * fStats, float * pValues,
-               const char * kernelSrc)
+               const float * y, int p, float * fStats, float * pValues)
 {
 
   if((p < 0) || (rows < 1) || (colsx < 1) || (colsy < 1)) {
@@ -306,7 +304,7 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
     &rR, &rRdim,
     &restricted, &restrictedDim
   };
-  cudaCompileLaunch(kernelSrc, "getRestricted", restArgs,
+  cudaLaunch("getRestricted", restArgs,
                     dimRGrid, dimRBlock);
   
   size_t unrestT = embedCols - 1;
@@ -320,7 +318,7 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
     &unrR, &unrRdim,
     &unrestricted, &unrestrictedDim
   };
-  cudaCompileLaunch(kernelSrc, "getUnrestricted", unrestArgs,
+  cudaLaunch("getUnrestricted", unrestArgs,
                     dimUnrGrid, dimUnrBlock);
 
   checkCudaError("grangerxy : kernel execution get(Un)Restricted");
@@ -349,7 +347,7 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
     &unrdata, &unrdataDim,
     &dfStats
   };
-  cudaCompileLaunch(kernelSrc, "ftest", ftestArgs, dimUnrGrid, dimUnrBlock); 
+  cudaLaunch("ftest", ftestArgs, dimUnrGrid, dimUnrBlock); 
   checkCudaError("grangerxy : kernel execution ftest");
 
   cudaMemcpy(fStats, dfStats, resultSize, cudaMemcpyDeviceToHost);

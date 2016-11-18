@@ -1,6 +1,12 @@
+#include <map>
+#include <vector>
+#include <string>
+
 #include "R.h"
 #include "nvrtc.h"
 #include "cuda.h"
+
+#include "cudaKernels.h"
 #include "cudaUtils.h"
 
 // Obtain compilation log from the program.
@@ -13,17 +19,154 @@ void printCompileLog(nvrtcProgram &prog) {
   delete[] log;
 }
 
-void cudaCompileLaunch(const char * kernelSrc,
-                       const char * kernelName,
-                       void * args[],
-                       const dim3 &gridDim, const dim3 &blockDim,
-                       cudaStream_t stream)
+static
+std::vector<std::string> & getFileKernels(std::string file)
+{
+  std::vector<std::string> * kernels;
+  if (file == "correlation") {  
+    std::string newKernels[] =
+      { "gpuSignif"
+      , "gpuMeans"
+      , "gpuSD"
+      , "gpuPMCC"
+      , "gpuMeansNoTest"
+      , "gpuSDNoTest"
+      , "gpuPMCCNoTest"
+      , "dUpdateSignif"
+      , "noNAsPmccMeans"
+      };
+    kernels = new std::vector<std::string>(newKernels, newKernels + 9);
+  } else if (file == "distance") {
+    std::string newKernels[] = 
+      { "euclidean_kernel_same"
+      , "maximum_kernel_same"
+      , "manhattan_kernel_same"
+      , "canberra_kernel_same"
+      , "binary_kernel_same"
+      , "minkowski_kernel_same"
+      };
+    kernels = new std::vector<std::string>(newKernels, newKernels + 6);
+  } else if (file == "granger") {
+    std::string newKernels[] = 
+      { "getRestricted"
+      , "getUnrestricted"
+      , "ftest"
+      , "getRestricted"
+      , "getUnrestricted"
+      , "ftest"
+      };
+    kernels = new std::vector<std::string>(newKernels, newKernels + 6);
+  } else if (file == "hcluster") {
+    std::string newKernels[] = 
+      { "complete_kernel"
+      , "wpgma_kernel"
+      , "average_kernel"
+      , "median_kernel"
+      , "centroid_kernel"
+      , "flexible_group_kernel"
+      , "flexible_kernel"
+      , "ward_kernel"
+      , "mcquitty_kernel"
+      , "single_kernel"
+      , "convert_kernel"
+      , "find_min1_kernel"
+      , "find_min2_kernel"
+      };
+    kernels = new std::vector<std::string>(newKernels, newKernels + 13);
+  } else if (file == "kendall") {
+    std::string newKernels[] = { "gpuKendall" };
+    kernels = new std::vector<std::string>(newKernels, newKernels + 1);
+  } else if (file == "mi") {
+    std::string newKernels[] =
+      { "scale"
+      , "get_bin_scores"
+      , "get_entropy"
+      , "get_mi"
+      };
+    kernels = new std::vector<std::string>(newKernels, newKernels + 4);
+  } else if (file == "qrdecomp") {
+    std::string newKernels[] =
+      { "getColNorms"
+      , "gpuFindMax"
+      , "gpuSwapCol"
+      , "makeHVector"
+      , "getColNorms"
+      , "UpdateHHNorms"
+      , "getColNorms"
+      };
+    kernels = new std::vector<std::string>(newKernels, newKernels + 4);
+  } else {
+    kernels = new std::vector<std::string>();
+  }
+  return(*kernels);
+}
+
+std::vector<char *> ptxToFree;
+
+extern "C"
+void cuCompile(const int * numFiles,
+               const char ** cuFilenames,
+               const char ** cuSrc)
+{
+  cudaKernels = new std::map<std::string, const char *>();
+  CUDA_SAFE_CALL(cuInit(0));
+
+  for (int i = 0; i < *numFiles; ++i) {
+    std::string file = cuFilenames[i];
+    const char * src = cuSrc[i];
+    nvrtcProgram prog;
+    NVRTC_SAFE_CALL(
+      nvrtcCreateProgram(&prog,  // prog
+        src,                     // buffer
+        file.c_str(),            // name
+        0,                       // numHeaders
+        NULL,                    // headers
+        NULL));                  // includeNames
+
+    nvrtcResult compileResult = nvrtcCompileProgram(prog, 0, NULL);
+    if (compileResult != NVRTC_SUCCESS) {
+      printCompileLog(prog);
+      error("\ncuda kernel compile failed");
+    }
+
+    //  Obtain PTX from the program.
+    size_t ptxSize;
+    NVRTC_SAFE_CALL(nvrtcGetPTXSize(prog, &ptxSize));
+
+    char * ptx = Calloc(ptxSize, char);
+    NVRTC_SAFE_CALL(nvrtcGetPTX(prog, ptx));
+
+    //  Destroy the program.
+    NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
+
+    std::vector<std::string> kernels = getFileKernels(file);
+    for(int i = 0; i < kernels.size(); ++i) {
+      (*cudaKernels)[kernels[i]] = ptx;
+      ptxToFree.push_back(ptx);
+    }
+  }
+}
+
+extern "C"
+void unloadPackage()
+{
+  for(int i = 0; i < ptxToFree.size(); ++i) {
+    Free(ptxToFree[i]);
+  }
+  delete cudaKernels;
+}
+
+void cudaLaunch(std::string kernelName,
+                void * args[],
+                const dim3 &gridDim, const dim3 &blockDim,
+                cudaStream_t stream)
 {
   nvrtcProgram prog;
+  const char * kernelSrc = (*cudaKernels)[kernelName];
   NVRTC_SAFE_CALL(
       nvrtcCreateProgram(&prog,  // prog
         kernelSrc,               // buffer
-        kernelName,              // name
+        kernelName.c_str(),      // name
         0,                       // numHeaders
         NULL,                    // headers
         NULL));                  // includeNames
@@ -51,7 +194,7 @@ void cudaCompileLaunch(const char * kernelSrc,
   CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
 
   CUfunction kernel;
-  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, kernelName));
+  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, kernelName.c_str()));
 
   CUDA_SAFE_CALL(
     cuLaunchKernel(kernel,

@@ -5,8 +5,7 @@ extern "C" {
              const float * samplesA, const int * numSamplesA,
              const float * samplesB, const int * numSamplesB, 
              const int * sampleSize, float * numPairs,
-             float * correlations, float * signifs,
-             const char ** kernel_src);
+             float * correlations, float * signifs);
 
   void rformatInput(const int * images, 
                     const int * xcoords, const int * ycoords, const int * zcoords,
@@ -29,51 +28,42 @@ extern "C" {
   void rhostT(const float * pairs, const float * coeffs, const int * n, 
               float * ts); 
   void rSignifFilter(const double * data, int * rows, double * results);
-  void gSignifFilter(const float * data, int * rows, float * results,
-                     const char ** kernelSrc);
+  void gSignifFilter(const float * data, int * rows, float * results);
 
   void RcublasPMCC(const float * samplesA, const int * numSamplesA,
                    const float * samplesB, const int * numSamplesB, 
-                   const int * sampleSize, float * correlations,
-                   const char ** kernelSrc);
+                   const int * sampleSize, float * correlations);
 
   void RhostKendall(const float * X, const float * Y, const int * n, 
                     double * answer);
   void RpermHostKendall(const float * X, const int * nx, const float * Y, 
                         const int * ny, const int * sampleSize, double * answers);
   void RgpuKendall(const float * X, const int * nx, const float * Y, 
-                   const int * ny, const int * sampleSize, double * answers,
-                   const char ** kernel_src);
+                   const int * ny, const int * sampleSize, double * answers);
 
   void rgpuGranger(const int * rows, const int * colsy, const float * y, 
-                   const int * p, float * fStats, float * pValues,
-                   const char ** kernelSrc);
+                   const int * p, float * fStats, float * pValues);
   void rgpuGrangerXY(const int * rows, const int * colsx, const float * x, 
                      const int * colsy, const float * y, const int * p, 
-                     float * fStats, float * pValues,
-                     const char ** kernelSrc);
+                     float * fStats, float * pValues);
 
   void Rdistclust(const char ** distmethod, const char ** clustmethod, 
                   const float * points, const int * numPoints, const int * dim,
-                  int * merge, int * order, float * val,
-                  const char ** distKernels,
-                  const char ** clustKernels);
+                  int * merge, int * order, float * val);
   void Rdistances(const float * points, const int * numPoints, 
                   const int * dim, float * distances, const char ** method,
-                  const float * p, const char ** kernelSrc);
+                  const float * p);
   void Rhcluster(const float * distMat, const int * numPoints, 
-                 int * merge, int * order, float * val, const char ** method,
-                 const char ** kernelSrc);
+                 int * merge, int * order, float * val, const char ** method);
 
   void RgetQRDecomp(int * rows, int * cols, float * a, float * q, int * pivot,
-                    int * rank, const char ** kernelSrc);
+                    int * rank);
   void RqrSolver(int * rows, int * cols, float * matX, float * vectY, 
-                 float * vectB, const char ** kernelSrc);
+                 float * vectB);
 
   void rGetQRDecompRR(const int * rows, const int * cols,
                       const double * tol, float * x, int * pivot,
-                      double * qraux, int * rank,
-                      const char ** kernelSrc);
+                      double * qraux, int * rank);
 
   void rGetInverseFromQR(const int * rows, const int * cols, const float * q,
                          const float * r, float * inverse);
@@ -83,13 +73,11 @@ extern "C" {
   void rBSplineMutualInfo(int * nBins, int * splineOrder, int * nsamples,
                           int * rowsA, const float * A,
                           int * rowsB, const float * B, 
-                          float * mutualInfo,
-                          const char ** kernelSrc);
+                          float * mutualInfo);
 
   void RgpuLSFit(float *X, int *n, int *p, float *Y, int *nY,
                  double *tol, float *coeffs, float *resids, float *effects,
-                 int *rank, int *pivot, double * qrAux, int useSingle,
-                 const char ** kernelSrc);
+                 int *rank, int *pivot, double * qrAux, int useSingle);
 
   void setDevice(int * device);
 }
