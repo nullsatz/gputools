@@ -64,8 +64,6 @@ if test [ -n "${cuda_include_path}" ] ; then
   CPPFLAGS="-I${cuda_include_path} ${CPPFLAGS}"
 fi
 
-AC_MSG_WARN([${CPPFLAGS}])
-
 AC_CHECK_HEADER([cuda.h], , [HAS_CUDA_H=no])
 AC_CHECK_HEADER([nvrtc.h], , [HAS_NVRTC_H=no])
 
