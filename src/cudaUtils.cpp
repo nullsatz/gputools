@@ -92,11 +92,9 @@ std::vector<std::string> & getFileKernels(std::string file)
       , "gpuFindMax"
       , "gpuSwapCol"
       , "makeHVector"
-      , "getColNorms"
       , "UpdateHHNorms"
-      , "getColNorms"
       };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 4);
+    kernels = new std::vector<std::string>(newKernels, newKernels + 5);
   } else {
     kernels = new std::vector<std::string>();
   }
@@ -123,7 +121,13 @@ void cuCompile(const int * numFiles,
         NULL,                    // headers
         NULL));                  // includeNames
 
-    nvrtcResult compileResult = nvrtcCompileProgram(prog, 0, NULL);
+    const char * options[] =
+    { "--use_fast_math"
+//    , "--gpu-architecture"
+//    , "compute_30"
+    };
+
+    nvrtcResult compileResult = nvrtcCompileProgram(prog, 1, options);
     if (compileResult != NVRTC_SUCCESS) {
       printCompileLog(prog);
       error("\ncuda kernel compile failed");
@@ -175,7 +179,6 @@ void cudaLaunch(std::string kernelName,
       blockDim.x, blockDim.y, blockDim.z, // block dim
       0, stream,                    // shared mem and stream
       args, 0));                  // arguments
-  CUDA_SAFE_CALL(cuCtxSynchronize());
-
+  //  CUDA_SAFE_CALL(cuCtxSynchronize());
   CUDA_SAFE_CALL(cuModuleUnload(module));
 }

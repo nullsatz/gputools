@@ -397,7 +397,7 @@ gpuLsfit <- function(x, y, wt=NULL, intercept=TRUE, useSingle = TRUE,
 		coefficients = coef, residuals = resid,
 		effects = drop(yIn),
 		rank = integer(1L), pivot = as.integer(0L:(ncx-1)),
-		qraux = qraux, useSingle,
+		qraux = qraux, useSingle
                )[c('qr', 'n', 'p', 'ny', 'tol',
 			'coefficients', 'residuals', 'effects', 'rank', 'pivot',
 			'qraux')]
