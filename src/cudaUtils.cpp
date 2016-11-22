@@ -1,6 +1,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 #include "R.h"
 #include "nvrtc.h"
@@ -8,8 +9,21 @@
 
 #include "cudaUtils.h"
 
-std::map<std::string, const char *> * cudaKernels;
-std::vector<char *> ptxToFree;
+class CudaKernel {
+public:
+  const char * name;
+  const char * ptx;
+  nvrtcProgram * prog;
+
+  CudaKernel(const char * _name, const char * _ptx, nvrtcProgram * _prog)
+  {
+    name = _name;
+    ptx = _ptx;
+    prog = _prog;
+  }
+};
+
+std::map<std::string, CudaKernel *> * cudaKernels;
 
 // Obtain compilation log from the program.
 void printCompileLog(nvrtcProgram &prog) {
@@ -106,47 +120,46 @@ void cuCompile(const int * numFiles,
                const char ** cuFilenames,
                const char ** cuSrc)
 {
-  cudaKernels = new std::map<std::string, const char *>();
+  cudaKernels = new std::map<std::string, CudaKernel *>();
   CUDA_SAFE_CALL(cuInit(0));
 
   for (int i = 0; i < *numFiles; ++i) {
     std::string file = cuFilenames[i];
     const char * src = cuSrc[i];
-    nvrtcProgram prog;
+
+    nvrtcProgram * prog = new nvrtcProgram();
     NVRTC_SAFE_CALL(
-      nvrtcCreateProgram(&prog,  // prog
+      nvrtcCreateProgram(prog,   // prog
         src,                     // buffer
         file.c_str(),            // name
         0,                       // numHeaders
         NULL,                    // headers
         NULL));                  // includeNames
+    
+    std::vector<std::string> kernels = getFileKernels(file);
+    for(int i = 0; i < kernels.size(); ++i) {
+      NVRTC_SAFE_CALL(nvrtcAddNameExpression(*prog, kernels[i].c_str()));
+    }
+    
+    const char * options[] = { "--use_fast_math" };
 
-    const char * options[] =
-    { "--use_fast_math"
-//    , "--gpu-architecture"
-//    , "compute_30"
-    };
-
-    nvrtcResult compileResult = nvrtcCompileProgram(prog, 1, options);
+    nvrtcResult compileResult = nvrtcCompileProgram(*prog, 1, options);
     if (compileResult != NVRTC_SUCCESS) {
-      printCompileLog(prog);
+      printCompileLog(*prog);
       error("\ncuda kernel compile failed");
     }
 
     //  Obtain PTX from the program.
     size_t ptxSize;
-    NVRTC_SAFE_CALL(nvrtcGetPTXSize(prog, &ptxSize));
+    NVRTC_SAFE_CALL(nvrtcGetPTXSize(*prog, &ptxSize));
 
     char * ptx = Calloc(ptxSize, char);
-    NVRTC_SAFE_CALL(nvrtcGetPTX(prog, ptx));
+    NVRTC_SAFE_CALL(nvrtcGetPTX(*prog, ptx));
 
-    //  Destroy the program.
-    NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
-
-    std::vector<std::string> kernels = getFileKernels(file);
     for(int i = 0; i < kernels.size(); ++i) {
-      (*cudaKernels)[kernels[i]] = ptx;
-      ptxToFree.push_back(ptx);
+      const char * name;
+      NVRTC_SAFE_CALL(nvrtcGetLoweredName(*prog, kernels[i].c_str(), &name));
+      (*cudaKernels)[kernels[i]] = new CudaKernel(name, ptx, prog); 
     }
   }
 }
@@ -154,10 +167,31 @@ void cuCompile(const int * numFiles,
 extern "C"
 void unloadPackage()
 {
-  for(int i = 0; i < ptxToFree.size(); ++i) {
-    Free(ptxToFree[i]);
+  std::vector<const char *> ptxs;
+  std::vector<nvrtcProgram *> progs;
+
+  std::map<std::string, CudaKernel *>::iterator iter;  
+  for (iter = cudaKernels->begin(); iter != cudaKernels->end(); ++iter) {
+    ptxs.push_back(iter->second->ptx);
+    progs.push_back(iter->second->prog);
+    delete iter->second;
   }
+  
   delete cudaKernels;
+
+  std::sort(ptxs.begin(), ptxs.end());
+  std::unique(ptxs.begin(), ptxs.end());
+  std::vector<const char *>::iterator ptx_i;
+  for (ptx_i = ptxs.begin(); ptx_i != ptxs.end(); ++ptx_i) {
+    Free(*ptx_i);
+    }
+
+  std::sort(progs.begin(), progs.end());
+  std::unique(progs.begin(), progs.end());
+  std::vector<nvrtcProgram *>::iterator prog_i;
+  for (prog_i = progs.begin(); prog_i != progs.end(); ++prog_i) {
+    NVRTC_SAFE_CALL(nvrtcDestroyProgram(*prog_i));
+  }
 }
 
 void cudaLaunch(std::string kernelName,
@@ -165,13 +199,13 @@ void cudaLaunch(std::string kernelName,
                 const dim3 &gridDim, const dim3 &blockDim,
                 cudaStream_t stream)
 {
-  const char * ptx = (*cudaKernels)[kernelName];
+  const CudaKernel * cudaKernel = (*cudaKernels)[kernelName];
 
   CUmodule module;
-  CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, ptx, 0, 0, 0));
+  CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, cudaKernel->ptx, 0, 0, 0));
 
   CUfunction kernel;
-  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, kernelName.c_str()));
+  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, cudaKernel->name));
 
   CUDA_SAFE_CALL(
     cuLaunchKernel(kernel,
