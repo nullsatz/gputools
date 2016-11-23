@@ -1,6 +1,5 @@
 #define NUM_THREADS 32
 
-extern "C"
 __global__ void euclidean_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
 				 const float * vg_b, size_t pitch_b, size_t n_b,
 				 size_t k,
@@ -38,7 +37,6 @@ __global__ void euclidean_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
   }
 }
 
-extern "C"
 __global__ void euclidean_kernel_same(const float * vg_a, size_t pitch_a, 
 	size_t n_a, const float * vg_b, size_t pitch_b, size_t n_b,
 	size_t k, float * d, size_t pitch_d, float p)
@@ -79,7 +77,6 @@ __global__ void euclidean_kernel_same(const float * vg_a, size_t pitch_a,
 	}
 }
 
-extern "C"
 __global__ void maximum_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
 			       const float * vg_b, size_t pitch_b, size_t n_b,
 			       size_t k,
@@ -116,7 +113,6 @@ __global__ void maximum_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
   }
 }
 
-extern "C"
 __global__ void maximum_kernel_same(const float * vg_a, size_t pitch_a, 
 	size_t n_a, const float * vg_b, size_t pitch_b, size_t n_b, size_t k,
     float * d, size_t pitch_d, float p)
@@ -157,7 +153,6 @@ __global__ void maximum_kernel_same(const float * vg_a, size_t pitch_a,
   }
 }
 
-extern "C"
 __global__ void manhattan_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
 				 const float * vg_b, size_t pitch_b, size_t n_b,
 				 size_t k,
@@ -194,7 +189,6 @@ __global__ void manhattan_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
   }
 }
 
-extern "C"
 __global__ void manhattan_kernel_same(const float * vg_a, size_t pitch_a, size_t n_a,
 				      const float * vg_b, size_t pitch_b, size_t n_b,
 				      size_t k,
@@ -237,7 +231,6 @@ __global__ void manhattan_kernel_same(const float * vg_a, size_t pitch_a, size_t
   }
 }
 
-extern "C"
 __global__ void canberra_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
 				const float * vg_b, size_t pitch_b, size_t n_b,
 				size_t k,
@@ -277,7 +270,6 @@ __global__ void canberra_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
   }
 }
 
-extern "C"
 __global__ void canberra_kernel_same(const float * vg_a, size_t pitch_a, size_t n_a,
 				     const float * vg_b, size_t pitch_b, size_t n_b,
 				     size_t k,
@@ -323,7 +315,6 @@ __global__ void canberra_kernel_same(const float * vg_a, size_t pitch_a, size_t 
   }
 }
 
-extern "C"
 __global__ void binary_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
 			      const float * vg_b, size_t pitch_b, size_t n_b,
 			      size_t k,
@@ -372,7 +363,6 @@ __global__ void binary_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
   }
 }
 
-extern "C"
 __global__ void binary_kernel_same(const float * vg_a, size_t pitch_a, 
 	size_t n_a, const float * vg_b, size_t pitch_b, size_t n_b, size_t k,
    float * d, size_t pitch_d, float p)
@@ -424,7 +414,6 @@ __global__ void binary_kernel_same(const float * vg_a, size_t pitch_a,
   }
 }
 
-extern "C"
 __global__ void minkowski_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
 				 const float * vg_b, size_t pitch_b, size_t n_b,
 				 size_t k,
@@ -461,7 +450,6 @@ __global__ void minkowski_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
   }
 }
 
-extern "C"
 __global__ void minkowski_kernel_same(const float * vg_a, size_t pitch_a, 
 	size_t n_a, const float * vg_b, size_t pitch_b, size_t n_b, size_t k, 
 	float * d, size_t pitch_d, float p)
@@ -504,7 +492,6 @@ __global__ void minkowski_kernel_same(const float * vg_a, size_t pitch_a,
   }
 }
 
-extern "C"
 __global__ void dot_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
 			   const float * vg_b, size_t pitch_b, size_t n_b,
 			   size_t k,
@@ -541,7 +528,6 @@ __global__ void dot_kernel(const float * vg_a, size_t pitch_a, size_t n_a,
   }
 }
 
-extern "C"
 __global__ void dot_kernel_same(const float * vg_a, size_t pitch_a, size_t n_a,
 	const float * vg_b, size_t pitch_b, size_t n_b,
 	size_t k,

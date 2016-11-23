@@ -7,7 +7,6 @@
 
 // mX has order rows x cols
 // vectY has length rows
-extern "C"
 __global__ void getRestricted(int countx, int county, int rows, int cols, 
                               float * mX, int mXdim, float * vY, int vYdim, float * mQ, int mQdim,
                               float * mR, int mRdim, float * vectB, int vectBdim) {
@@ -83,7 +82,6 @@ __global__ void getRestricted(int countx, int county, int rows, int cols,
 
 // mX has order rows x cols
 // vectY has length rows
-extern "C"
 __global__ void getUnrestricted(int countx, int county, int rows, int cols, 
                                 float * mX, int mXdim, float * vY, int vYdim, float * mQ, int mQdim,
                                 float * mR, int mRdim, float * vectB, int vectBdim) {
@@ -155,7 +153,6 @@ __global__ void getUnrestricted(int countx, int county, int rows, int cols,
   }
 }
 
-extern "C"
 __global__ void ftest(int diagFlag, int p, int rows, int colsx, int colsy, 
                       int rCols, int unrCols, float * obs, int obsDim, 
                       float * rCoeffs, int rCoeffsDim, float * unrCoeffs, int unrCoeffsDim, 

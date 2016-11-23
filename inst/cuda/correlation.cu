@@ -4,7 +4,6 @@
 #define NUMTHREADS 16
 #define THREADWORK 32
 
-extern "C"
 __global__ void gpuMeans(const float * vectsA, size_t na, 
 	const float * vectsB, size_t nb, size_t dim, 
 	float * means, float * numPairs)
@@ -51,7 +50,6 @@ __global__ void gpuMeans(const float * vectsA, size_t na,
 	}
 }
 
-extern "C"
 __global__ void gpuSD(const float * vectsA, size_t na,
 	const float * vectsB, size_t nb, size_t dim, 
 	const float * means, const float * numPairs, float * sds)
@@ -104,7 +102,6 @@ __global__ void gpuSD(const float * vectsA, size_t na,
 	}
 }
 
-extern "C"
 __global__ void gpuPMCC(const float * vectsa, size_t na,
 	const float * vectsb, size_t nb, size_t dim,
 	const float * numPairs, const float * means, const float * sds,
@@ -152,7 +149,6 @@ __global__ void gpuPMCC(const float * vectsa, size_t na,
 	if(tx == 0) correlations[x*nb+y] = threadSums[0] / (n - 1.f);
 }
 
-extern "C"
 __global__ void gpuMeansNoTest(const float * vectsA, size_t na, 
 	const float * vectsB, size_t nb, size_t dim, 
 	float * means, float * numPairs)
@@ -198,7 +194,6 @@ __global__ void gpuMeansNoTest(const float * vectsA, size_t na,
 	}
 }
 
-extern "C"
 __global__ void gpuSDNoTest(const float * vectsA, size_t na,
 	const float * vectsB, size_t nb, size_t dim, 
 	const float * means, const float * numPairs, float * sds)
@@ -250,7 +245,6 @@ __global__ void gpuSDNoTest(const float * vectsA, size_t na,
 	}
 }
 
-extern "C"
 __global__ void gpuPMCCNoTest(const float * vectsa, size_t na,
 	const float * vectsb, size_t nb, size_t dim,
 	const float * numPairs, const float * means, const float * sds,
@@ -297,7 +291,6 @@ __global__ void gpuPMCCNoTest(const float * vectsa, size_t na,
 	if(tx == 0) correlations[x*nb+y] = threadSums[0] / (n - 1.f);
 }
 
-extern "C"
 __global__ void gpuSignif(const float * gpuNumPairs, 
 	const float * gpuCorrelations, size_t n, float * gpuTScores)
 {
@@ -358,7 +351,6 @@ __device__ int dIsSignificant(float signif, int df) {
   return TRUE;
 }
 
-extern "C"
 __global__ void dUpdateSignif(const float * gpuData, size_t n, 
                               float * gpuResults)
 {
@@ -398,7 +390,6 @@ __global__ void dUpdateSignif(const float * gpuData, size_t n,
   }
 }
 
-extern "C"
 __global__ void noNAsPmccMeans(int nRows, int nCols, float * a, float * means)
 {
 	int

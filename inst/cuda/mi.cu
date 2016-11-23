@@ -1,6 +1,5 @@
 #define NTHREADS 16
 
-extern "C"
 __global__ void scale(float knot_max, int nx, int nsamples,
                       float * x, int pitch_x)
 {
@@ -37,7 +36,6 @@ __device__ float do_fraction(float numer, float denom) {
 }
 
 // bins must be initialized to zero before calling get_bin_scores
-extern "C"
 __global__ void get_bin_scores(int nbins, int order,
                                int nknots, float * knots, int nsamples,
                                int nx, float * x, int pitch_x,
@@ -88,7 +86,6 @@ __global__ void get_bin_scores(int nbins, int order,
   }
 }
 
-extern "C"
 __global__ void get_entropy(int nbins, int nsamples, int nx,
                             float * bin_scores, int pitch_bin_scores, float * entropies)
 {
@@ -118,7 +115,6 @@ __global__ void get_entropy(int nbins, int nsamples, int nx,
   entropies[col_x] = -entropy;
 }
 
-extern "C"
 __global__ void get_mi(int nbins, int nsamples,
                        int nx, float * x_bin_scores, int pitch_x_bin_scores,
                        float * entropies_x,

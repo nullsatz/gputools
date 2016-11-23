@@ -1,6 +1,5 @@
 #define NTHREADS 512
 
-extern "C"
 __global__ void getColNorms(int rows, int cols, float * da, int lda, 
                             float * colNorms)
 {
@@ -34,7 +33,6 @@ __global__ void getColNorms(int rows, int cols, float * da, int lda,
   colNorms[colIndex] = sum;
 }
 
-extern "C"
 __global__ void gpuFindMax(int n, float * data, int threadWorkLoad, 
                            int * maxIndex)
 {
@@ -77,7 +75,6 @@ __global__ void gpuFindMax(int n, float * data, int threadWorkLoad,
   }
 }
 
-extern "C"
 __global__ void gpuSwapCol(int rows, float * dArray, int coli, int * dColj,
                            int * dPivot)
 {
@@ -100,7 +97,6 @@ __global__ void gpuSwapCol(int rows, float * dArray, int coli, int * dColj,
   }
 }
 
-extern "C"
 __global__ void makeHVector(int rows, float * input, float * output)
 {
   int
@@ -157,7 +153,6 @@ __global__ void makeHVector(int rows, float * input, float * output)
 // N.B.:  Overflow incurred in computing the square should already have
 // been detected in the original norm construction.
 
-extern "C"
 __global__ void UpdateHHNorms(int cols, float *dV, float *dNorms) {
   // Copyright 2009, Mark Seligman at Rapid Biologics, LLC.  All rights
   // reserved.

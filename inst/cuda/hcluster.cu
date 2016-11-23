@@ -1,7 +1,6 @@
 #define NUM_THREADS 32
 #define NUM_BLOCKS 1024
 
-extern "C"
 __global__ void convert_kernel(float * dist, size_t pitch_dist, size_t n)
 {
   for(size_t index = threadIdx.x; index < n; index += NUM_THREADS) {
@@ -9,7 +8,6 @@ __global__ void convert_kernel(float * dist, size_t pitch_dist, size_t n)
   }
 }
 
-extern "C"
 __global__ void find_min1_kernel(const float * dist, const size_t pitch_dist, 
 	const size_t n, const float * count, float * min_val, size_t * min_col, 
 	const size_t row_offset)
@@ -60,7 +58,6 @@ __global__ void find_min1_kernel(const float * dist, const size_t pitch_dist,
 	}
 }
 
-extern "C"
 __global__ void find_min2_kernel(const float * min_val, const size_t * min_col,
 	float * count, int * sub, int * sup, float * val, const size_t n, 
 	const size_t iter)
@@ -108,7 +105,6 @@ __global__ void find_min2_kernel(const float * min_val, const size_t * min_col,
 	}
 }
 
-extern "C"
 __global__ void single_kernel(float * dist, const size_t pitch_dist, 
 	const size_t n, const int * sub, const int * sup, const float * count, 
 	const float * val, const size_t iter, const size_t col_offset, 
@@ -135,7 +131,6 @@ __global__ void single_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-extern "C"
 __global__ void complete_kernel(float * dist, const size_t pitch_dist, 
 	const size_t n, const int * sub, const int * sup, const float * count, 
 	const float * val, const size_t iter, const size_t col_offset, 
@@ -166,7 +161,6 @@ __global__ void complete_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-extern "C"
 __global__ void wpgma_kernel(float * dist, const size_t pitch_dist, 
 	const size_t n, const int * sub, const int * sup, const float * count,  
 	const float * val, const size_t iter, const size_t col_offset, 
@@ -193,7 +187,6 @@ __global__ void wpgma_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-extern "C"
 __global__ void average_kernel(float * dist, const size_t pitch_dist, 
 	const size_t n, const int * sub, const int * sup, const float * count, 
 	const float * val, const size_t iter, const size_t col_offset, 
@@ -223,7 +216,6 @@ __global__ void average_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-extern "C"
 __global__ void median_kernel(float * dist, const size_t pitch_dist, 
 	const size_t n, const int * sub, const int * sup, const float * count, 
 	const float * val, const size_t iter, const size_t col_offset, 
@@ -250,7 +242,6 @@ __global__ void median_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-extern "C"
 __global__ void mcquitty_kernel(float * dist, const size_t pitch_dist, 
 	const size_t n, const int * sub, const int * sup, const float * count, 
 	const float * val, const size_t iter, const size_t col_offset, 
@@ -277,7 +268,6 @@ __global__ void mcquitty_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-extern "C"
 __global__ void centroid_kernel(float * dist, size_t pitch_dist, 
 	size_t n, const int * sub, const int * sup, const float * count, 
 	const float * val, size_t iter, size_t col_offset, 
@@ -317,7 +307,6 @@ __global__ void centroid_kernel(float * dist, size_t pitch_dist,
 	}
 }
 
-extern "C"
 __global__ void flexible_group_kernel(float * dist, const size_t pitch_dist, 
 	const size_t n, const int * sub, const int * sup, const float * count, 
 	const float * val, const size_t iter, const size_t col_offset, 
@@ -347,7 +336,6 @@ __global__ void flexible_group_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-extern "C"
 __global__ void flexible_kernel(float * dist, const size_t pitch_dist, 
 	const size_t n, const int * sub, const int * sup, const float * count, 
 	const float * val, const size_t iter, const size_t col_offset, 
@@ -374,7 +362,6 @@ __global__ void flexible_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-extern "C"
 __global__ void ward_kernel(float * dist, const size_t pitch_dist, 
 	const size_t n, const int * sub, const int * sup, const float * count, 
 	const float * val, const size_t iter, const size_t col_offset, 

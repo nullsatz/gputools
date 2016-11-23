@@ -1,7 +1,6 @@
 #define NUMTHREADS 16
 #define THREADWORK 32
 
-extern "C"
 __global__ void gpuKendall(const float * a, size_t na, 
 	const float * b, size_t nb, size_t sampleSize, double * results) 
 {
