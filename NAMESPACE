@@ -21,3 +21,5 @@ importFrom("stats",
   "model.offset",
   "model.response",
   "model.weights")
+
+importFrom(Rcpp, evalCpp)

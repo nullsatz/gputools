@@ -12,7 +12,6 @@
 #include "distance.h"
 #include "granger.h"
 #include "hcluster.h"
-#include "kendall.h"
 #include "lsfit.h"
 #include "matmult.h"
 #include "mi.h"
@@ -123,12 +122,6 @@ void RpermHostKendall(const float * X, const int * nx, const float * Y,
                       const int * ny, const int * sampleSize, double * answers)
 {
   permHostKendall(X, *nx, Y, *ny, *sampleSize, answers);
-}
-
-void RgpuKendall(const float * X, const int * nx, const float * Y, 
-                 const int * ny, const int * sampleSize, double * answers)
-{
-  masterKendall(X, *nx, Y, *ny, *sampleSize, answers);
 }
 
 void rgpuGranger(const int * rows, const int * cols, const float * y,

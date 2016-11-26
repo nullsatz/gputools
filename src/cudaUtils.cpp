@@ -90,8 +90,11 @@ std::vector<std::string> & getFileKernels(std::string file)
       };
     kernels = new std::vector<std::string>(newKernels, newKernels + 13);
   } else if (file == "kendall") {
-    std::string newKernels[] = { "gpuKendall" };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 1);
+    std::string newKernels[] =
+      { "gpuKendall<float>"
+      , "gpuKendall<double>"
+      };
+    kernels = new std::vector<std::string>(newKernels, newKernels + 2);
   } else if (file == "mi") {
     std::string newKernels[] =
       { "scale"

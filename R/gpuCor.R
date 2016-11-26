@@ -1,4 +1,6 @@
-gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
+gpuCor <- function(x, y = NULL, use = "everything", method = "pearson",
+                   precision = "single")
+{
     x <- as.matrix(x)
     nx <- ncol(x)
     size <- nrow(x)
@@ -30,6 +32,15 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
         stop("ambiguous correlation method")
     }
 
+    precisions <- c("single", "double")
+    precision <- pmatch(precision, precisions, -1)
+    if(is.na(precision)) {
+        stop("invalid correlation precision")
+    }
+    if(precision == -1) {
+        stop("ambiguous correlation precision")
+    }
+
     if(methods[method] == "pearson") {
         answer <- .C("rpmcc", NAOK=TRUE,
                      as.integer(use - 1), as.single(x), as.integer(nx),
@@ -42,20 +53,20 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
         ts <- t(matrix(answer$ts, ny, nx))
 
         return(list(coefficients = corr, ts = ts, pairs = pairs))
-
     } else if(methods[method] == "kendall") {
-
         if(uses[use] != "everything") {
-            warning("NA handling for Kendall's is not yet supported. Defaulting to using everything. Sorry for any inconvenience.")
+            warning("NA handling for Kendall's is not yet supported.")
         }
 
-        a <- .C("RgpuKendall",
-                as.single(x), nx, as.single(y), ny, 
-                size, result = double(nx*ny),
-                PACKAGE = "gputools")
+        precisionFlag <- 2L
+        if (precisions[precision] == "single") {
+            precisionFlag <- 1L
+        }
+
+        a <- kendall(x, y, precisionFlag)
 
         pairs <- matrix(size, nx, ny)
-        return(list(coefficients = matrix(a$result, nx, ny), pairs = pairs))
+        return(list(coefficients = a, pairs = pairs))
     } else {
         stop("This correlation method is not yet supported.")
     }

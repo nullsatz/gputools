@@ -113,9 +113,14 @@ if test [ -n "${cuda_lib_path}" ] ; then
   esac
 fi
 
+RCPP_FLAGS=`${R_HOME}/bin/Rscript -e "Rcpp:::CxxFlags()"`
+RCPP_LIBS=`${R_HOME}/bin/Rscript -e "Rcpp:::LdFlags()"`
+
 dnl substitute CUDA_CPPFLAGS and LIBS
 AC_SUBST(CUDA_CPPFLAGS)
 AC_SUBST(LIBS)
+AC_SUBST(RCPP_FLAGS)
+AC_SUBST(RCPP_LIBS)
 dnl and do substitution in the src/Makevars.in
 AC_CONFIG_FILES([src/Makevars])
 AC_OUTPUT

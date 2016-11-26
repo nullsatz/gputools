@@ -620,6 +620,8 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+RCPP_LIBS
+RCPP_FLAGS
 CUDA_CPPFLAGS
 host_os
 host_vendor
@@ -3963,6 +3965,11 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
       ;;
   esac
 fi
+
+RCPP_FLAGS=`${R_HOME}/bin/Rscript -e "Rcpp:::CxxFlags()"`
+RCPP_LIBS=`${R_HOME}/bin/Rscript -e "Rcpp:::LdFlags()"`
+
+
 
 
 

@@ -38,8 +38,6 @@ extern "C" {
                     double * answer);
   void RpermHostKendall(const float * X, const int * nx, const float * Y, 
                         const int * ny, const int * sampleSize, double * answers);
-  void RgpuKendall(const float * X, const int * nx, const float * Y, 
-                   const int * ny, const int * sampleSize, double * answers);
 
   void rgpuGranger(const int * rows, const int * colsy, const float * y, 
                    const int * p, float * fStats, float * pValues);
