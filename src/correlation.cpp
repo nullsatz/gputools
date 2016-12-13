@@ -64,10 +64,10 @@ void hostSignif(const float * goodPairs, const float * coeffs, size_t n,
 }
 
 void pmcc(UseObs whichObs,
-    const float * vectsa, size_t na,
-    const float * vectsb, size_t nb,
-    size_t dim, float * numPairs, float * correlations,
-          float * signifs)
+          const float * vectsa, size_t na,
+          const float * vectsb, size_t nb,
+          size_t dim,
+          float * numPairs, float * correlations, float * signifs)
 {
   size_t 
     fbytes = sizeof(float);
@@ -75,15 +75,16 @@ void pmcc(UseObs whichObs,
     same = (vectsa == vectsb);
   float
     * gpuVA, * gpuVB,
-    * gpuNumPairs, * gpumean, * gpuSds, 
+    * gpumean, * gpuSds, 
     * gpuCorrelations;
+  float * gpuNumPairs;
   dim3 
     block(NUMTHREADS), grid(na, nb);
 
-  cudaMalloc((void **)&gpuNumPairs, na*nb*fbytes);
-  cudaMalloc((void **)&gpumean, na*nb*2*fbytes);
-  cudaMalloc((void **)&gpuSds, na*nb*2*fbytes);
-  cudaMalloc((void**)&gpuCorrelations, na*nb*fbytes);
+  cudaMalloc((void **)&gpuNumPairs, na * nb * fbytes);
+  cudaMalloc((void **)&gpumean, na * nb * 2 * fbytes);
+  cudaMalloc((void **)&gpuSds, na * nb * 2 * fbytes);
+  cudaMalloc((void **)&gpuCorrelations, na * nb * fbytes);
 
   cudaMalloc((void**)&gpuVA, na*dim*fbytes);
   cudaMemcpy(gpuVA, vectsa, na*dim*fbytes, cudaMemcpyHostToDevice);
@@ -124,30 +125,31 @@ void pmcc(UseObs whichObs,
 
   switch(whichObs) {
   case pairwiseComplete:
-    cudaLaunch("gpuMeans", argsMeans, grid, block);
+    cudaLaunch("gpuMeans<float>", argsMeans, grid, block);
     cudaThreadSynchronize();
 
-    cudaLaunch("gpuSD", argsSD, grid, block);
+    cudaLaunch("gpuSD<float>", argsSD, grid, block);
     cudaThreadSynchronize();
 
-    cudaLaunch("gpuPMCC", argsPMCC, grid, block);
+    cudaLaunch("gpuPMCC<float>", argsPMCC, grid, block);
     break;
   default:
-    cudaLaunch("gpuMeansNoTest", argsMeans, grid, block);
+    cudaLaunch("gpuMeansNoTest<float>", argsMeans, grid, block);
     cudaThreadSynchronize();
 
-    cudaLaunch("gpuSDNoTest", argsSD, grid, block);
+    cudaLaunch("gpuSDNoTest<float>", argsSD, grid, block);
     cudaThreadSynchronize();
     
-    cudaLaunch("gpuPMCCNoTest", argsPMCC, grid, block);
+    cudaLaunch("gpuPMCCNoTest<float>", argsPMCC, grid, block);
   }
 
-  cudaMemcpy(correlations, gpuCorrelations, na*nb*fbytes, 
+  cudaMemcpy(correlations, gpuCorrelations, na * nb * fbytes, 
              cudaMemcpyDeviceToHost);
-  cudaMemcpy(numPairs, gpuNumPairs, na*nb*fbytes, cudaMemcpyDeviceToHost);
+  cudaMemcpy(numPairs, gpuNumPairs, na * nb * fbytes,
+             cudaMemcpyDeviceToHost);
   checkCudaError("PMCC function : kernel finish and memcpy");
 
-  hostSignif(numPairs, correlations, na*nb, signifs);
+  hostSignif(numPairs, correlations, na * nb, signifs);
     
   // Free allocated space
   cudaFree(gpuNumPairs);

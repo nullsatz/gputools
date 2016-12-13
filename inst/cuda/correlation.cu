@@ -4,312 +4,322 @@
 #define NUMTHREADS 16
 #define THREADWORK 32
 
-__global__ void gpuMeans(const float * vectsA, size_t na, 
-	const float * vectsB, size_t nb, size_t dim, 
-	float * means, float * numPairs)
+template<typename T>
+__global__ void gpuMeans(const T * vectsA, size_t na, 
+                         const T * vectsB, size_t nb,
+                         size_t dim, 
+                         T * means, float * numPairs)
 {
-	size_t 
-		offset, stride,
-		bx = blockIdx.x, by = blockIdx.y, tx = threadIdx.x;
-	float a, b;
+  size_t
+    offset, stride,
+    bx = blockIdx.x, by = blockIdx.y,
+    tx = threadIdx.x;
 
-	__shared__ float 
-		threadSumsA[NUMTHREADS], threadSumsB[NUMTHREADS],
-		count[NUMTHREADS];
+  T a, b;
 
-	if((bx >= na) || (by >= nb))
-		return;
+  __shared__ T threadSumsA[NUMTHREADS], threadSumsB[NUMTHREADS];
+  __shared__ size_t count[NUMTHREADS];
 
-	threadSumsA[tx] = 0.f;
-	threadSumsB[tx] = 0.f;
-	count[tx] = 0.f;
+  if((bx >= na) || (by >= nb)) return;
 
-	for(offset = tx; offset < dim; offset += NUMTHREADS) {
-		a = vectsA[bx * dim + offset];
-		b = vectsB[by * dim + offset];
-		if(!(isnan(a) || isnan(b))) {
-			threadSumsA[tx] += a;
-			threadSumsB[tx] += b;
-			count[tx] += 1.f;
-		}
-	}
-	__syncthreads();
+  threadSumsA[tx] = threadSumsB[tx] = 0;
+  count[tx] = 0;
+
+  for(offset = tx; offset < dim; offset += NUMTHREADS) {
+    a = vectsA[bx * dim + offset];
+    b = vectsB[by * dim + offset];
+    if(!(isnan(a) || isnan(b))) {
+      threadSumsA[tx] += a;
+      threadSumsB[tx] += b;
+      count[tx] += 1;
+    }
+  }
+  __syncthreads();
     
-	for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
-		if(tx < stride) {
-			threadSumsA[tx] += threadSumsA[tx + stride];
-			threadSumsB[tx] += threadSumsB[tx + stride];
-			count[tx] += count[tx+stride];
-		}
-		__syncthreads();
-	}
-	if(tx == 0) {
-		means[bx*nb*2+by*2] = threadSumsA[0] / count[0];
-		means[bx*nb*2+by*2+1] = threadSumsB[0] / count[0];
-		numPairs[bx*nb+by] = count[0];
-	}
+  for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
+    if(tx < stride) {
+      threadSumsA[tx] += threadSumsA[tx + stride];
+      threadSumsB[tx] += threadSumsB[tx + stride];
+      count[tx] += count[tx + stride];
+    }
+    __syncthreads();
+  }
+  if(tx == 0) {
+    means[bx * nb * 2 + by * 2] = threadSumsA[0] / (double) count[0];
+    means[bx * nb * 2 + by * 2 + 1] = threadSumsB[0] / (double) count[0];
+    numPairs[bx * nb + by] = count[0];
+  }
 }
 
-__global__ void gpuSD(const float * vectsA, size_t na,
-	const float * vectsB, size_t nb, size_t dim, 
-	const float * means, const float * numPairs, float * sds)
+template<typename T>
+__global__ void gpuSD(const T * vectsA, size_t na,
+                      const T * vectsB, size_t nb,
+                      size_t dim, 
+                      const T * means, const float * numPairs,
+                      T * sds)
 {
-	size_t 
-		offset, stride,
-		tx = threadIdx.x, 
-		bx = blockIdx.x, by = blockIdx.y;
-	float 
-		a, b,
-		termA, termB;
-	__shared__ float 
-		meanA, meanB, n,
-		threadSumsA[NUMTHREADS], threadSumsB[NUMTHREADS];
+  size_t 
+    offset, stride,
+    tx = threadIdx.x, 
+    bx = blockIdx.x, by = blockIdx.y;
+  T
+    a, b,
+    termA, termB;
+  __shared__ T
+    meanA, meanB,
+    threadSumsA[NUMTHREADS], threadSumsB[NUMTHREADS];
+  __shared__ size_t n;
 
-	if((bx >= na) || (by >= nb))
-		return;
+  if((bx >= na) || (by >= nb)) return;
 
-	if(tx == 0) {
-		meanA = means[bx*nb*2+by*2];	
-		meanB = means[bx*nb*2+by*2+1];	
-		n = numPairs[bx*nb+by]; 
-	}
-	__syncthreads();
+  if(tx == 0) {
+    meanA = means[bx * nb * 2 + by * 2];
+    meanB = means[bx * nb * 2 + by * 2 + 1];
+    n = numPairs[bx * nb + by];
+  }
+  __syncthreads();
 
-	threadSumsA[tx] = 0.f;
-	threadSumsB[tx] = 0.f;
-	for(offset = tx; offset < dim; offset += NUMTHREADS) {
-		a = vectsA[bx * dim + offset];
-		b = vectsB[by * dim + offset];
-		if(!(isnan(a) || isnan(b))) {
-			termA = a - meanA;
-			termB = b - meanB;
-			threadSumsA[tx] += termA * termA;
-			threadSumsB[tx] += termB * termB;
-		}
-	}
-	__syncthreads();
+  threadSumsA[tx] = threadSumsB[tx] = 0;
+  for(offset = tx; offset < dim; offset += NUMTHREADS) {
+    a = vectsA[bx * dim + offset];
+    b = vectsB[by * dim + offset];
+    if(!(isnan(a) || isnan(b))) {
+      termA = a - meanA;
+      termB = b - meanB;
+      threadSumsA[tx] += termA * termA;
+      threadSumsB[tx] += termB * termB;
+    }
+  }
+  __syncthreads();
 
-	for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
-		if(tx < stride) {
-			threadSumsA[tx] += threadSumsA[tx + stride];
-			threadSumsB[tx] += threadSumsB[tx + stride];
-		}
-		__syncthreads();
-	}
-	if(tx == 0) {
-		sds[bx*nb*2+by*2]   = sqrtf(threadSumsA[0] / (n - 1.f));
-		sds[bx*nb*2+by*2+1] = sqrtf(threadSumsB[0] / (n - 1.f));
-	}
+  for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
+    if(tx < stride) {
+      threadSumsA[tx] += threadSumsA[tx + stride];
+      threadSumsB[tx] += threadSumsB[tx + stride];
+    }
+    __syncthreads();
+  }
+  if(tx == 0) {
+    sds[bx * nb * 2 + by * 2] =
+      sqrt(threadSumsA[0] / (double) (n - 1));
+    sds[bx * nb * 2 + by * 2 + 1] =
+      sqrt(threadSumsB[0] / (double) (n - 1));
+  }
 }
 
-__global__ void gpuPMCC(const float * vectsa, size_t na,
-	const float * vectsb, size_t nb, size_t dim,
-	const float * numPairs, const float * means, const float * sds,
-	float * correlations) 
+template<typename T>
+__global__ void gpuPMCC(const T * vectsa, size_t na,
+                        const T * vectsb, size_t nb,
+                        size_t dim,
+                        const float * numPairs, const T * means,
+                        const T * sds,
+                        T * correlations) 
 {
-	size_t 
-		offset, stride,
-		x = blockIdx.x, y = blockIdx.y, 
-		tx = threadIdx.x;
-	float 
-		a, b, n, scoreA, scoreB;
-    __shared__ float 
-		meanA, meanB, 
-		sdA, sdB, 
-		threadSums[NUMTHREADS];
+  size_t 
+    offset, stride,
+    x = blockIdx.x, y = blockIdx.y, 
+    tx = threadIdx.x,
+    n;
+  T
+    a, b, scoreA, scoreB;
+  __shared__ T
+    meanA, meanB, 
+    sdA, sdB, 
+    threadSums[NUMTHREADS];
 
-	if((x >= na) || (y >= nb))
-		return;
+  if((x >= na) || (y >= nb)) return;
 
-	if(tx == 0) {
-		meanA = means[x*nb*2+y*2];
-		meanB = means[x*nb*2+y*2+1];	
-		sdA = sds[x*nb*2+y*2];
-		sdB = sds[x*nb*2+y*2+1];	
-		n = numPairs[x*nb+y]; 
-	}
-	__syncthreads();
+  if(tx == 0) {
+    meanA = means[x * nb * 2 + y * 2];
+    meanB = means[x * nb * 2 + y * 2 + 1];
+    sdA = sds[x * nb * 2 + y * 2];
+    sdB = sds[x * nb * 2 + y * 2 + 1];
+    n = numPairs[x * nb + y];
+  }
+  __syncthreads();
 
-	threadSums[tx] = 0.f;
-	for(offset = tx; offset < dim; offset += NUMTHREADS) {
-		a = vectsa[x * dim + offset];
-		b = vectsb[y * dim + offset];
-		if(!(isnan(a) || isnan(b))) {
-			scoreA = (a - meanA) / sdA; 
-			scoreB = (b - meanB) / sdB;
-			threadSums[tx] += scoreA * scoreB;
-		}
-	}
-	__syncthreads();
+  threadSums[tx] = 0;
+  for(offset = tx; offset < dim; offset += NUMTHREADS) {
+    a = vectsa[x * dim + offset];
+    b = vectsb[y * dim + offset];
+    if(!(isnan(a) || isnan(b))) {
+      scoreA = (a - meanA) / sdA; 
+      scoreB = (b - meanB) / sdB;
+      threadSums[tx] += scoreA * scoreB;
+    }
+  }
+  __syncthreads();
 
-	for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
-		if(tx < stride) threadSums[tx] += threadSums[tx + stride];
-		__syncthreads();
-	}
-	if(tx == 0) correlations[x*nb+y] = threadSums[0] / (n - 1.f);
+  for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
+    if(tx < stride) threadSums[tx] += threadSums[tx + stride];
+    __syncthreads();
+  }
+  if(tx == 0) correlations[x * nb + y] = threadSums[0] / (double) (n - 1);
 }
 
-__global__ void gpuMeansNoTest(const float * vectsA, size_t na, 
-	const float * vectsB, size_t nb, size_t dim, 
-	float * means, float * numPairs)
+template<typename T>
+__global__ void gpuMeansNoTest(const T * vectsA, size_t na, 
+                               const T * vectsB, size_t nb,
+                               size_t dim, 
+                               T * means, float * numPairs)
 {
-	size_t 
-		offset, stride,
-		bx = blockIdx.x, by = blockIdx.y, tx = threadIdx.x;
-	float a, b;
+  size_t 
+    offset, stride,
+    bx = blockIdx.x, by = blockIdx.y, tx = threadIdx.x;
+  float a, b;
 
-	__shared__ float 
-		threadSumsA[NUMTHREADS], threadSumsB[NUMTHREADS],
-		count[NUMTHREADS];
+  __shared__ float threadSumsA[NUMTHREADS], threadSumsB[NUMTHREADS];
+  __shared__ size_t count[NUMTHREADS];
 
-	if((bx >= na) || (by >= nb))
-		return;
+  if((bx >= na) || (by >= nb)) return;
 
-	threadSumsA[tx] = 0.f;
-	threadSumsB[tx] = 0.f;
-	count[tx] = 0.f;
+  threadSumsA[tx] = threadSumsB[tx] = 0;
+  count[tx] = 0;
 
-	for(offset = tx; offset < dim; offset += NUMTHREADS) {
-		a = vectsA[bx * dim + offset];
-		b = vectsB[by * dim + offset];
+  for(offset = tx; offset < dim; offset += NUMTHREADS) {
+    a = vectsA[bx * dim + offset];
+    b = vectsB[by * dim + offset];
 
-		threadSumsA[tx] += a;
-		threadSumsB[tx] += b;
-		count[tx] += 1.f;
-	}
-	__syncthreads();
+    threadSumsA[tx] += a;
+    threadSumsB[tx] += b;
+    count[tx] += 1;
+  }
+  __syncthreads();
     
-	for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
-		if(tx < stride) {
-			threadSumsA[tx] += threadSumsA[tx + stride];
-			threadSumsB[tx] += threadSumsB[tx + stride];
-			count[tx] += count[tx+stride];
-		}
-		__syncthreads();
-	}
-	if(tx == 0) {
-		means[bx*nb*2+by*2] = threadSumsA[0] / count[0];
-		means[bx*nb*2+by*2+1] = threadSumsB[0] / count[0];
-		numPairs[bx*nb+by] = count[0];
-	}
+  for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
+    if(tx < stride) {
+      threadSumsA[tx] += threadSumsA[tx + stride];
+      threadSumsB[tx] += threadSumsB[tx + stride];
+      count[tx] += count[tx+stride];
+    }
+    __syncthreads();
+  }
+  if(tx == 0) {
+    means[bx * nb * 2 + by * 2] = threadSumsA[0] / (double) count[0];
+    means[bx * nb * 2 + by * 2 + 1] = threadSumsB[0] / (double) count[0];
+    numPairs[bx * nb + by] = count[0];
+  }
 }
 
-__global__ void gpuSDNoTest(const float * vectsA, size_t na,
-	const float * vectsB, size_t nb, size_t dim, 
-	const float * means, const float * numPairs, float * sds)
+template<typename T>
+__global__ void gpuSDNoTest(const T * vectsA, size_t na,
+                            const T * vectsB, size_t nb,
+                            size_t dim, 
+                            const T * means, const float * numPairs, T * sds)
 {
-	size_t 
-		offset, stride,
-		tx = threadIdx.x, 
-		bx = blockIdx.x, by = blockIdx.y;
-	float 
-		a, b,
-		termA, termB;
-	__shared__ float 
-		meanA, meanB, n,
-		threadSumsA[NUMTHREADS], threadSumsB[NUMTHREADS];
+  size_t 
+    offset, stride,
+    tx = threadIdx.x, 
+    bx = blockIdx.x, by = blockIdx.y;
+  T
+    a, b,
+    termA, termB;
+  __shared__ size_t n;
+  __shared__ T
+    meanA, meanB,
+    threadSumsA[NUMTHREADS], threadSumsB[NUMTHREADS];
 
-	if((bx >= na) || (by >= nb))
-		return;
+  if((bx >= na) || (by >= nb)) return;
 
-	if(tx == 0) {
-		meanA = means[bx*nb*2+by*2];	
-		meanB = means[bx*nb*2+by*2+1];	
-		n = numPairs[bx*nb+by]; 
-	}
-	__syncthreads();
+  if(tx == 0) {
+    meanA = means[bx * nb * 2 + by * 2];    
+    meanB = means[bx * nb * 2 + by * 2 + 1];  
+    n = numPairs[bx * nb + by]; 
+  }
+  __syncthreads();
 
-	threadSumsA[tx] = 0.f;
-	threadSumsB[tx] = 0.f;
-	for(offset = tx; offset < dim; offset += NUMTHREADS) {
-		a = vectsA[bx * dim + offset];
-		b = vectsB[by * dim + offset];
+  threadSumsA[tx] = threadSumsB[tx] = 0;
+  for(offset = tx; offset < dim; offset += NUMTHREADS) {
+    a = vectsA[bx * dim + offset];
+    b = vectsB[by * dim + offset];
 
-		termA = a - meanA;
-		termB = b - meanB;
-		threadSumsA[tx] += termA * termA;
-		threadSumsB[tx] += termB * termB;
-	}
-	__syncthreads();
+    termA = a - meanA;
+    termB = b - meanB;
+    threadSumsA[tx] += termA * termA;
+    threadSumsB[tx] += termB * termB;
+  }
+  __syncthreads();
 
-	for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
-		if(tx < stride) {
-			threadSumsA[tx] += threadSumsA[tx + stride];
-			threadSumsB[tx] += threadSumsB[tx + stride];
-		}
-		__syncthreads();
-	}
-	if(tx == 0) {
-		sds[bx*nb*2+by*2]   = sqrtf(threadSumsA[0] / (n - 1.f));
-		sds[bx*nb*2+by*2+1] = sqrtf(threadSumsB[0] / (n - 1.f));
-	}
+  for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
+    if(tx < stride) {
+      threadSumsA[tx] += threadSumsA[tx + stride];
+      threadSumsB[tx] += threadSumsB[tx + stride];
+    }
+    __syncthreads();
+  }
+  if(tx == 0) {
+    sds[bx * nb * 2 + by * 2]   = sqrt(threadSumsA[0] / (double) (n - 1));
+    sds[bx * nb * 2 + by * 2 + 1] = sqrt(threadSumsB[0] / (double) (n - 1));
+  }
 }
 
-__global__ void gpuPMCCNoTest(const float * vectsa, size_t na,
-	const float * vectsb, size_t nb, size_t dim,
-	const float * numPairs, const float * means, const float * sds,
-	float * correlations) 
+template<typename T>
+__global__ void gpuPMCCNoTest(const T * vectsa, size_t na,
+                              const T * vectsb, size_t nb,
+                              size_t dim,
+                              const float * numPairs, const T * means,
+                              const T * sds,
+                              T * correlations) 
 {
-	size_t 
-		offset, stride,
-		x = blockIdx.x, y = blockIdx.y, 
-		tx = threadIdx.x;
-	float 
-		a, b, n, scoreA, scoreB;
-    __shared__ float 
-		meanA, meanB, 
-		sdA, sdB, 
-		threadSums[NUMTHREADS];
+  size_t 
+    offset, stride, n,
+    x = blockIdx.x, y = blockIdx.y, 
+    tx = threadIdx.x;
+  float 
+    a, b, scoreA, scoreB;
+  __shared__ T
+    meanA, meanB, 
+    sdA, sdB, 
+    threadSums[NUMTHREADS];
 
-	if((x >= na) || (y >= nb))
-		return;
+  if((x >= na) || (y >= nb)) return;
 
-	if(tx == 0) {
-		meanA = means[x*nb*2+y*2];
-		meanB = means[x*nb*2+y*2+1];	
-		sdA = sds[x*nb*2+y*2];
-		sdB = sds[x*nb*2+y*2+1];	
-		n = numPairs[x*nb+y]; 
-	}
-	__syncthreads();
+  if(tx == 0) {
+    meanA = means[x * nb * 2 + y * 2];
+    meanB = means[x * nb * 2 + y * 2 + 1];
+    sdA = sds[x * nb * 2 + y * 2];
+    sdB = sds[x * nb * 2 + y * 2 + 1];
+    n = numPairs[x * nb + y];
+  }
+  __syncthreads();
 
-	threadSums[tx] = 0.f;
-	for(offset = tx; offset < dim; offset += NUMTHREADS) {
-		a = vectsa[x * dim + offset];
-		b = vectsb[y * dim + offset];
-		
-		scoreA = (a - meanA) / sdA; 
-		scoreB = (b - meanB) / sdB;
-		threadSums[tx] += scoreA * scoreB;
-	}
-	__syncthreads();
+  threadSums[tx] = 0;
+  for(offset = tx; offset < dim; offset += NUMTHREADS) {
+    a = vectsa[x * dim + offset];
+    b = vectsb[y * dim + offset];
+                
+    scoreA = (a - meanA) / sdA; 
+    scoreB = (b - meanB) / sdB;
+    threadSums[tx] += scoreA * scoreB;
+  }
+  __syncthreads();
 
-	for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
-		if(tx < stride) threadSums[tx] += threadSums[tx + stride];
-		__syncthreads();
-	}
-	if(tx == 0) correlations[x*nb+y] = threadSums[0] / (n - 1.f);
+  for(stride = NUMTHREADS >> 1; stride > 0; stride >>= 1) {
+    if(tx < stride) threadSums[tx] += threadSums[tx + stride];
+    __syncthreads();
+  }
+  if(tx == 0) correlations[x * nb + y] = threadSums[0] / (double) (n - 1);
 }
 
 __global__ void gpuSignif(const float * gpuNumPairs, 
-	const float * gpuCorrelations, size_t n, float * gpuTScores)
+                          const float * gpuCorrelations, size_t n, float * gpuTScores)
 {
-	size_t 
-		i, start,
-		bx = blockIdx.x, tx = threadIdx.x;
-	float 
-		radicand, cor, npairs;
+  size_t 
+    i, start,
+    bx = blockIdx.x, tx = threadIdx.x;
+  float 
+    radicand, cor, npairs;
 
-	start = bx * NUMTHREADS * THREADWORK + tx * THREADWORK;
-	for(i = 0; i < THREADWORK; i++) {
-		if(start+i >= n)
-			break;
+  start = bx * NUMTHREADS * THREADWORK + tx * THREADWORK;
+  for(i = 0; i < THREADWORK; i++) {
+    if(start+i >= n)
+      break;
 
-		npairs = gpuNumPairs[start+i];
-		cor = gpuCorrelations[start+i];
-		radicand = (npairs - 2.f) / (1.f - cor * cor);
-		gpuTScores[start+i] = cor * sqrtf(radicand);
-	}
+    npairs = gpuNumPairs[start+i];
+    cor = gpuCorrelations[start+i];
+    radicand = (npairs - 2.f) / (1.f - cor * cor);
+    gpuTScores[start+i] = cor * sqrtf(radicand);
+  }
 }
 
 __device__ int dIsSignificant(float signif, int df) {
@@ -392,30 +402,30 @@ __global__ void dUpdateSignif(const float * gpuData, size_t n,
 
 __global__ void noNAsPmccMeans(int nRows, int nCols, float * a, float * means)
 {
-	int
-		col = blockDim.x * blockIdx.x + threadIdx.x,
-		inOffset = col * nRows,
-		outOffset = threadIdx.x * blockDim.y,
-		j = outOffset + threadIdx.y;
-	float sum = 0.f;
+  int
+    col = blockDim.x * blockIdx.x + threadIdx.x,
+    inOffset = col * nRows,
+    outOffset = threadIdx.x * blockDim.y,
+    j = outOffset + threadIdx.y;
+  float sum = 0.f;
 
-	if(col >= nCols) return;
+  if(col >= nCols) return;
 
-	__shared__ float threadSums[NUMTHREADS*NUMTHREADS];
+  __shared__ float threadSums[NUMTHREADS*NUMTHREADS];
 
-	for(int i = threadIdx.y; i < nRows; i += blockDim.y)
-		sum += a[inOffset + i];
+  for(int i = threadIdx.y; i < nRows; i += blockDim.y)
+    sum += a[inOffset + i];
 
-	threadSums[j] = sum;
-	__syncthreads();
+  threadSums[j] = sum;
+  __syncthreads();
 
-	for(int i = blockDim.y >> 1; i > 0; i >>= 1) {
-		if(threadIdx.y < i) {
-			threadSums[outOffset+threadIdx.y] 
-				+= threadSums[outOffset+threadIdx.y + i];
-		}
-		__syncthreads();
-	}
-	if(threadIdx.y == 0)
-		means[col] = threadSums[outOffset] / (float)nRows;
+  for(int i = blockDim.y >> 1; i > 0; i >>= 1) {
+    if(threadIdx.y < i) {
+      threadSums[outOffset+threadIdx.y] 
+        += threadSums[outOffset+threadIdx.y + i];
+    }
+    __syncthreads();
+  }
+  if(threadIdx.y == 0)
+    means[col] = threadSums[outOffset] / (float)nRows;
 }

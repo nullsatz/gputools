@@ -42,12 +42,12 @@ std::vector<std::string> & getFileKernels(std::string file)
   if (file == "correlation") {  
     std::string newKernels[] =
       { "gpuSignif"
-      , "gpuMeans"
-      , "gpuSD"
-      , "gpuPMCC"
-      , "gpuMeansNoTest"
-      , "gpuSDNoTest"
-      , "gpuPMCCNoTest"
+      , "gpuMeans<float>"
+      , "gpuSD<float>"
+      , "gpuPMCC<float>"
+      , "gpuMeansNoTest<float>"
+      , "gpuSDNoTest<float>"
+      , "gpuPMCCNoTest<float>"
       , "dUpdateSignif"
       , "noNAsPmccMeans"
       };
