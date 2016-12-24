@@ -8,7 +8,8 @@ template<typename T>
 __global__ void gpuMeans(const T * vectsA, size_t na, 
                          const T * vectsB, size_t nb,
                          size_t dim, 
-                         T * means, float * numPairs)
+                         T * means,
+                         size_t * numPairs)
 {
   size_t
     offset, stride,
@@ -55,7 +56,7 @@ template<typename T>
 __global__ void gpuSD(const T * vectsA, size_t na,
                       const T * vectsB, size_t nb,
                       size_t dim, 
-                      const T * means, const float * numPairs,
+                      const T * means, const size_t * numPairs,
                       T * sds)
 {
   size_t 
@@ -111,7 +112,7 @@ template<typename T>
 __global__ void gpuPMCC(const T * vectsa, size_t na,
                         const T * vectsb, size_t nb,
                         size_t dim,
-                        const float * numPairs, const T * means,
+                        const size_t * numPairs, const T * means,
                         const T * sds,
                         T * correlations) 
 {
@@ -161,7 +162,7 @@ template<typename T>
 __global__ void gpuMeansNoTest(const T * vectsA, size_t na, 
                                const T * vectsB, size_t nb,
                                size_t dim, 
-                               T * means, float * numPairs)
+                               T * means, size_t * numPairs)
 {
   size_t 
     offset, stride,
@@ -205,7 +206,7 @@ template<typename T>
 __global__ void gpuSDNoTest(const T * vectsA, size_t na,
                             const T * vectsB, size_t nb,
                             size_t dim, 
-                            const T * means, const float * numPairs, T * sds)
+                            const T * means, const size_t * numPairs, T * sds)
 {
   size_t 
     offset, stride,
@@ -257,7 +258,7 @@ template<typename T>
 __global__ void gpuPMCCNoTest(const T * vectsa, size_t na,
                               const T * vectsb, size_t nb,
                               size_t dim,
-                              const float * numPairs, const T * means,
+                              const size_t * numPairs, const T * means,
                               const T * sds,
                               T * correlations) 
 {
@@ -302,7 +303,8 @@ __global__ void gpuPMCCNoTest(const T * vectsa, size_t na,
 }
 
 __global__ void gpuSignif(const float * gpuNumPairs, 
-                          const float * gpuCorrelations, size_t n, float * gpuTScores)
+                          const float * gpuCorrelations, size_t n,
+                          float * gpuTScores)
 {
   size_t 
     i, start,
@@ -312,12 +314,12 @@ __global__ void gpuSignif(const float * gpuNumPairs,
 
   start = bx * NUMTHREADS * THREADWORK + tx * THREADWORK;
   for(i = 0; i < THREADWORK; i++) {
-    if(start+i >= n)
+    if(start + i >= n)
       break;
 
     npairs = gpuNumPairs[start+i];
     cor = gpuCorrelations[start+i];
-    radicand = (npairs - 2.f) / (1.f - cor * cor);
+    radicand = (npairs - 2.0) / (1.0 - cor * cor);
     gpuTScores[start+i] = cor * sqrtf(radicand);
   }
 }

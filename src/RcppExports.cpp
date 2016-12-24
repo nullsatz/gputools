@@ -5,6 +5,20 @@
 
 using namespace Rcpp;
 
+// pearson
+Rcpp::List pearson(const Rcpp::NumericVector& useFlag, const Rcpp::NumericVector& precisionFlag, const Rcpp::NumericMatrix& x, const Rcpp::NumericMatrix& y);
+RcppExport SEXP gputools_pearson(SEXP useFlagSEXP, SEXP precisionFlagSEXP, SEXP xSEXP, SEXP ySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type useFlag(useFlagSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type precisionFlag(precisionFlagSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type y(ySEXP);
+    rcpp_result_gen = Rcpp::wrap(pearson(useFlag, precisionFlag, x, y));
+    return rcpp_result_gen;
+END_RCPP
+}
 // kendall
 Rcpp::NumericMatrix kendall(const Rcpp::NumericMatrix& x, const Rcpp::NumericMatrix& y, const Rcpp::NumericVector& precisionFlag);
 RcppExport SEXP gputools_kendall(SEXP xSEXP, SEXP ySEXP, SEXP precisionFlagSEXP) {

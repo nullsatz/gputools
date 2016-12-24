@@ -1,11 +1,14 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<math.h>
-#include<cublas.h>
-#include<cuseful.h>
-#include<R.h>
-#include<Rinternals.h>
-#include<correlation.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#include "cuda.h"
+#include "cublas.h"
+
+#include "R.h"
+#include "Rcpp.h"
+
+#include "cuseful.h"
 #include "cudaUtils.h"
 
 #define FALSE 0
@@ -48,118 +51,185 @@ void testSignif(const float * goodPairs, const float * coeffs,
   cudaFree(gpuTs);
 }
 
-void hostSignif(const float * goodPairs, const float * coeffs, size_t n, 
-                float * tscores)
+void hostSignif(const double * goodPairs, const double * coeffs, size_t n, 
+                double * tscores)
 {
-  float cor, radicand;
-  for(size_t i = 0; i < n; i++) {
+  double cor, radicand;
+  for(size_t i = 0; i < n; ++i) {
     cor = coeffs[i];
-    if(cor >= 0.999f) 
-      tscores[i] = 10000.0f;
+    if(cor >= 0.999) 
+      tscores[i] = 10000.0;
     else {
-      radicand = (goodPairs[i] - 2.f) / (1.f - cor * cor);
-      tscores[i] = cor * sqrtf(radicand);
+      radicand = (goodPairs[i] - 2.0) / (1.0 - cor * cor);
+      tscores[i] = cor * sqrt(radicand);
     }
   }
 }
 
+/*
 void pmcc(UseObs whichObs,
           const float * vectsa, size_t na,
           const float * vectsb, size_t nb,
           size_t dim,
           float * numPairs, float * correlations, float * signifs)
+*/
+
+template <typename T>
+Rcpp::NumericMatrix makeMat(size_t nx, size_t ny, const T * elts)
 {
-  size_t 
-    fbytes = sizeof(float);
-  int 
-    same = (vectsa == vectsb);
-  float
-    * gpuVA, * gpuVB,
-    * gpumean, * gpuSds, 
+  Rcpp::NumericMatrix result(nx, ny);
+  for (size_t i = 0; i < nx * ny; ++i) {
+    result[i] = elts[i];
+  }
+  return result;
+}
+
+template <typename T>
+Rcpp::List pearsonHelper(int useFlag,
+                         const T * x, size_t nx,
+                         const T * y, size_t ny,
+                         size_t sampleSize,
+                         std::string kernelTemplate)
+{
+  bool same = (x == y);
+  T
+    * gpuX, * gpuY,
+    * gpuMean, * gpuSds, 
     * gpuCorrelations;
-  float * gpuNumPairs;
+  size_t * gpuNumPairs;
   dim3 
-    block(NUMTHREADS), grid(na, nb);
+    block(NUMTHREADS), grid(ny, nx);
+  size_t nbytes = nx * ny * sizeof(T);
 
-  cudaMalloc((void **)&gpuNumPairs, na * nb * fbytes);
-  cudaMalloc((void **)&gpumean, na * nb * 2 * fbytes);
-  cudaMalloc((void **)&gpuSds, na * nb * 2 * fbytes);
-  cudaMalloc((void **)&gpuCorrelations, na * nb * fbytes);
+  cudaMalloc((void **)&gpuNumPairs, nx * ny * sizeof(size_t));
+  cudaMalloc((void **)&gpuMean, 2 * nbytes);
+  cudaMalloc((void **)&gpuSds, 2 * nbytes);
+  cudaMalloc((void **)&gpuCorrelations, nbytes);
 
-  cudaMalloc((void**)&gpuVA, na*dim*fbytes);
-  cudaMemcpy(gpuVA, vectsa, na*dim*fbytes, cudaMemcpyHostToDevice);
+  cudaMalloc((void**) & gpuX, sampleSize * nx * sizeof(T));
+  cudaMemcpy(gpuX, x, sampleSize * nx * sizeof(T), cudaMemcpyHostToDevice);
 
   if(!same) { 
-    cudaMalloc((void**)&gpuVB, nb*dim*fbytes);
-    cudaMemcpy(gpuVB, vectsb, nb*dim*fbytes, cudaMemcpyHostToDevice);
+    cudaMalloc((void**) & gpuY, sampleSize * ny * sizeof(T));
+    cudaMemcpy(gpuY, y, sampleSize * ny * sizeof(T), cudaMemcpyHostToDevice);
   } else {
-    gpuVB = gpuVA;
+    gpuY = gpuX;
   }
-  checkCudaError("PMCC function : malloc and memcpy");
+  checkCudaError("pearson function : malloc and memcpy");
 
   void * argsMeans[] = {
-    &gpuVA, &na,
-    &gpuVB, &nb,
-    &dim,
-    &gpumean, &gpuNumPairs
+    &gpuY, &ny,
+    &gpuX, &nx,
+    &sampleSize,
+    &gpuMean, &gpuNumPairs
   };
 
   void * argsSD[] = {
-    &gpuVA, &na,
-    &gpuVB, &nb,
-    &dim,
-    &gpumean,
+    &gpuY, &ny,
+    &gpuX, &nx,
+    &sampleSize,
+    &gpuMean,
     &gpuNumPairs,
     &gpuSds
   };
 
   void * argsPMCC[] = {
-    &gpuVA, &na,
-    &gpuVB, &nb,
-    &dim,
+    &gpuY, &ny,
+    &gpuX, &nx,
+    &sampleSize,
     &gpuNumPairs,
-    &gpumean,
+    &gpuMean,
     &gpuSds,
     &gpuCorrelations
   };
 
-  switch(whichObs) {
-  case pairwiseComplete:
-    cudaLaunch("gpuMeans<float>", argsMeans, grid, block);
+  if (useFlag == 2) { // pairwiseComplete
+    cudaLaunch("gpuMeans" + kernelTemplate, argsMeans, grid, block);
     cudaThreadSynchronize();
 
-    cudaLaunch("gpuSD<float>", argsSD, grid, block);
+    cudaLaunch("gpuSD" + kernelTemplate, argsSD, grid, block);
     cudaThreadSynchronize();
 
-    cudaLaunch("gpuPMCC<float>", argsPMCC, grid, block);
-    break;
-  default:
-    cudaLaunch("gpuMeansNoTest<float>", argsMeans, grid, block);
+    cudaLaunch("gpuPMCC" + kernelTemplate, argsPMCC, grid, block);
+  } else { // everything
+    cudaLaunch("gpuMeansNoTest" + kernelTemplate, argsMeans, grid, block);
     cudaThreadSynchronize();
 
-    cudaLaunch("gpuSDNoTest<float>", argsSD, grid, block);
+    cudaLaunch("gpuSDNoTest" + kernelTemplate, argsSD, grid, block);
     cudaThreadSynchronize();
     
-    cudaLaunch("gpuPMCCNoTest<float>", argsPMCC, grid, block);
+    cudaLaunch("gpuPMCCNoTest" + kernelTemplate, argsPMCC, grid, block);
   }
-
-  cudaMemcpy(correlations, gpuCorrelations, na * nb * fbytes, 
-             cudaMemcpyDeviceToHost);
-  cudaMemcpy(numPairs, gpuNumPairs, na * nb * fbytes,
-             cudaMemcpyDeviceToHost);
-  checkCudaError("PMCC function : kernel finish and memcpy");
-
-  hostSignif(numPairs, correlations, na * nb, signifs);
-    
-  // Free allocated space
-  cudaFree(gpuNumPairs);
-  cudaFree(gpumean);
+  cudaFree(gpuMean);
   cudaFree(gpuSds);
+  cudaFree(gpuX);
+  if(!same) cudaFree(gpuY);
+
+  T * coeffsPtr = Calloc(nx * ny, T);
+  cudaMemcpy(coeffsPtr, gpuCorrelations, nbytes,
+             cudaMemcpyDeviceToHost);
   cudaFree(gpuCorrelations);
-  cudaFree(gpuVA);
-  if(!same) {
-    cudaFree(gpuVB);
+  Rcpp::NumericMatrix coeffs = makeMat(nx, ny, coeffsPtr);
+  Free(coeffsPtr);
+  
+  size_t * pairsPtr = Calloc(nx * ny, size_t);
+  cudaMemcpy(pairsPtr, gpuNumPairs, nx * ny * sizeof(size_t),
+             cudaMemcpyDeviceToHost);
+  checkCudaError("pearson function : kernel finish and memcpy");
+  cudaFree(gpuNumPairs);
+  Rcpp::NumericMatrix pairs = makeMat(nx, ny, pairsPtr);
+  Free(pairsPtr);
+
+  Rcpp::NumericMatrix signifs(nx, ny);
+  hostSignif(&pairs[0], &coeffs[0], nx * ny, &signifs[0]);
+
+  return Rcpp::List::create(Rcpp::Named("coefficients") = coeffs,
+                            Rcpp::Named("pairs") = pairs,
+                            Rcpp::Named("ts") = signifs);
+}
+
+// [[Rcpp::export]]
+Rcpp::List
+pearson(const Rcpp::NumericVector & useFlag,
+        const Rcpp::NumericVector & precisionFlag,
+        const Rcpp::NumericMatrix & x,
+        const Rcpp::NumericMatrix & y)
+{
+  int
+    use = (int) useFlag[0],
+    prec = (int) precisionFlag[0];
+  bool same = (&x[0]) == (&y[0]);
+
+  size_t 
+    nx = x.ncol(), ny = y.ncol(),
+    sampleSize = x.nrow();
+  Rcpp::List results;
+
+  if (prec == 1) {
+    float
+      * xf = Calloc(x.length(), float),
+      * yf = xf;
+
+    for(int i = 0; i < x.length(); ++i) {
+      xf[i] = x[i];
+    }
+
+    if (!same) {
+      yf = Calloc(y.length(), float);
+      for(int i = 0; i < y.length(); ++i) {
+        yf[i] = y[i];
+      }
+    }
+
+    results = pearsonHelper(use, xf, nx, yf, ny, sampleSize, "<float>");
+    Free(xf);
+    if (!same) Free(yf);
+  } else if (prec == 2) {
+    results = pearsonHelper(use, &x[0], nx, &y[0], ny, sampleSize, "<double>");
+  } else {
+    error("precision must be 1 (float) or 2 (double)");
   }
+  return results;
 }
 
 void setDevice(int device) {
@@ -224,6 +294,45 @@ void getData(const int * images,
   }
 }
 
+int isSignificant(double signif, int df) {
+  double tcutoffs[49] = {
+    // cuttoffs for degrees of freedom <= 30
+    637.000, 31.600, 2.920, 8.610, 6.869, 5.959, 5.408, 5.041, 4.781, 
+    4.587, 4.437, 4.318, 4.221, 4.140, 4.073, 4.015, 3.965, 3.922, 
+    3.883, 3.850, 3.819, 3.792, 3.768, 3.745, 3.725, 3.707, 3.690, 
+    3.674, 3.659, 3.646,
+    // cuttoffs for even degrees of freedom > 30 but <= 50
+    3.622, 3.601, 3.582, 3.566, 3.551, 3.538, 3.526, 3.515, 3.505, 3.496, 
+    // 55 <= df <= 70 by 5s
+    3.476, 3.460, 3.447, 3.435, 
+    3.416, // 80
+    3.390, // 100
+    3.357, // 150
+    3.340, // 200
+    3.290  // > 200
+  };
+
+  size_t index = 0;
+  if(df <= 0) return 0;
+  else if(df <= 30) index = df - 1;
+  else if(df <= 50) index = 30 + (df + (df%2) - 32) / 2;
+  else if(df <= 70) {
+    if(df <= 55) index = 40;
+    else if(df <= 60) index = 41;
+    else if(df <= 65) index = 42;
+    else if(df <= 70) index = 43;
+  }
+  else if(df <= 80) index = 44;
+  else if(df <= 100) index = 45;
+  else if(df <= 150) index = 46;
+  else if(df <= 200) index = 47;
+  else if(df > 200) index = 48;
+
+  if(fabs(signif) < tcutoffs[index]) return FALSE;
+
+  return TRUE;
+}
+
 size_t parseResults(const int * imageList1, size_t numImages1, 
                     const int * imageList2, size_t numImages2,
                     int structureid,
@@ -264,45 +373,6 @@ size_t parseResults(const int * imageList1, size_t numImages1,
     }
   }
   return nrows;
-}
-
-int isSignificant(double signif, int df) {
-  double tcutoffs[49] = {
-    // cuttoffs for degrees of freedom <= 30
-    637.000, 31.600, 2.920, 8.610, 6.869, 5.959, 5.408, 5.041, 4.781, 
-    4.587, 4.437, 4.318, 4.221, 4.140, 4.073, 4.015, 3.965, 3.922, 
-    3.883, 3.850, 3.819, 3.792, 3.768, 3.745, 3.725, 3.707, 3.690, 
-    3.674, 3.659, 3.646,
-    // cuttoffs for even degrees of freedom > 30 but <= 50
-    3.622, 3.601, 3.582, 3.566, 3.551, 3.538, 3.526, 3.515, 3.505, 3.496, 
-    // 55 <= df <= 70 by 5s
-    3.476, 3.460, 3.447, 3.435, 
-    3.416, // 80
-    3.390, // 100
-    3.357, // 150
-    3.340, // 200
-    3.290  // > 200
-  };
-
-  size_t index = 0;
-  if(df <= 0) return 0;
-  else if(df <= 30) index = df - 1;
-  else if(df <= 50) index = 30 + (df + (df%2) - 32) / 2;
-  else if(df <= 70) {
-    if(df <= 55) index = 40;
-    else if(df <= 60) index = 41;
-    else if(df <= 65) index = 42;
-    else if(df <= 70) index = 43;
-  }
-  else if(df <= 80) index = 44;
-  else if(df <= 100) index = 45;
-  else if(df <= 150) index = 46;
-  else if(df <= 200) index = 47;
-  else if(df > 200) index = 48;
-
-  if(fabs(signif) < tcutoffs[index]) return FALSE;
-
-  return TRUE;
 }
 
 size_t signifFilter(const double * data, size_t rows, double * results)

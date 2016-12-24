@@ -27,6 +27,7 @@ void R_init_mylib(DllInfo *info) {
   R_registerRoutines(info, NULL, callMethods, NULL, NULL);
 }
 
+/*
 // whichObs = 0 means everything
 // whichObs = 1 means pairwiseComplete
 void rpmcc(const int * whichObs,
@@ -52,7 +53,7 @@ void rpmcc(const int * whichObs,
        *sampleSize,
        numPairs, correlations, signifs);
 }
-
+*/
 void rformatInput(const int * images, 
                   const int * xcoords, const int * ycoords, const int * zcoords,
                   const int * mins, const int * maxes,
@@ -89,11 +90,13 @@ void rtestT(const float * pairs, const float * coeffs, const int * n,
   testSignif(pairs, coeffs, (size_t) *n, ts);
 }
 
+/*
 void rhostT(const float * pairs, const float * coeffs, const int * n, 
             float * ts) 
 {
   hostSignif(pairs, coeffs, (size_t) *n, ts);
 }
+*/
 
 void rSignifFilter(const double * data, int * rows, double * results) {
   *rows = signifFilter(data, (size_t) *rows, results);
