@@ -48,10 +48,16 @@ std::vector<std::string> & getFileKernels(std::string file)
       , "gpuMeansNoTest<float>"
       , "gpuSDNoTest<float>"
       , "gpuPMCCNoTest<float>"
+      , "gpuMeans<double>"
+      , "gpuSD<double>"
+      , "gpuPMCC<double>"
+      , "gpuMeansNoTest<double>"
+      , "gpuSDNoTest<double>"
+      , "gpuPMCCNoTest<double>"
       , "dUpdateSignif"
       , "noNAsPmccMeans"
       };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 9);
+    kernels = new std::vector<std::string>(newKernels, newKernels + 15);
   } else if (file == "distance") {
     std::string newKernels[] = 
       { "euclidean_kernel_same"
