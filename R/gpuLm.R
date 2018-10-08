@@ -716,7 +716,7 @@ gpuGlm.fit <-
 		coefficients = coef, residuals = resid,
 		effects = effects,
 		rank = integer(1L), pivot = as.integer(0L:(nvars-1)),
-		qraux = qraux, useSingle=useSingle,
+		qraux = qraux, useSingle=useSingle
                )[c('qr', 'n', 'p', 'ny', 'tol',
 			'coefficients', 'residuals', 'effects', 'rank', 'pivot',
 			'qraux')]
