@@ -1,11 +1,4 @@
 void fatal(const char * msg);
-void getComputeNumber(int * major, int * minor);
-void checkDoubleCapable(const char * failMsg);
-char * getTime();
-void printVect(int n, const float * vect, const char * msg);
-void printMat(int rows, int cols, const float * mat, const char * msg);
 void checkCudaError(const char * msg);
 int hasCudaError(const char * msg);
-float * getMatFromFile(int rows, int cols, const char * fn);
 void checkCublasError(const char * msg);
-int hasCublasError(const char * msg);

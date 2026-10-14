@@ -86,28 +86,6 @@ void rpmcc(const int * whichObs,
        numPairs, correlations, signifs);
 }
 
-void rformatInput(const int * images, 
-                  const int * xcoords, const int * ycoords, const int * zcoords,
-                  const int * mins, const int * maxes,
-                  const float * evs, const int * numrows, const int * numimages, 
-                  float * output)
-{
-  getData(images, xcoords, ycoords, zcoords, mins, maxes, evs, 
-          *numrows, *numimages, output);
-}
-
-void rformatOutput(const int * imageList1, const int * numImages1, 
-                   const int * imageList2, const int * numImages2, 
-                   const int * structureid,
-                   const double * cutCorrelation, const int * cutPairs,
-                   const double * correlations, const double * signifs, const int * numPairs, 
-                   double * results, int * nrows)
-{
-  *nrows = (int) parseResults(imageList1, *numImages1, imageList2, 
-                              *numImages2, *structureid, *cutCorrelation, *cutPairs, 
-                              correlations, signifs, numPairs, results);
-}
-
 void rsetDevice(const int * device) {
   setDevice(*device);
 }
@@ -120,41 +98,6 @@ void rtestT(const float * pairs, const float * coeffs, const int * n,
             float * ts)
 {
   testSignif(pairs, coeffs, (size_t) *n, ts);
-}
-
-void rhostT(const float * pairs, const float * coeffs, const int * n, 
-            float * ts) 
-{
-  hostSignif(pairs, coeffs, (size_t) *n, ts);
-}
-
-void rSignifFilter(const double * data, int * rows, double * results) {
-  *rows = signifFilter(data, (size_t) *rows, results);
-}
-
-void gSignifFilter(const float * data, int * rows, float * results) {
-  *rows = gpuSignifFilter(data, (size_t) *rows, results);
-}
-
-void RcublasPMCC(const float * samplesA, const int * numSamplesA,
-                 const float * samplesB, const int * numSamplesB,
-                 const int * sampleSize,
-                 float * correlations)
-{
-  cublasPMCC(samplesA, *numSamplesA, samplesB, *numSamplesB, *sampleSize, 
-             correlations);
-}
-
-void RhostKendall(const float * X, const float * Y, const int * n, 
-                  double * answer)
-{
-  *answer = hostKendall(X, Y, *n);
-}
-
-void RpermHostKendall(const float * X, const int * nx, const float * Y, 
-                      const int * ny, const int * sampleSize, double * answers)
-{
-  permHostKendall(X, *nx, Y, *ny, *sampleSize, answers);
 }
 
 void RgpuKendall(const float * X, const int * nx, const float * Y, 
@@ -323,72 +266,6 @@ void depthFirst(const int len, const int * merge, int level, int * otop,
     depthFirst(len, merge, merge[left]-1, otop, order);
 }
 
-void RgetQRDecomp(int * rows, int * cols, float * a, float * q, int * pivot,
-                  int * rank)
-{
-
-  int
-    fbytes = sizeof(float),
-    m = *rows, n = *cols;
-  float
-    * da, * dq;
-
-  cublasAlloc(m*n, fbytes, (void **)&da);
-  cublasAlloc(m*m, fbytes, (void **)&dq);
-  cublasSetMatrix(m, n, fbytes, a, m, da, m);
-
-  getQRDecomp(m, n, dq, da, pivot);
-
-  cublasGetMatrix(m, n, fbytes, da, m, a, m);
-  cublasGetMatrix(m, m, fbytes, dq, m, q, m);
-  cublasFree(da);
-  cublasFree(dq);
-
-  int foundZero = 0;
-  for(int i = 0; (i < m) && (i < n); i++) {
-    if((a[i+i*m] < 0.0001f) && (a[i+i*m] > -0.0001f)) {
-      foundZero = 1;
-      *rank = i+1;
-      break;
-    }
-  }
-  if(!foundZero) {
-    if(m > n) *rank = n;
-    else *rank = m;
-  }
-}
-
-// solve for B:  XB=Y where B and Y are vectors and X is a matrix of
-// dimension rows x cols
-void RqrSolver(int * rows, int * cols, float * matX, float * vectY, 
-               float * vectB)
-{
-  int
-    fbytes = sizeof(float),
-    m = *rows, n = *cols;
-  float
-    * dX, * dY, * dB;
-
-  cublasAlloc(m*n, fbytes, (void **)&dX);
-  cublasAlloc(n, fbytes, (void **)&dB);
-  cublasAlloc(m, fbytes, (void **)&dY);
-  checkCublasError("RqrSolver: line 80");
-
-  cublasSetMatrix(m, n, fbytes, matX, m, dX, m);
-  cublasSetVector(m, fbytes, vectY, 1, dY, 1);
-  checkCublasError("RqrSolver: line 84");
-
-  qrSolver(m, n, dX, dY, dB);
-
-  cublasFree(dX);
-  cublasFree(dY);
-
-  cublasGetVector(n, fbytes, dB, 1, vectB, 1);
-  checkCublasError("RqrSolver: line 93");
-
-  cublasFree(dB);
-}
-
 void rGetQRDecompRR(const int * rows, const int * cols,
                     const double * tol, float * x, int * pivot,
                     double * qraux, int * rank)
@@ -457,9 +334,9 @@ void rBSplineMutualInfo(int * nBins, int * splineOrder, int * nsamples,
 //
 void RgpuLSFit(float *X, int *n, int *p, float *Y, int *nY,
                double *tol, float *coeffs, float *resids, float *effects,
-               int *rank, int *pivot, double * qrAux, int useSingle)
+               int *rank, int *pivot, double * qrAux, int * useSingle)
 {
-  if (useSingle) {
+  if (*useSingle) {
     gpuLSFitF(X, *n, *p, Y, *nY, *tol, coeffs, resids, effects,
               rank, pivot, qrAux);
   }

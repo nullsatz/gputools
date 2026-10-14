@@ -29,7 +29,7 @@ const std::vector<KernelFile> & kernelFiles()
   static const std::vector<KernelFile> files = {
     { "correlation",
       { "gpuSignif", "gpuMeans", "gpuSD", "gpuPMCC", "gpuMeansNoTest",
-        "gpuSDNoTest", "gpuPMCCNoTest", "dUpdateSignif", "noNAsPmccMeans" } },
+        "gpuSDNoTest", "gpuPMCCNoTest" } },
     { "distance",
       { "euclidean_kernel_same", "maximum_kernel_same",
         "manhattan_kernel_same", "canberra_kernel_same",
@@ -43,7 +43,7 @@ const std::vector<KernelFile> & kernelFiles()
     { "kendall", { "gpuKendall" } },
     { "mi", { "scale", "get_bin_scores", "get_entropy", "get_mi" } },
     { "qrdecomp",
-      { "getColNorms", "gpuFindMax", "gpuSwapCol", "makeHVector" } },
+      { "getColNorms" } },
   };
   return files;
 }

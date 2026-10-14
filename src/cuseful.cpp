@@ -17,74 +17,6 @@ void fatal(const char * msg)
 	error(msg);
 }
 
-void getComputeNumber(int * major, int * minor)
-{
-	int currentDevice = 0;
-	struct cudaDeviceProp dProps;
-
-	cudaGetDevice(&currentDevice);
-	cudaGetDeviceProperties(&dProps, currentDevice);
-
-	*major = dProps.major;
-	*minor = dProps.minor;
-}
-
-void checkDoubleCapable(const char * failMsg)
-{
-	int major, minor;
-	major = minor = 0;
-	getComputeNumber(&major, &minor);
-	if((major < 1) || ((major == 1) && (minor < 3)))
-		error(failMsg);
-}
-
-float * getMatFromFile(int rows, int cols, const char * fn)
-{
-	FILE * matFile;
-	matFile = fopen(fn, "r");
-	if(matFile == NULL)
-		error("unable to open file %s", fn);
-	float * mat = R_Calloc(rows*cols, float);
-	int i, j, err;
-	for(i = 0; i < rows; i++) {
-		for(j = 0; j < cols; j++) {
-			err = fscanf(matFile, " %f ", mat+i+j*rows);
-			if(err == EOF)
-				error("file %s incorrect: formatting or size", fn);
-		}
-		fscanf(matFile, " \n ");
-	}
-	fclose(matFile);
-	return mat;
-}
-
-char * getTime() {
-	time_t curtime;
-	struct tm *loctime;
-	curtime = time(NULL);
-	loctime = localtime(&curtime);
-
-	return asctime(loctime);
-}
-
-void printVect(int n, const float * vect, const char * msg) {
-	if(msg != NULL) Rprintf(msg);
-	for(int i = 0; i < n; i++) {
-		Rprintf("%6.4f, ", vect[i]);
-		if((i+1)%10 == 0) Rprintf("\n");
-	}
-	if(n%10 != 0) Rprintf("\n");
-	if(msg != NULL) Rprintf("----------\n");
-}
-
-void printMat(int rows, int cols, const float * mat, const char * msg) {
-	int i;
-	if(msg != NULL) Rprintf(msg);
-	for(i = 0; i < rows; i++)
-		printVect(cols, mat+i*cols, NULL);
-	if(msg != NULL) Rprintf("----------\n");
-}
-
 int hasCudaError(const char * msg) {
 	cudaError_t err = cudaGetLastError();
 	if(cudaSuccess != err)
@@ -133,10 +65,3 @@ void checkCublasError(const char * msg)
 		error("cublas error : %s : %s\n", msg, cublasGetErrorString(err).c_str());
 }
 
-int hasCublasError(const char * msg)
-{
-	cublasStatus err = cublasGetError();
-	if(err != CUBLAS_STATUS_SUCCESS)
-		error("cublas error : %s : %s\n", msg, cublasGetErrorString(err).c_str());
-	return 0;
-}

@@ -43,16 +43,6 @@ void distance_device(const float * vg_a, size_t pitch_a, size_t n_a,
 		     dist_method method,
 		     float p);
 
-/* This function is analogous to distance_device except that it
- * will run on a CPU.  Storage for d is not allocated in this function.
- */
-void distance_host(const float * vg_a, size_t pitch_a, size_t n_a,
-		   const float * vg_b, size_t pitch_b, size_t n_b,
-		   size_t k,
-		   float * d, size_t pitch_d,
-		   dist_method method,
-		   float p = 2.0);
-
 void distanceLeaveOnGpu(dist_method method, float p, const float * points, 
 	size_t dim, size_t numPoints, float ** gpuDistances, 
                         size_t * pitchDistances);
