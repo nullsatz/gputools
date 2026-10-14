@@ -8,7 +8,8 @@
 }
 
 \usage{
-	gpuDist(points, method = "euclidean", p = 2.0)
+	gpuDist(points, method = "euclidean", p = 2.0,
+		precision = getOption("gputools.precision", "single"))
 }
 
 \arguments{
@@ -19,6 +20,10 @@
 		supported values are: "binary", "canberra", "euclidean", "manhattan",
 		"maximum", and "minkowski".}
 	\item{p}{a floating point parameter for the Minkowski metric.}
+	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
+		the GPU computes in. Single precision is the default, set with
+		\code{options(gputools.precision = "double")}; it runs many times
+		faster on most consumer GPUs. Results are returned as doubles either way.}
 }
 
 \value{

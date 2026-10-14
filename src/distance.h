@@ -24,27 +24,30 @@ typedef enum {
  * This function may run on the CPU or GPU depending on the size and
  * number of vectors.  Good data alignment will increase performance.
  */
-void distance(const float * vg_a, size_t pitch_a, size_t n_a,
-	      const float * vg_b, size_t pitch_b, size_t n_b,
+template <typename T>
+void distance(const T * vg_a, size_t pitch_a, size_t n_a,
+	      const T * vg_b, size_t pitch_b, size_t n_b,
 	      size_t k,
-	      float * d, size_t pitch_d,
+	      T * d, size_t pitch_d,
 	      dist_method method,
-	      float p);
+	      T p);
 
 /* This function should be used to calculate a distance matrix when 
  * the data is already stored on the GPU.  vg_a, vg_b, and
  * d should already be allocated and initialized on the device.
  * This function does not allocate or free any storage on the device.
  */
-void distance_device(const float * vg_a, size_t pitch_a, size_t n_a,
-		     const float * vg_b, size_t pitch_b, size_t n_b,
+template <typename T>
+void distance_device(const T * vg_a, size_t pitch_a, size_t n_a,
+		     const T * vg_b, size_t pitch_b, size_t n_b,
 		     size_t k,
-		     float * d, size_t pitch_d,
+		     T * d, size_t pitch_d,
 		     dist_method method,
-		     float p);
+		     T p);
 
-void distanceLeaveOnGpu(dist_method method, float p, const float * points, 
-	size_t dim, size_t numPoints, float ** gpuDistances, 
+template <typename T>
+void distanceLeaveOnGpu(dist_method method, T p, const T * points, 
+	size_t dim, size_t numPoints, T ** gpuDistances, 
                         size_t * pitchDistances);
 
 

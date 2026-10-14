@@ -28,27 +28,34 @@
 
 namespace {
 
-// Narrows a numeric vector to floats. Unless naok, refuses NA, NaN and Inf
-// the way .C() used to.
-std::vector<float> floats(SEXP x, const char * what, bool naok = false)
+// Converts a numeric vector to T (narrowing to float for single
+// precision). Unless naok, refuses NA, NaN and Inf the way .C() used to.
+template <typename T>
+std::vector<T> narrow(SEXP x, const char * what, bool naok = false)
 {
   if (!isNumeric(x) && !isLogical(x))
     error("gputools: %s must be numeric", what);
   x = PROTECT(coerceVector(x, REALSXP));
   R_xlen_t n = XLENGTH(x);
   const double * px = REAL(x);
-  std::vector<float> out(n);
+  std::vector<T> out(n);
   for (R_xlen_t i = 0; i < n; ++i) {
     if (!naok && !R_FINITE(px[i]))
       error("gputools: NA/NaN/Inf in %s", what);
-    out[i] = (float) px[i];
+    out[i] = (T) px[i];
   }
   UNPROTECT(1);
   return out;
 }
 
+std::vector<float> floats(SEXP x, const char * what, bool naok = false)
+{
+  return narrow<float>(x, what, naok);
+}
+
 // A new double vector holding v.
-SEXP doubles(const float * v, R_xlen_t n)
+template <typename T>
+SEXP doubles(const T * v, R_xlen_t n)
 {
   SEXP out = allocVector(REALSXP, n);
   double * po = REAL(out);
@@ -57,7 +64,8 @@ SEXP doubles(const float * v, R_xlen_t n)
 }
 
 // A double copy of like (dims and all) overwritten with v.
-SEXP doublesLike(SEXP like, const float * v)
+template <typename T>
+SEXP doublesLike(SEXP like, const T * v)
 {
   // coerceVector keeps the attributes; duplicate in case it returned like
   SEXP out = PROTECT(duplicate(coerceVector(like, REALSXP)));
@@ -79,6 +87,15 @@ SEXP namedList(const char ** names, SEXP * values)
 const char * string(SEXP x)
 {
   return CHAR(STRING_ELT(x, 0));
+}
+
+// The precision argument every entry point takes: "single" or "double".
+bool isDouble(SEXP precision)
+{
+  const char * p = string(precision);
+  if (strcmp(p, "double") == 0) return true;
+  if (strcmp(p, "single") == 0) return false;
+  error("gputools: precision must be \"single\" or \"double\"");
 }
 
 } // namespace
@@ -160,6 +177,65 @@ void depthFirst(const int len, const int * merge, int level, int * otop,
   } else
     depthFirst(len, merge, merge[left]-1, otop, order);
 }
+
+namespace {
+
+template <typename T>
+SEXP distT(SEXP points, int n, int k, SEXP method, SEXP p)
+{
+  std::vector<T> pts = narrow<T>(points, "points"), d((size_t) n * n);
+  distance(pts.data(), k * sizeof(T), n, pts.data(), k * sizeof(T),
+           n, k, d.data(), n * sizeof(T), getDistEnum(string(method)),
+           (T) asReal(p));
+  return doubles(d.data(), d.size());
+}
+
+// merge and order as hclust() has them, from the sub/sup merge pairs
+template <typename T>
+SEXP clusteringResult(int n, const int * sub, const int * sup,
+                      const T * heights)
+{
+  const char * names[] = { "merge", "order", "height", "" };
+  SEXP values[] = {
+    PROTECT(allocVector(INTSXP, 2 * (n - 1))),
+    PROTECT(allocVector(INTSXP, n)),
+    PROTECT(doubles(heights, n - 1))
+  };
+  formatClustering(n - 1, sub, sup, INTEGER(values[0]), INTEGER(values[1]));
+  SEXP out = namedList(names, values);
+  UNPROTECT(3);
+  return out;
+}
+
+template <typename T>
+SEXP hclustT(SEXP distMat, int n, SEXP method)
+{
+  std::vector<T> d = narrow<T>(distMat, "distances"), heights(n - 1);
+  std::vector<int> sub(n - 1), sup(n - 1);
+  hcluster(d.data(), n * sizeof(T), n, sub.data(), sup.data(),
+           heights.data(), getClusterEnum(string(method)), T(0.5), T(0.5));
+  return clusteringResult(n, sub.data(), sup.data(), heights.data());
+}
+
+template <typename T>
+SEXP distClustT(SEXP distMethod, SEXP clustMethod, SEXP points, int n,
+                int dim)
+{
+  std::vector<T> pts = narrow<T>(points, "points"), heights(n - 1);
+  std::vector<int> sub(n - 1), sup(n - 1);
+
+  size_t pitch = 0;
+  T * gpuDistances = NULL;
+  distanceLeaveOnGpu(getDistEnum(string(distMethod)), T(2), pts.data(),
+                     dim, n, &gpuDistances, &pitch);
+  hclusterPreparedDistances(gpuDistances, pitch, n, sub.data(), sup.data(),
+                            heights.data(), getClusterEnum(string(clustMethod)),
+                            T(0.5), T(0.5));
+  cudaFree(gpuDistances);
+  return clusteringResult(n, sub.data(), sup.data(), heights.data());
+}
+
+} // namespace
 
 extern "C" {
 
@@ -264,60 +340,31 @@ SEXP gpuGrangerXY(SEXP x, SEXP rows, SEXP colsx, SEXP y, SEXP colsy,
   return out;
 }
 
-SEXP gpuDist(SEXP points, SEXP numPoints, SEXP dim, SEXP method, SEXP p)
+SEXP gpuDist(SEXP points, SEXP numPoints, SEXP dim, SEXP method, SEXP p,
+             SEXP precision)
 {
   requireDevice();
   int n = asInteger(numPoints), k = asInteger(dim);
-  std::vector<float> pts = floats(points, "points"), d((size_t) n * n);
-  distance(pts.data(), k * sizeof(float), n, pts.data(), k * sizeof(float),
-           n, k, d.data(), n * sizeof(float), getDistEnum(string(method)),
-           (float) asReal(p));
-  return doubles(d.data(), d.size());
+  return isDouble(precision) ? distT<double>(points, n, k, method, p)
+                             : distT<float>(points, n, k, method, p);
 }
 
-// merge and order as hclust() has them, from the sub/sup merge pairs
-SEXP clusteringResult(int n, const int * sub, const int * sup,
-                      const float * heights)
-{
-  const char * names[] = { "merge", "order", "height", "" };
-  SEXP values[] = {
-    PROTECT(allocVector(INTSXP, 2 * (n - 1))),
-    PROTECT(allocVector(INTSXP, n)),
-    PROTECT(doubles(heights, n - 1))
-  };
-  formatClustering(n - 1, sub, sup, INTEGER(values[0]), INTEGER(values[1]));
-  SEXP out = namedList(names, values);
-  UNPROTECT(3);
-  return out;
-}
-
-SEXP gpuHclust(SEXP distMat, SEXP numPoints, SEXP method)
+SEXP gpuHclust(SEXP distMat, SEXP numPoints, SEXP method, SEXP precision)
 {
   requireDevice();
   int n = asInteger(numPoints);
-  std::vector<float> d = floats(distMat, "distances"), heights(n - 1);
-  std::vector<int> sub(n - 1), sup(n - 1);
-  hcluster(d.data(), n * sizeof(float), n, sub.data(), sup.data(),
-           heights.data(), getClusterEnum(string(method)), 0.5f, 0.5f);
-  return clusteringResult(n, sub.data(), sup.data(), heights.data());
+  return isDouble(precision) ? hclustT<double>(distMat, n, method)
+                             : hclustT<float>(distMat, n, method);
 }
 
 SEXP gpuDistClust(SEXP distMethod, SEXP clustMethod, SEXP points,
-                  SEXP numPoints, SEXP dim)
+                  SEXP numPoints, SEXP dim, SEXP precision)
 {
   requireDevice();
-  int n = asInteger(numPoints);
-  std::vector<float> pts = floats(points, "points"), heights(n - 1);
-  std::vector<int> sub(n - 1), sup(n - 1);
-
-  size_t pitch = 0;
-  float * gpuDistances = NULL;
-  distanceLeaveOnGpu(getDistEnum(string(distMethod)), 2.f, pts.data(),
-                     asInteger(dim), n, &gpuDistances, &pitch);
-  hclusterPreparedDistances(gpuDistances, pitch, n, sub.data(), sup.data(),
-                            heights.data(), getClusterEnum(string(clustMethod)),
-                            0.5f, 0.5f);
-  return clusteringResult(n, sub.data(), sup.data(), heights.data());
+  int n = asInteger(numPoints), k = asInteger(dim);
+  return isDouble(precision)
+    ? distClustT<double>(distMethod, clustMethod, points, n, k)
+    : distClustT<float>(distMethod, clustMethod, points, n, k);
 }
 
 SEXP gpuQrDecomp(SEXP x, SEXP tol)
@@ -452,9 +499,9 @@ static const R_CallMethodDef callMethods[] = {
   CALLDEF(gpuKendall, 5),
   CALLDEF(gpuGranger, 4),
   CALLDEF(gpuGrangerXY, 6),
-  CALLDEF(gpuDist, 5),
-  CALLDEF(gpuHclust, 3),
-  CALLDEF(gpuDistClust, 5),
+  CALLDEF(gpuDist, 6),
+  CALLDEF(gpuHclust, 4),
+  CALLDEF(gpuDistClust, 6),
   CALLDEF(gpuQrDecomp, 2),
   CALLDEF(gpuInverseFromQR, 4),
   CALLDEF(gpuSolveFromQR, 5),

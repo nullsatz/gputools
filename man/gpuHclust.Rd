@@ -9,7 +9,8 @@
 }
 
 \usage{
-	gpuHclust(distances, method = "complete")
+	gpuHclust(distances, method = "complete",
+		precision = getOption("gputools.precision", "single"))
 }
 
 \arguments{
@@ -20,6 +21,10 @@
 		applied to distances.  Currently supported method names include
 		"average", "centroid", "complete", "flexible", "flexible group", 
 		"mcquitty", "median", "single", "ward", and "wpgma".}
+	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
+		the GPU computes in. Single precision is the default, set with
+		\code{options(gputools.precision = "double")}; it runs many times
+		faster on most consumer GPUs. Results are returned as doubles either way.}
 }
 
 \value{Copied from the native R function 'hclust' documentation.  A class of

@@ -15,16 +15,18 @@ typedef enum {
   MCQUITTY
 } hc_method;
 
-void hcluster(const float * dist, size_t dist_pitch, size_t n,
+template <typename T>
+void hcluster(const T * dist, size_t dist_pitch, size_t n,
               int * sub, int * sup,
-              float * val,
+              T * val,
               hc_method method,
-              float lambda = 0.5, float beta = 0.5);
+              T lambda = 0.5, T beta = 0.5);
 
-void hclusterPreparedDistances(float * gpuDist, size_t pitch_dist_d, size_t n,
+template <typename T>
+void hclusterPreparedDistances(T * gpuDist, size_t pitch_dist_d, size_t n,
                                int * sub, int * sup,
-                               float * val,
+                               T * val,
                                hc_method method,
-                               float lambda, float beta);
+                               T lambda, T beta);
 
 #endif // HCLUSTER_H

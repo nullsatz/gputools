@@ -1,6 +1,8 @@
-# Results come back in single precision, so compare with a float32-sized
-# tolerance rather than R's double-precision default.
+# Single-precision results get a float32-sized tolerance; double-precision
+# ones should agree with base R almost to the last digit.
 tol <- 1e-4
+precisions <- c("single", "double")
+tolFor <- function(precision) if (precision == "double") 1e-10 else tol
 
 skip_if_no_gpu <- function() {
   if (!gpuAvailable()) skip("no usable CUDA device")

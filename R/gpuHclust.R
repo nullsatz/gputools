@@ -1,5 +1,7 @@
-gpuDist <- function(points, method = "euclidean", p = 2.0)
+gpuDist <- function(points, method = "euclidean", p = 2.0,
+	precision = getOption("gputools.precision", "single"))
 {
+    precision <- .precision(precision)
     if(!is.na(pmatch(method, "euclidian"))) {
         method <- "euclidean"
     }
@@ -19,7 +21,7 @@ gpuDist <- function(points, method = "euclidean", p = 2.0)
     numPoints <- nrow(points)
 
     a <- .Call(C_gpuDist, t(points), as.integer(numPoints),
-               as.integer(ncol(points)), method, as.double(p))
+               as.integer(ncol(points)), method, as.double(p), precision)
 
     d <- as.dist(matrix(a, numPoints, numPoints))
     attr(d, "Labels") <- dimnames(points)[[1L]]
@@ -33,8 +35,10 @@ gpuDist <- function(points, method = "euclidean", p = 2.0)
     return(d)
 }
 
-gpuHclust <- function(distances, method = "complete")
+gpuHclust <- function(distances, method = "complete",
+	precision = getOption("gputools.precision", "single"))
 {
+    precision <- .precision(precision)
     methods <- c("ward", "single", "complete", "average", "mcquitty",
                  "median", "centroid", "flexible", "flexible group", "wpgma")
     method <-  pmatch(method, methods) # method is now an integer
@@ -65,7 +69,7 @@ gpuHclust <- function(distances, method = "complete")
     
     numpoints <- n
     a <- .Call(C_gpuHclust, as.matrix(distances), as.integer(numpoints),
-               method)
+               method, precision)
 
     merge <- matrix(a$merge, numpoints-1, 2)
 
@@ -80,8 +84,10 @@ gpuHclust <- function(distances, method = "complete")
 }
 
 gpuDistClust <- function(points, distmethod = "euclidean", 
-                         clustmethod = "complete") 
+                         clustmethod = "complete",
+                         precision = getOption("gputools.precision", "single"))
 {
+    precision <- .precision(precision)
     if(!is.na(pmatch(distmethod, "euclidian"))) {
         method <- "euclidean"
     }
@@ -112,7 +118,7 @@ gpuDistClust <- function(points, distmethod = "euclidean",
     nump <- nrow(points)
 
     a <- .Call(C_gpuDistClust, distmethod, clustmethod, t(points),
-               as.integer(nump), as.integer(ncol(points)))
+               as.integer(nump), as.integer(ncol(points)), precision)
 
     merge <- matrix(a$merge, nump-1, 2)
 
