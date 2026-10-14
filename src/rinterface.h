@@ -24,7 +24,7 @@ extern "C" {
   void rgetDevice(int * device);
 
   void rtestT(const float * pairs, const float * coeffs, const int * n, 
-              float * ts, const char ** kernelSrc);
+              float * ts);
   void rhostT(const float * pairs, const float * coeffs, const int * n, 
               float * ts); 
   void rSignifFilter(const double * data, int * rows, double * results);
