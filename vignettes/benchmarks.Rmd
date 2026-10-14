@@ -1,0 +1,112 @@
+---
+title: "gputools against base R: measured timings"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{gputools against base R: measured timings}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+bench <- read.csv("benchmarks.csv")
+machine <- read.csv("benchmarks-machine.csv")
+```
+
+Whether a GPU is worth it depends on the computation, the size of the data
+and the hardware at both ends. This vignette reports what we measured, so
+you can judge for your own work, including the cases where the GPU loses.
+
+The timings below were recorded by `bench/run-benchmarks.R` in the
+package's source repository, not computed when this vignette was built
+(the machines that build R packages have no GPU).
+
+## The machine
+
+```{r machine, echo = FALSE}
+knitr::kable(machine, col.names = c("", ""))
+```
+
+The CPU side is base R as most people run it: a multi-threaded BLAS on 8
+cores, which is what `%*%`, `lm`, `qr` and `solve` use. `dist`, `hclust`
+and `cor` do not use the BLAS and run on one core.
+
+Each time is the median of three runs after a warm-up run, in seconds.
+Data is in R's memory at the start and the result back in R's memory at the
+end, so the GPU times include copying both ways.
+
+## Results
+
+```{r results, echo = FALSE}
+tab <- bench[!is.na(bench$cpu), ]
+speedup <- function(gpu) ifelse(is.na(gpu), "",
+                                sprintf("%.1fx", tab$cpu / gpu))
+shown <- data.frame(
+  Task = tab$task, Size = tab$size,
+  `base R` = sprintf("%.3f", tab$cpu),
+  `GPU single` = ifelse(is.na(tab$single), "",
+                        sprintf("%.3f", tab$single)),
+  `speed-up` = speedup(tab$single),
+  `GPU double` = sprintf("%.3f", tab$double),
+  `speed-up ` = speedup(tab$double),
+  check.names = FALSE)
+knitr::kable(shown, align = "llrrrrr")
+```
+
+`gpuMatMult` only computes in double precision, so it has no single
+column.
+
+```{r chart, echo = FALSE, fig.width = 7, fig.height = 4.5, fig.alt = "Speed-up of each gputools function over base R in single and double precision, on a log scale; values above 1 mean the GPU is faster."}
+s <- tab$cpu / tab$single
+d <- tab$cpu / tab$double
+labels <- sub(" vs .*", "", tab$task)
+op <- par(mar = c(4, 13, 1, 1))
+barplot(t(cbind(s, d)), beside = TRUE, horiz = TRUE, log = "x",
+        names.arg = labels, las = 1, xlab = "speed-up over base R (log scale)",
+        legend.text = c("single", "double"),
+        args.legend = list(x = "bottomright", bty = "n"))
+abline(v = 1, lty = 2)
+par(op)
+```
+
+## Reading the results
+
+**Where the GPU wins.** Computations that are large, regular and many
+times over the same data: Kendall's correlation (base R's is a direct
+O(n^2) loop per pair of variables), Pearson correlation, distance
+matrices, Granger tests over many pairs of series, and the combined
+`gpuDistClust`, which keeps the distance matrix on the GPU for the
+clustering.
+
+**Where it does not.**
+
+- `gpuMatMult`, `gpuLm`: a modern multi-threaded BLAS is already fast at
+  these, and the GPU pays for copying the data across and back. The GPU
+  here is also a workstation card with slow double precision.
+- `gpuHclust` alone: the clustering is a sequence of n small dependent
+  steps, which leaves the GPU mostly idle; it pays off only together with
+  the distance computation (`gpuDistClust`).
+- `gpuSolve` is much slower than `solve()`. It computes the QR
+  factorisation with base R on the CPU and uses the GPU only for the last
+  step, so it is slower than doing everything on the CPU.
+
+**Single or double precision.** Consumer and workstation GPUs run double
+precision many times slower than single; data-centre GPUs do not. For
+statistics whose result is a correlation, a distance or a test statistic,
+single precision usually loses nothing that matters; for least squares on
+badly conditioned data, use double.
+
+**The first call.** The first use of a function compiles its GPU code for
+the card in use. That took
+`r sprintf("%.2f", bench$single[bench$task == "kernel compile, first use of a file"])`
+seconds here, once per session for each group of functions and each
+precision.
+
+## Your own hardware
+
+To measure your own machine, run from a checkout of the source repository
+with gputools installed:
+
+```sh
+Rscript bench/run-benchmarks.R my-results
+```

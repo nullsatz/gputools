@@ -41,7 +41,8 @@ jobs:
 
       - name: Install R and CUDA
         run: |
-          conda install -y r-base r-testthat cxx-compiler c-compiler make \
+          conda install -y r-base r-testthat r-knitr r-rmarkdown pandoc \
+            cxx-compiler c-compiler make \
             ${{ matrix.cuda-packages }}
           R --version | head -1
           grep -m1 "define CUDART_VERSION" \
@@ -52,7 +53,7 @@ jobs:
           _R_CHECK_FORCE_SUGGESTS_: false
         run: |
           export CUDA_HOME=$CONDA_PREFIX
-          R CMD build --no-build-vignettes .
+          R CMD build .
           R CMD check --no-manual gputools_*.tar.gz || true
           cat gputools.Rcheck/00check.log
           if grep -qE "^\* .*(ERROR|WARNING)" gputools.Rcheck/00check.log; then

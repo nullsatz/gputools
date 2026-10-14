@@ -1,4 +1,4 @@
-AC_INIT([gputools], [1.2])
+AC_INIT([gputools], [2.0.0])
 
 dnl Locating CUDA, first match wins:
 dnl   --with-cuda-include / --with-cuda-lib (each overrides its half)

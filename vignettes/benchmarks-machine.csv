@@ -1,0 +1,8 @@
+"item","value"
+"GPU, driver","NVIDIA RTX A5500, 580.76.05"
+"CPU","Intel(R) Xeon(R) Gold 6336Y CPU @ 2.40GHz"
+"CPU threads","8"
+"BLAS","libopenblasp-r0.3.34.so"
+"R","R version 4.5.3 (2026-03-11)"
+"gputools","2.0.0 development (commit 11f1d88)"
+"date","2026-10-14"
