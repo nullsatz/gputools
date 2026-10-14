@@ -1,4 +1,4 @@
-useDynLib(gputools)
+useDynLib(gputools, .registration = TRUE, .fixes = "C_")
 
 export(gpuCor, 
 	gpuTtest,
@@ -8,7 +8,7 @@ export(gpuCor,
 	gpuMatMult, cpuMatMult, gpuCrossprod, gpuTcrossprod,
 	gpuMi,
 	gpuLm, gpuLm.fit, gpuLsfit, gpuGlm, gpuGlm.fit,
-	chooseGpu, getGpuId)
+	chooseGpu, getGpuId, gpuAvailable)
 
 importFrom("stats",
   ".getXlevels",

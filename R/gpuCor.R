@@ -1,4 +1,6 @@
-gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
+gpuCor <- function(x, y = NULL, use = "everything", method = "pearson",
+    precision = getOption("gputools.precision", "single")) {
+    precision <- .precision(precision)
     x <- as.matrix(x)
     nx <- ncol(x)
     size <- nrow(x)
@@ -31,11 +33,8 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
     }
 
     if(methods[method] == "pearson") {
-        answer <- .C("rpmcc", NAOK=TRUE,
-                     as.integer(use - 1), as.single(x), as.integer(nx),
-                     as.single(y), as.integer(ny), as.integer(size),
-                     pairs = single(n), corr = single(n), ts = single(n),
-                     PACKAGE='gputools')
+        answer <- .Call(C_gpuPmcc, as.integer(use - 1), x, as.integer(nx),
+                        y, as.integer(ny), as.integer(size), precision)
 
         pairs <- t(matrix(answer$pairs, ny, nx))
         corr <- t(matrix(answer$corr, ny, nx))
@@ -49,26 +48,18 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
             warning("NA handling for Kendall's is not yet supported. Defaulting to using everything. Sorry for any inconvenience.")
         }
 
-        a <- .C("RgpuKendall",
-                as.single(x), nx, as.single(y), ny, 
-                size, result = double(nx*ny),
-                PACKAGE = "gputools")
+        result <- .Call(C_gpuKendall, x, as.integer(nx), y, as.integer(ny),
+                        as.integer(size), precision)
 
         pairs <- matrix(size, nx, ny)
-        return(list(coefficients = matrix(a$result, nx, ny), pairs = pairs))
+        return(list(coefficients = matrix(result, nx, ny), pairs = pairs))
     } else {
         stop("This correlation method is not yet supported.")
     }
 }
 
-gpuTtest <- function(goodPairs, coeffs) {
-    goodPairs <- as.single(goodPairs)
-    coeffs <- as.single(coeffs)
-
-    n <- as.integer(length(goodPairs))
-
-    .C("rtestT", NAOK = TRUE,
-       goodPairs, coeffs, n,
-       results = single(n),
-       PACKAGE = 'gputools')$results
+gpuTtest <- function(goodPairs, coeffs,
+    precision = getOption("gputools.precision", "single")) {
+    precision <- .precision(precision)
+    .Call(C_gpuTtest, as.double(goodPairs), as.double(coeffs), precision)
 }

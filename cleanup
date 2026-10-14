@@ -1,4 +1,4 @@
 #!/bin/sh
 
-rm -f src/*o
-rm -f src/Makefile
+rm -f src/*.o src/*.so src/Makevars
+rm -rf config.log config.status autom4te.cache

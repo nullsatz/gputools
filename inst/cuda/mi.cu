@@ -1,14 +1,14 @@
 #define NTHREADS 16
 
-__global__ void scale(float knot_max, int nx, int nsamples,
-                      float * x, int pitch_x)
+__global__ void scale(real knot_max, int nx, int nsamples,
+                      real * x, int pitch_x)
 {
   int
     col_idx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if(col_idx >= nx) return;
 
-  float
+  real
     min, max,
     * col = x + col_idx * pitch_x;
 
@@ -19,17 +19,17 @@ __global__ void scale(float knot_max, int nx, int nsamples,
     if(col[i] > max) max = col[i];
   }
 
-  float delta = max - min;
+  real delta = max - min;
   for(int i = 0; i < nsamples; i++)
     col[i] = (knot_max * (col[i] - min)) / delta;
 }
 
-__device__ float do_fraction(float numer, float denom) {
-  float result = 0.f; 
+__device__ real do_fraction(real numer, real denom) {
+  real result = real(0); 
 
-  if((numer == denom) && (numer != 0.f))
-    result = 1.f;
-  else if(denom != 0.f)
+  if((numer == denom) && (numer != real(0)))
+    result = real(1);
+  else if(denom != real(0))
     result = numer / denom;
 
   return result;
@@ -37,9 +37,9 @@ __device__ float do_fraction(float numer, float denom) {
 
 // bins must be initialized to zero before calling get_bin_scores
 __global__ void get_bin_scores(int nbins, int order,
-                               int nknots, float * knots, int nsamples,
-                               int nx, float * x, int pitch_x,
-                               float * bins, int pitch_bins)
+                               int nknots, real * knots, int nsamples,
+                               int nx, real * x, int pitch_x,
+                               real * bins, int pitch_bins)
 {
   int
     col_x = blockDim.x * blockIdx.x + threadIdx.x;
@@ -47,7 +47,7 @@ __global__ void get_bin_scores(int nbins, int order,
   if(col_x >= nx)
     return;
 
-  float
+  real
     ld, rd, z,
     term1, term2,
     * in_col = x + col_x * pitch_x,
@@ -56,17 +56,17 @@ __global__ void get_bin_scores(int nbins, int order,
 
   for(int k = 0; k < nsamples; k++, bin_col += nbins) {
     z = in_col[k];
-    i0 = (int)floorf(z) + order - 1;
+    i0 = (int)floor(z) + order - 1;
     if(i0 >= nbins)
       i0 = nbins - 1;
 
-    bin_col[i0] = 1.f;
+    bin_col[i0] = real(1);
     for(int i = 2; i <= order; i++) {
       for(int j = i0 - i + 1; j <= i0; j++) {
         rd = do_fraction(knots[j + i] - z, knots[j + i] - knots[j + 1]);
 
         if((j < 0) || (j >= nbins) || (j >= nknots) || (j + i - 1 < 0) || (j > nknots))
-          term1 = 0.f;
+          term1 = real(0);
         else {
           ld = do_fraction(z - knots[j],
                            knots[j + i - 1] - knots[j]);
@@ -74,7 +74,7 @@ __global__ void get_bin_scores(int nbins, int order,
         }
 
         if((j + 1 < 0) || (j + 1 >= nbins) || (j + 1 >= nknots) || (j + i < 0) || (j + i >= nknots))
-          term2 = 0.f;
+          term2 = real(0);
         else {
           rd = do_fraction(knots[j + i] - z,
                            knots[j + i] - knots[j + 1]);
@@ -87,7 +87,7 @@ __global__ void get_bin_scores(int nbins, int order,
 }
 
 __global__ void get_entropy(int nbins, int nsamples, int nx,
-                            float * bin_scores, int pitch_bin_scores, float * entropies)
+                            real * bin_scores, int pitch_bin_scores, real * entropies)
 {
   int
     col_x = blockDim.x * blockIdx.x + threadIdx.x;
@@ -95,20 +95,20 @@ __global__ void get_entropy(int nbins, int nsamples, int nx,
   if(col_x >= nx)
     return;
 
-  float
+  real
     * in_col = bin_scores + col_x * pitch_bin_scores,
-    entropy = 0.f, prob, logp;
+    entropy = real(0), prob, logp;
 
   for(int i = 0; i < nbins; i++) {
-    prob = 0.f;
+    prob = real(0);
     for(int j = 0; j < nsamples; j++)
       prob += in_col[j * nbins + i];
     prob /= (double) nsamples;
 
-    if(prob <= 0.f)
-      logp = 0.f;
+    if(prob <= real(0))
+      logp = real(0);
     else
-      logp = __log2f(prob);
+      logp = log2(prob);
 
     entropy += prob * logp;
   }
@@ -116,11 +116,11 @@ __global__ void get_entropy(int nbins, int nsamples, int nx,
 }
 
 __global__ void get_mi(int nbins, int nsamples,
-                       int nx, float * x_bin_scores, int pitch_x_bin_scores,
-                       float * entropies_x,
-                       int ny, float * y_bin_scores, int pitch_y_bin_scores,
-                       float * entropies_y,
-                       float * mis, int pitch_mis)
+                       int nx, real * x_bin_scores, int pitch_x_bin_scores,
+                       real * entropies_x,
+                       int ny, real * y_bin_scores, int pitch_y_bin_scores,
+                       real * entropies_y,
+                       real * mis, int pitch_mis)
 {
   int
     col_x = blockDim.x * blockIdx.x + threadIdx.x,
@@ -129,23 +129,23 @@ __global__ void get_mi(int nbins, int nsamples,
   if((col_x >= nx) || (col_y >= ny))
     return;
 
-  float
-    prob, logp, mi = 0.f,
+  real
+    prob, logp, mi = real(0),
     * x_bins = x_bin_scores + col_x * pitch_x_bin_scores,
     * y_bins = y_bin_scores + col_y * pitch_y_bin_scores;
                 
   // calculate joint entropy
   for(int i = 0; i < nbins; i++) {
     for(int j = 0; j < nbins; j++) {
-      prob = 0.f;
+      prob = real(0);
       for(int k = 0; k < nsamples; k++)
         prob += x_bins[k * nbins + i] * y_bins[k * nbins + j];
-      prob /= (float)nsamples;
+      prob /= (real)nsamples;
 
-      if(prob <= 0.f)
-        logp = 0.f;
+      if(prob <= real(0))
+        logp = real(0);
       else
-        logp = __log2f(prob);
+        logp = log2(prob);
 
       mi += prob * logp;
     }

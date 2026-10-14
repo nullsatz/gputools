@@ -1,5 +1,7 @@
-gpuDist <- function(points, method = "euclidean", p = 2.0)
+gpuDist <- function(points, method = "euclidean", p = 2.0,
+	precision = getOption("gputools.precision", "single"))
 {
+    precision <- .precision(precision)
     if(!is.na(pmatch(method, "euclidian"))) {
         method <- "euclidean"
     }
@@ -18,15 +20,10 @@ gpuDist <- function(points, method = "euclidean", p = 2.0)
     points <- as.matrix(points)
     numPoints <- nrow(points)
 
-    a <- .C("Rdistances",
-            as.single(t(points)),
-            as.integer(numPoints),
-            as.integer(ncol(points)),
-            d = single(numPoints * numPoints),
-            method, as.single(p),
-            PACKAGE='gputools')
+    a <- .Call(C_gpuDist, t(points), as.integer(numPoints),
+               as.integer(ncol(points)), method, as.double(p), precision)
 
-    d <- as.dist(matrix(a$d, numPoints, numPoints))
+    d <- as.dist(matrix(a, numPoints, numPoints))
     attr(d, "Labels") <- dimnames(points)[[1L]]
     attr(d, "method") <- method
     attr(d, "call") <- match.call()
@@ -38,8 +35,10 @@ gpuDist <- function(points, method = "euclidean", p = 2.0)
     return(d)
 }
 
-gpuHclust <- function(distances, method = "complete")
+gpuHclust <- function(distances, method = "complete",
+	precision = getOption("gputools.precision", "single"))
 {
+    precision <- .precision(precision)
     methods <- c("ward", "single", "complete", "average", "mcquitty",
                  "median", "centroid", "flexible", "flexible group", "wpgma")
     method <-  pmatch(method, methods) # method is now an integer
@@ -69,18 +68,12 @@ gpuHclust <- function(distances, method = "complete")
     }
     
     numpoints <- n
-    a <- .C("Rhcluster",
-            as.single(as.matrix(distances)),
-            as.integer(numpoints),
-            merge = integer(2*(numpoints-1)),
-            order = integer(numpoints),
-            val = single(numpoints-1),
-            method,
-            PACKAGE='gputools')
+    a <- .Call(C_gpuHclust, as.matrix(distances), as.integer(numpoints),
+               method, precision)
 
     merge <- matrix(a$merge, numpoints-1, 2)
 
-    tree <- list(merge = merge, height= a$val, order = a$order,
+    tree <- list(merge = merge, height = a$height, order = a$order,
                  labels = attr(distances, "Labels"),
                  method = method,
                  call = match.call(),
@@ -91,8 +84,10 @@ gpuHclust <- function(distances, method = "complete")
 }
 
 gpuDistClust <- function(points, distmethod = "euclidean", 
-                         clustmethod = "complete") 
+                         clustmethod = "complete",
+                         precision = getOption("gputools.precision", "single"))
 {
+    precision <- .precision(precision)
     if(!is.na(pmatch(distmethod, "euclidian"))) {
         method <- "euclidean"
     }
@@ -122,19 +117,12 @@ gpuDistClust <- function(points, distmethod = "euclidean",
     points <- as.matrix(points)
     nump <- nrow(points)
 
-    a <- .C("Rdistclust",
-            distmethod, clustmethod,
-            as.single(t(points)),
-            as.integer(nump),
-            as.integer(ncol(points)),
-            merge = integer(2*(nump-1)),
-            order = integer(nump),
-            val = single(nump-1),
-            PACKAGE='gputools')
+    a <- .Call(C_gpuDistClust, distmethod, clustmethod, t(points),
+               as.integer(nump), as.integer(ncol(points)), precision)
 
     merge <- matrix(a$merge, nump-1, 2)
 
-    tree <- list(merge = merge, height = a$val, order = a$order,
+    tree <- list(merge = merge, height = a$height, order = a$order,
                  labels = dimnames(points)[[1L]],
                  method = clustmethod,
                  call = match.call(),

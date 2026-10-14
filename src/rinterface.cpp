@@ -1,11 +1,12 @@
-#include<stdio.h>
-#include<string.h>
+#include <stdio.h>
+#include <string.h>
+#include <vector>
 
-#include "cublas.h"
+#include "cuda_runtime.h"
 
 #include "R.h"
 #include "Rinternals.h"
-#include  "R_ext/Rdynload.h"
+#include "R_ext/Rdynload.h"
 
 #include "correlation.h"
 #include "cuseful.h"
@@ -19,130 +20,81 @@
 #include "qrdecomp.h"
 
 #include "rinterface.h"
+#include "cudaUtils.h"
+#include "gpublas.h"
 
-void R_init_mylib(DllInfo *info) {
-  R_CallMethodDef callMethods[]  = {
-    {"gpuMatMult", (DL_FUNC) &gpuMatMult, 2},
-    {NULL, NULL, 0}
-  };
-  R_registerRoutines(info, NULL, callMethods, NULL, NULL);
-}
+// The .Call entry points. The kernels work in single precision: inputs
+// arrive as R doubles and are narrowed here, results are widened back to
+// doubles, so R never sees a "Csingle" object.
 
-// whichObs = 0 means everything
-// whichObs = 1 means pairwiseComplete
-void rpmcc(const int * whichObs,
-           const float * samplesA, const int * numSamplesA,
-           const float * samplesB, const int * numSamplesB,
-           const int * sampleSize,
-           float * numPairs, float * correlations, float * signifs)
+namespace {
+
+// Converts a numeric vector to T (narrowing to float for single
+// precision). Unless naok, refuses NA, NaN and Inf the way .C() used to.
+template <typename T>
+std::vector<T> narrow(SEXP x, const char * what, bool naok = false)
 {
-  UseObs myObs;
-  switch(*whichObs) {
-  case 0:
-    myObs = everything;
-    break;
-  case 1:
-    myObs = pairwiseComplete;
-    break;
-  default:
-    fatal("unknown use method");
+  if (!isNumeric(x) && !isLogical(x))
+    error("gputools: %s must be numeric", what);
+  x = PROTECT(coerceVector(x, REALSXP));
+  R_xlen_t n = XLENGTH(x);
+  const double * px = REAL(x);
+  std::vector<T> out(n);
+  for (R_xlen_t i = 0; i < n; ++i) {
+    if (!naok && !R_FINITE(px[i]))
+      error("gputools: NA/NaN/Inf in %s", what);
+    out[i] = (T) px[i];
   }
-  pmcc(myObs,
-       samplesA, *numSamplesA,
-       samplesB, *numSamplesB,
-       *sampleSize,
-       numPairs, correlations, signifs);
+  UNPROTECT(1);
+  return out;
 }
 
-void rformatInput(const int * images, 
-                  const int * xcoords, const int * ycoords, const int * zcoords,
-                  const int * mins, const int * maxes,
-                  const float * evs, const int * numrows, const int * numimages, 
-                  float * output)
+// A new double vector holding v.
+template <typename T>
+SEXP doubles(const T * v, R_xlen_t n)
 {
-  getData(images, xcoords, ycoords, zcoords, mins, maxes, evs, 
-          *numrows, *numimages, output);
+  SEXP out = allocVector(REALSXP, n);
+  double * po = REAL(out);
+  for (R_xlen_t i = 0; i < n; ++i) po[i] = v[i];
+  return out;
 }
 
-void rformatOutput(const int * imageList1, const int * numImages1, 
-                   const int * imageList2, const int * numImages2, 
-                   const int * structureid,
-                   const double * cutCorrelation, const int * cutPairs,
-                   const double * correlations, const double * signifs, const int * numPairs, 
-                   double * results, int * nrows)
+// A double copy of like (dims and all) overwritten with v.
+template <typename T>
+SEXP doublesLike(SEXP like, const T * v)
 {
-  *nrows = (int) parseResults(imageList1, *numImages1, imageList2, 
-                              *numImages2, *structureid, *cutCorrelation, *cutPairs, 
-                              correlations, signifs, numPairs, results);
+  // coerceVector keeps the attributes; duplicate in case it returned like
+  SEXP out = PROTECT(duplicate(coerceVector(like, REALSXP)));
+  double * po = REAL(out);
+  for (R_xlen_t i = 0; i < XLENGTH(out); ++i) po[i] = v[i];
+  UNPROTECT(1);
+  return out;
 }
 
-void rsetDevice(const int * device) {
-  setDevice(*device);
-}
-
-void rgetDevice(int * device) {
-  getDevice(device);
-}
-
-void rtestT(const float * pairs, const float * coeffs, const int * n, 
-            float * ts)
+// names must end with "".
+SEXP namedList(const char ** names, SEXP * values)
 {
-  testSignif(pairs, coeffs, (size_t) *n, ts);
+  SEXP out = PROTECT(mkNamed(VECSXP, names));
+  for (int i = 0; names[i][0]; ++i) SET_VECTOR_ELT(out, i, values[i]);
+  UNPROTECT(1);
+  return out;
 }
 
-void rhostT(const float * pairs, const float * coeffs, const int * n, 
-            float * ts) 
+const char * string(SEXP x)
 {
-  hostSignif(pairs, coeffs, (size_t) *n, ts);
+  return CHAR(STRING_ELT(x, 0));
 }
 
-void rSignifFilter(const double * data, int * rows, double * results) {
-  *rows = signifFilter(data, (size_t) *rows, results);
-}
-
-void gSignifFilter(const float * data, int * rows, float * results) {
-  *rows = gpuSignifFilter(data, (size_t) *rows, results);
-}
-
-void RcublasPMCC(const float * samplesA, const int * numSamplesA,
-                 const float * samplesB, const int * numSamplesB,
-                 const int * sampleSize,
-                 float * correlations)
+// The precision argument every entry point takes: "single" or "double".
+bool isDouble(SEXP precision)
 {
-  cublasPMCC(samplesA, *numSamplesA, samplesB, *numSamplesB, *sampleSize, 
-             correlations);
+  const char * p = string(precision);
+  if (strcmp(p, "double") == 0) return true;
+  if (strcmp(p, "single") == 0) return false;
+  error("gputools: precision must be \"single\" or \"double\"");
 }
 
-void RhostKendall(const float * X, const float * Y, const int * n, 
-                  double * answer)
-{
-  *answer = hostKendall(X, Y, *n);
-}
-
-void RpermHostKendall(const float * X, const int * nx, const float * Y, 
-                      const int * ny, const int * sampleSize, double * answers)
-{
-  permHostKendall(X, *nx, Y, *ny, *sampleSize, answers);
-}
-
-void RgpuKendall(const float * X, const int * nx, const float * Y, 
-                 const int * ny, const int * sampleSize, double * answers)
-{
-  masterKendall(X, *nx, Y, *ny, *sampleSize, answers);
-}
-
-void rgpuGranger(const int * rows, const int * cols, const float * y,
-                 const int * p, float * fStats, float * pValues)
-{
-  granger(*rows, *cols, y, *p, fStats, pValues);
-}
-
-void rgpuGrangerXY(const int * rows, const int * colsx, const float * x, 
-                   const int * colsy, const float * y, const int * p, 
-                   float * fStats, float * pValues)
-{
-  grangerxy(*rows, *colsx, x, *colsy, y, *p, fStats, pValues);
-}
+} // namespace
 
 dist_method getDistEnum(const char * methodStr)
 {
@@ -167,75 +119,6 @@ hc_method getClusterEnum(const char * methodStr)
   if(0 == strcmp(methodStr,"ward"))                       return WARD;
   if(0 == strcmp(methodStr,"mcquitty"))           return MCQUITTY;
   return SINGLE;
-}
-
-void Rdistclust(const char ** distmethod, const char ** clustmethod, 
-                const float * points, const int * numPoints, const int * dim,
-                int * merge, int * order, float * val)
-{
-  dist_method dmeth = getDistEnum(*distmethod); 
-  hc_method hcmeth = getClusterEnum(*clustmethod); 
-
-  size_t dpitch = 0;
-  float * gpuDistances = NULL;
-
-  distanceLeaveOnGpu(dmeth, 2.f, points, *dim, *numPoints, 
-                     &gpuDistances, &dpitch);
-
-  size_t len = (*numPoints) - 1;
-  float 
-    lambda = 0.5f, beta = 0.5f;
-  int 
-    * presub, * presup;
-
-  presub = Calloc(len, int);
-  presup = Calloc(len, int);
-
-  hclusterPreparedDistances(gpuDistances, dpitch, *numPoints, 
-                            presub, presup,
-                            val,
-                            hcmeth,
-                            lambda, beta);
-
-  formatClustering(len, presub, presup, merge, order);
-
-  Free(presub);
-  Free(presup);
-}
-
-void Rdistances(const float * points, const int * numPoints, const int * dim,
-                float * distances, const char ** method, const float *p)
-{
-  dist_method nummethod = getDistEnum(*method); 
-
-  distance(points, (*dim)*sizeof(float), *numPoints, points, 
-           (*dim)*sizeof(float), *numPoints, *dim, distances, 
-           (*numPoints)*sizeof(float), nummethod, *p);
-}
-
-void Rhcluster(const float * distMat, const int * numPoints, 
-               int * merge, int * order, float * val,
-               const char ** method)
-{
-  hc_method nummethod = getClusterEnum(*method); 
-        
-  size_t len = (*numPoints) - 1;
-  size_t pitch = (*numPoints) * sizeof(float);
-  float lambda = 0.5;
-  float beta = 0.5;
-  int 
-    * presub, * presup;
-
-  presub = Calloc(len, int);
-  presup = Calloc(len, int);
-
-  hcluster(distMat, pitch, *numPoints, presub, presup, val, nummethod,
-           lambda, beta);
-
-  formatClustering(len, presub, presup, merge, order);
-
-  Free(presub);
-  Free(presup);
 }
 
 void formatClustering(const int len, const int * sub,  const int * sup, 
@@ -291,147 +174,417 @@ void depthFirst(const int len, const int * merge, int level, int * otop,
     depthFirst(len, merge, merge[left]-1, otop, order);
 }
 
-void RgetQRDecomp(int * rows, int * cols, float * a, float * q, int * pivot,
-                  int * rank)
+namespace {
+
+template <typename T>
+SEXP pmccT(UseObs obs, SEXP x, int na, SEXP y, int nb, int size)
 {
+  std::vector<T>
+    a = narrow<T>(x, "x", true), b = narrow<T>(y, "y", true),
+    pairs(na * nb), corr(na * nb), ts(na * nb);
+  pmcc(obs, a.data(), na, b.data(), nb, size,
+       pairs.data(), corr.data(), ts.data());
 
-  int
-    fbytes = sizeof(float),
-    m = *rows, n = *cols;
-  float
-    * da, * dq;
-
-  cublasAlloc(m*n, fbytes, (void **)&da);
-  cublasAlloc(m*m, fbytes, (void **)&dq);
-  cublasSetMatrix(m, n, fbytes, a, m, da, m);
-
-  getQRDecomp(m, n, dq, da, pivot);
-
-  cublasGetMatrix(m, n, fbytes, da, m, a, m);
-  cublasGetMatrix(m, m, fbytes, dq, m, q, m);
-  cublasFree(da);
-  cublasFree(dq);
-
-  int foundZero = 0;
-  for(int i = 0; (i < m) && (i < n); i++) {
-    if((a[i+i*m] < 0.0001f) && (a[i+i*m] > -0.0001f)) {
-      foundZero = 1;
-      *rank = i+1;
-      break;
-    }
-  }
-  if(!foundZero) {
-    if(m > n) *rank = n;
-    else *rank = m;
-  }
+  const char * names[] = { "pairs", "corr", "ts", "" };
+  SEXP values[] = {
+    PROTECT(doubles(pairs.data(), na * nb)),
+    PROTECT(doubles(corr.data(), na * nb)),
+    PROTECT(doubles(ts.data(), na * nb))
+  };
+  SEXP out = namedList(names, values);
+  UNPROTECT(3);
+  return out;
 }
 
-// solve for B:  XB=Y where B and Y are vectors and X is a matrix of
-// dimension rows x cols
-void RqrSolver(int * rows, int * cols, float * matX, float * vectY, 
-               float * vectB)
+template <typename T>
+SEXP ttestT(SEXP goodPairs, SEXP coeffs)
 {
-  int
-    fbytes = sizeof(float),
-    m = *rows, n = *cols;
-  float
-    * dX, * dY, * dB;
-
-  cublasAlloc(m*n, fbytes, (void **)&dX);
-  cublasAlloc(n, fbytes, (void **)&dB);
-  cublasAlloc(m, fbytes, (void **)&dY);
-  checkCublasError("RqrSolver: line 80");
-
-  cublasSetMatrix(m, n, fbytes, matX, m, dX, m);
-  cublasSetVector(m, fbytes, vectY, 1, dY, 1);
-  checkCublasError("RqrSolver: line 84");
-
-  qrSolver(m, n, dX, dY, dB);
-
-  cublasFree(dX);
-  cublasFree(dY);
-
-  cublasGetVector(n, fbytes, dB, 1, vectB, 1);
-  checkCublasError("RqrSolver: line 93");
-
-  cublasFree(dB);
+  std::vector<T>
+    pairs = narrow<T>(goodPairs, "goodPairs", true),
+    cors = narrow<T>(coeffs, "coeffs", true),
+    ts(pairs.size());
+  if (cors.size() != pairs.size())
+    error("gputools: goodPairs and coeffs differ in length");
+  testSignif(pairs.data(), cors.data(), pairs.size(), ts.data());
+  return doubles(ts.data(), ts.size());
 }
 
-void rGetQRDecompRR(const int * rows, const int * cols,
-                    const double * tol, float * x, int * pivot,
-                    double * qraux, int * rank)
+template <typename T>
+SEXP kendallT(SEXP x, int na, SEXP y, int nb, int size)
 {
-  float * dQR;
-  cudaMalloc((void **) &dQR, (*rows) * (*cols) * sizeof(float));
-  checkCudaError("rGetQRDecompRR:");
+  std::vector<T> a = narrow<T>(x, "x"), b = narrow<T>(y, "y");
+  SEXP out = PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb));
+  masterKendall(a.data(), na, b.data(), nb, size, REAL(out));
+  UNPROTECT(1);
+  return out;
+}
 
-  cudaMemcpy(dQR, x, (*rows) * (*cols) * sizeof(float),
-             cudaMemcpyHostToDevice);
+template <typename T>
+SEXP fAndP(const std::vector<T> & f, const std::vector<T> & p)
+{
+  const char * names[] = { "fStats", "pValues", "" };
+  SEXP values[] = {
+    PROTECT(doubles(f.data(), f.size())), PROTECT(doubles(p.data(), p.size()))
+  };
+  SEXP out = namedList(names, values);
+  UNPROTECT(2);
+  return out;
+}
 
-  getQRDecompRR(*rows, *cols, *tol, dQR, pivot, qraux, rank);
+template <typename T>
+SEXP grangerT(SEXP x, int rows, int n, int lag)
+{
+  std::vector<T> a = narrow<T>(x, "x"), f(n * n), p(n * n);
+  granger(rows, n, a.data(), lag, f.data(), p.data());
+  return fAndP(f, p);
+}
 
-  cudaMemcpy(x, dQR, (*rows) * (*cols) * sizeof(float),
-             cudaMemcpyDeviceToHost);
-  checkCudaError("rGetQRDecompRR:");
+template <typename T>
+SEXP grangerXYT(SEXP x, int rows, int nx, SEXP y, int ny, int lag)
+{
+  std::vector<T>
+    a = narrow<T>(x, "x"), b = narrow<T>(y, "y"), f(nx * ny), p(nx * ny);
+  grangerxy(rows, nx, a.data(), ny, b.data(), lag, f.data(), p.data());
+  return fAndP(f, p);
+}
+
+template <typename T>
+SEXP mutualInfoT(int bins, int order, int nsamples, SEXP x, int na, SEXP y,
+                 int nb)
+{
+  std::vector<T> a = narrow<T>(x, "x"), b = narrow<T>(y, "y"), mi(na * nb);
+  bSplineMutualInfo(bins, order, nsamples, na, a.data(), nb, b.data(),
+                    mi.data());
+  return doubles(mi.data(), mi.size());
+}
+
+template <typename T>
+SEXP qrDecompT(SEXP x, SEXP tol)
+{
+  SEXP dim = getAttrib(x, R_DimSymbol);
+  int rows = INTEGER(dim)[0], cols = INTEGER(dim)[1];
+  std::vector<T> a = narrow<T>(x, "x");
+
+  const char * names[] = { "qr", "pivot", "qraux", "rank", "" };
+  SEXP values[] = {
+    R_NilValue,
+    PROTECT(allocVector(INTSXP, cols)),
+    PROTECT(allocVector(REALSXP, cols)),
+    PROTECT(allocVector(INTSXP, 1))
+  };
+  int * pivot = INTEGER(values[1]);
+  for (int i = 0; i < cols; ++i) pivot[i] = i;
+  memset(REAL(values[2]), 0, cols * sizeof(double));
+  INTEGER(values[3])[0] = 0;
+
+  T * dQR = gpuAlloc<T>(a.size());
+  CUDART_CALL(cudaMemcpy(dQR, a.data(), a.size() * sizeof(T),
+                         cudaMemcpyHostToDevice));
+  getQRDecompRR(rows, cols, asReal(tol), dQR, pivot, REAL(values[2]),
+                INTEGER(values[3]));
+  CUDART_CALL(cudaMemcpy(a.data(), dQR, a.size() * sizeof(T),
+                         cudaMemcpyDeviceToHost));
   cudaFree(dQR);
-  checkCudaError("rGetQRDecompRR:");
+
+  values[0] = PROTECT(doublesLike(x, a.data()));
+  SEXP out = namedList(names, values);
+  UNPROTECT(4);
+  return out;
 }
 
-void rGetInverseFromQR(const int * rows, const int * cols,
-                       const float * q, const float * r,
-                       float * inverse)
+template <typename T>
+SEXP inverseFromQRT(SEXP q, SEXP r, int n, int p)
 {
-  float
-    * dQ, * dR, * dInverse;
+  std::vector<T> fq = narrow<T>(q, "q"), fr = narrow<T>(r, "r"), inv(n * p);
 
-  cudaMalloc((void **) &dQ, (*rows) * (*cols) * sizeof(float));
-  cudaMalloc((void **) &dR, (*cols) * (*cols) * sizeof(float));
-  cudaMalloc((void **) &dInverse,  (*rows) * (*cols) * sizeof(float));
-  checkCudaError("rGetInverseFromQR:");
+  T * dQ = gpuAlloc<T>(n * p), * dR = gpuAlloc<T>(p * p),
+    * dInverse = gpuAlloc<T>(n * p);
+  CUDART_CALL(cudaMemcpy(dQ, fq.data(), n * p * sizeof(T),
+                         cudaMemcpyHostToDevice));
+  CUDART_CALL(cudaMemcpy(dR, fr.data(), p * p * sizeof(T),
+                         cudaMemcpyHostToDevice));
 
-  cudaMemcpy(dQ, q, (*rows) * (*cols) * sizeof(float),
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(dR, r, (*cols) * (*cols) * sizeof(float),
-             cudaMemcpyHostToDevice);
+  getInverseFromQR(n, p, dQ, dR, dInverse);
 
-  getInverseFromQR(*rows, *cols, dQ, dR, dInverse);
-
+  CUDART_CALL(cudaMemcpy(inv.data(), dInverse, n * p * sizeof(T),
+                         cudaMemcpyDeviceToHost));
   cudaFree(dQ);
   cudaFree(dR);
-
-  cudaMemcpy(inverse, dInverse, (*rows) * (*cols) * sizeof(float),
-             cudaMemcpyDeviceToHost);
-  checkCudaError("rGetInverseFromQR:");
-
   cudaFree(dInverse);
+  return doubles(inv.data(), inv.size());
 }
 
-void rSolveFromQR(const int * rows, const int * cols, const float * q, const float * r,
-                  const float * y, float * b)
+template <typename T>
+SEXP solveFromQRT(SEXP q, SEXP r, SEXP y, int n, int p)
 {
-  solveFromQR(*rows, *cols, q, r, y, b);
+  std::vector<T>
+    fq = narrow<T>(q, "q"), fr = narrow<T>(r, "r"), fy = narrow<T>(y, "y"),
+    b(p);
+  solveFromQR(n, p, fq.data(), fr.data(), fy.data(), b.data());
+  return doubles(b.data(), p);
 }
 
-void rBSplineMutualInfo(int * nBins, int * splineOrder, int * nsamples,
-                        int * rowsA, const float * A,
-                        int * rowsB, const float * B, 
-                        float * mutualInfo)
+template <typename T>
+SEXP lsFitT(SEXP x, SEXP n, SEXP p, SEXP y, SEXP ny, SEXP tol, SEXP coef,
+            SEXP resid, SEXP effects)
 {
-  bSplineMutualInfo(*nBins, *splineOrder, *nsamples, *rowsA, A, *rowsB, B,
-                    mutualInfo);
+  int rows = asInteger(n), cols = asInteger(p), ycols = asInteger(ny);
+  std::vector<T>
+    fx = narrow<T>(x, "x"), fy = narrow<T>(y, "y"),
+    fcoef = narrow<T>(coef, "coefficients"),
+    fresid = narrow<T>(resid, "residuals"),
+    feff = narrow<T>(effects, "effects");
+
+  const char * names[] = { "qr", "n", "p", "ny", "tol", "coefficients",
+                           "residuals", "effects", "rank", "pivot", "qraux",
+                           "" };
+  SEXP values[] = {
+    R_NilValue, n, p, ny, tol, R_NilValue, R_NilValue, R_NilValue,
+    PROTECT(allocVector(INTSXP, 1)),
+    PROTECT(allocVector(INTSXP, cols)),
+    PROTECT(allocVector(REALSXP, cols))
+  };
+  int * rank = INTEGER(values[8]), * pivot = INTEGER(values[9]);
+  double * qraux = REAL(values[10]);
+  *rank = 0;
+  for (int i = 0; i < cols; ++i) { pivot[i] = i; qraux[i] = 0.0; }
+
+  leastSquaresFit(fx.data(), rows, cols, fy.data(), ycols, asReal(tol),
+           fcoef.data(), fresid.data(), feff.data(), rank, pivot, qraux);
+
+  values[0] = PROTECT(doublesLike(x, fx.data()));
+  values[5] = PROTECT(doublesLike(coef, fcoef.data()));
+  values[6] = PROTECT(doublesLike(resid, fresid.data()));
+  values[7] = PROTECT(doublesLike(effects, feff.data()));
+  SEXP out = namedList(names, values);
+  UNPROTECT(7);
+  return out;
 }
 
-// Interface for R functions requiring least-squares computations.
-//
-void RgpuLSFit(float *X, int *n, int *p, float *Y, int *nY,
-               double *tol, float *coeffs, float *resids, float *effects,
-               int *rank, int *pivot, double * qrAux, int useSingle)
+template <typename T>
+SEXP distT(SEXP points, int n, int k, SEXP method, SEXP p)
 {
-  if (useSingle) {
-    gpuLSFitF(X, *n, *p, Y, *nY, *tol, coeffs, resids, effects,
-              rank, pivot, qrAux);
+  std::vector<T> pts = narrow<T>(points, "points"), d((size_t) n * n);
+  distance(pts.data(), k * sizeof(T), n, pts.data(), k * sizeof(T),
+           n, k, d.data(), n * sizeof(T), getDistEnum(string(method)),
+           (T) asReal(p));
+  return doubles(d.data(), d.size());
+}
+
+// merge and order as hclust() has them, from the sub/sup merge pairs
+template <typename T>
+SEXP clusteringResult(int n, const int * sub, const int * sup,
+                      const T * heights)
+{
+  const char * names[] = { "merge", "order", "height", "" };
+  SEXP values[] = {
+    PROTECT(allocVector(INTSXP, 2 * (n - 1))),
+    PROTECT(allocVector(INTSXP, n)),
+    PROTECT(doubles(heights, n - 1))
+  };
+  formatClustering(n - 1, sub, sup, INTEGER(values[0]), INTEGER(values[1]));
+  SEXP out = namedList(names, values);
+  UNPROTECT(3);
+  return out;
+}
+
+template <typename T>
+SEXP hclustT(SEXP distMat, int n, SEXP method)
+{
+  std::vector<T> d = narrow<T>(distMat, "distances"), heights(n - 1);
+  std::vector<int> sub(n - 1), sup(n - 1);
+  hcluster(d.data(), n * sizeof(T), n, sub.data(), sup.data(),
+           heights.data(), getClusterEnum(string(method)), T(0.5), T(0.5));
+  return clusteringResult(n, sub.data(), sup.data(), heights.data());
+}
+
+template <typename T>
+SEXP distClustT(SEXP distMethod, SEXP clustMethod, SEXP points, int n,
+                int dim)
+{
+  std::vector<T> pts = narrow<T>(points, "points"), heights(n - 1);
+  std::vector<int> sub(n - 1), sup(n - 1);
+
+  size_t pitch = 0;
+  T * gpuDistances = NULL;
+  distanceLeaveOnGpu(getDistEnum(string(distMethod)), T(2), pts.data(),
+                     dim, n, &gpuDistances, &pitch);
+  hclusterPreparedDistances(gpuDistances, pitch, n, sub.data(), sup.data(),
+                            heights.data(), getClusterEnum(string(clustMethod)),
+                            T(0.5), T(0.5));
+  cudaFree(gpuDistances);
+  return clusteringResult(n, sub.data(), sup.data(), heights.data());
+}
+
+} // namespace
+
+extern "C" {
+
+SEXP gpuPmcc(SEXP use, SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
+             SEXP precision)
+{
+  requireDevice();
+  UseObs obs = everything;
+  switch (asInteger(use)) {
+  case 0: obs = everything; break;
+  case 1: obs = pairwiseComplete; break;
+  default: error("gputools: unknown use method");
   }
-  else {
-    //    gpuLSFitD(X, *n, *p, Y, *nY, *tol, coeffs, resids, effects, rank, pivot, qrAux);
-  }    
+  int na = asInteger(nx), nb = asInteger(ny), n = asInteger(size);
+  return isDouble(precision) ? pmccT<double>(obs, x, na, y, nb, n)
+                             : pmccT<float>(obs, x, na, y, nb, n);
 }
+
+SEXP gpuSetDevice(SEXP device)
+{
+  requireDevice();
+  setDevice(asInteger(device));
+  return R_NilValue;
+}
+
+SEXP gpuGetDevice()
+{
+  requireDevice();
+  int device = 0;
+  getDevice(&device);
+  return ScalarInteger(device);
+}
+
+SEXP gpuTtest(SEXP goodPairs, SEXP coeffs, SEXP precision)
+{
+  requireDevice();
+  return isDouble(precision) ? ttestT<double>(goodPairs, coeffs)
+                             : ttestT<float>(goodPairs, coeffs);
+}
+
+SEXP gpuKendall(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
+                SEXP precision)
+{
+  requireDevice();
+  int na = asInteger(nx), nb = asInteger(ny), n = asInteger(size);
+  return isDouble(precision) ? kendallT<double>(x, na, y, nb, n)
+                             : kendallT<float>(x, na, y, nb, n);
+}
+
+SEXP gpuGranger(SEXP x, SEXP rows, SEXP cols, SEXP lag, SEXP precision)
+{
+  requireDevice();
+  int r = asInteger(rows), n = asInteger(cols), p = asInteger(lag);
+  return isDouble(precision) ? grangerT<double>(x, r, n, p)
+                             : grangerT<float>(x, r, n, p);
+}
+
+SEXP gpuGrangerXY(SEXP x, SEXP rows, SEXP colsx, SEXP y, SEXP colsy,
+                  SEXP lag, SEXP precision)
+{
+  requireDevice();
+  int r = asInteger(rows), nx = asInteger(colsx), ny = asInteger(colsy),
+    p = asInteger(lag);
+  return isDouble(precision) ? grangerXYT<double>(x, r, nx, y, ny, p)
+                             : grangerXYT<float>(x, r, nx, y, ny, p);
+}
+
+SEXP gpuDist(SEXP points, SEXP numPoints, SEXP dim, SEXP method, SEXP p,
+             SEXP precision)
+{
+  requireDevice();
+  int n = asInteger(numPoints), k = asInteger(dim);
+  return isDouble(precision) ? distT<double>(points, n, k, method, p)
+                             : distT<float>(points, n, k, method, p);
+}
+
+SEXP gpuHclust(SEXP distMat, SEXP numPoints, SEXP method, SEXP precision)
+{
+  requireDevice();
+  int n = asInteger(numPoints);
+  return isDouble(precision) ? hclustT<double>(distMat, n, method)
+                             : hclustT<float>(distMat, n, method);
+}
+
+SEXP gpuDistClust(SEXP distMethod, SEXP clustMethod, SEXP points,
+                  SEXP numPoints, SEXP dim, SEXP precision)
+{
+  requireDevice();
+  int n = asInteger(numPoints), k = asInteger(dim);
+  return isDouble(precision)
+    ? distClustT<double>(distMethod, clustMethod, points, n, k)
+    : distClustT<float>(distMethod, clustMethod, points, n, k);
+}
+
+SEXP gpuQrDecomp(SEXP x, SEXP tol, SEXP precision)
+{
+  requireDevice();
+  return isDouble(precision) ? qrDecompT<double>(x, tol)
+                             : qrDecompT<float>(x, tol);
+}
+
+SEXP gpuInverseFromQR(SEXP q, SEXP r, SEXP rows, SEXP cols, SEXP precision)
+{
+  requireDevice();
+  int n = asInteger(rows), p = asInteger(cols);
+  return isDouble(precision) ? inverseFromQRT<double>(q, r, n, p)
+                             : inverseFromQRT<float>(q, r, n, p);
+}
+
+SEXP gpuSolveFromQR(SEXP q, SEXP r, SEXP y, SEXP rows, SEXP cols,
+                    SEXP precision)
+{
+  requireDevice();
+  int n = asInteger(rows), p = asInteger(cols);
+  return isDouble(precision) ? solveFromQRT<double>(q, r, y, n, p)
+                             : solveFromQRT<float>(q, r, y, n, p);
+}
+
+SEXP gpuMutualInfo(SEXP bins, SEXP splineOrder, SEXP nsamples,
+                   SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP precision)
+{
+  requireDevice();
+  int b = asInteger(bins), o = asInteger(splineOrder), n = asInteger(nsamples),
+    na = asInteger(nx), nb = asInteger(ny);
+  return isDouble(precision) ? mutualInfoT<double>(b, o, n, x, na, y, nb)
+                             : mutualInfoT<float>(b, o, n, x, na, y, nb);
+}
+
+// Least squares by blocked, pivoted Householder QR. coef, resid and
+// effects come in initialized (zeros, zeros, y) and go back filled in,
+// with the attributes they came with.
+SEXP gpuLSFit(SEXP x, SEXP n, SEXP p, SEXP y, SEXP ny, SEXP tol,
+              SEXP coef, SEXP resid, SEXP effects, SEXP precision)
+{
+  requireDevice();
+  return isDouble(precision)
+    ? lsFitT<double>(x, n, p, y, ny, tol, coef, resid, effects)
+    : lsFitT<float>(x, n, p, y, ny, tol, coef, resid, effects);
+}
+
+#define CALLDEF(name, n) {#name, (DL_FUNC) &name, n}
+
+static const R_CallMethodDef callMethods[] = {
+  CALLDEF(gpuMatMult, 2),
+  CALLDEF(gpuPmcc, 7),
+  CALLDEF(gpuSetDevice, 1),
+  CALLDEF(gpuGetDevice, 0),
+  CALLDEF(gpuTtest, 3),
+  CALLDEF(gpuKendall, 6),
+  CALLDEF(gpuGranger, 5),
+  CALLDEF(gpuGrangerXY, 7),
+  CALLDEF(gpuDist, 6),
+  CALLDEF(gpuHclust, 4),
+  CALLDEF(gpuDistClust, 6),
+  CALLDEF(gpuQrDecomp, 3),
+  CALLDEF(gpuInverseFromQR, 5),
+  CALLDEF(gpuSolveFromQR, 6),
+  CALLDEF(gpuMutualInfo, 8),
+  CALLDEF(gpuLSFit, 10),
+  CALLDEF(gputoolsSetKernelDir, 1),
+  CALLDEF(gputoolsUnloadKernels, 0),
+  {NULL, NULL, 0}
+};
+
+void R_init_gputools(DllInfo * dll)
+{
+  R_registerRoutines(dll, NULL, callMethods, NULL, NULL);
+  R_useDynamicSymbols(dll, FALSE);
+}
+
+} // extern "C"

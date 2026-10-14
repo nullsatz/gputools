@@ -1,218 +1,324 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <fstream>
+#include <sstream>
 #include <algorithm>
+#include <tuple>
 
 #include "R.h"
+#include "Rinternals.h"
 #include "nvrtc.h"
 #include "cuda.h"
+#include "cuda_runtime.h"
 
 #include "cudaUtils.h"
+#include "gpublas.h"
 
-class CudaKernel {
-public:
-  const char * name;
-  const char * ptx;
-  nvrtcProgram * prog;
+// Kernels are compiled from inst/cuda/<file>.cu with NVRTC the first time
+// one of them is launched, for the architecture of the current device, and
+// the loaded module is kept for the rest of the session.
+//
+// The few driver API functions needed are looked up through the runtime
+// rather than linked, so the package does not depend on libcuda and still
+// loads on a machine without the NVIDIA driver.
 
-  CudaKernel(const char * _name, const char * _ptx, nvrtcProgram * _prog)
-  {
-    name = _name;
-    ptx = _ptx;
-    prog = _prog;
-  }
+namespace {
+
+struct KernelFile {
+  const char * file;
+  std::vector<std::string> kernels;
 };
 
-std::map<std::string, CudaKernel *> * cudaKernels;
-
-// Obtain compilation log from the program.
-void printCompileLog(nvrtcProgram &prog) {
-  size_t logSize;
-  NVRTC_SAFE_CALL(nvrtcGetProgramLogSize(prog, &logSize));
-  char * log = new char[logSize];
-  NVRTC_SAFE_CALL(nvrtcGetProgramLog(prog, log));
-  warning(log);
-  delete[] log;
+const std::vector<KernelFile> & kernelFiles()
+{
+  static const std::vector<KernelFile> files = {
+    { "correlation",
+      { "gpuSignif", "gpuMeans", "gpuSD", "gpuPMCC", "gpuMeansNoTest",
+        "gpuSDNoTest", "gpuPMCCNoTest" } },
+    { "distance",
+      { "euclidean_kernel_same", "maximum_kernel_same",
+        "manhattan_kernel_same", "canberra_kernel_same",
+        "binary_kernel_same", "minkowski_kernel_same" } },
+    { "granger", { "getRestricted", "getUnrestricted", "ftest" } },
+    { "hcluster",
+      { "complete_kernel", "wpgma_kernel", "average_kernel", "median_kernel",
+        "centroid_kernel", "flexible_group_kernel", "flexible_kernel",
+        "ward_kernel", "mcquitty_kernel", "single_kernel", "convert_kernel",
+        "find_min1_kernel", "find_min2_kernel" } },
+    { "kendall", { "gpuKendall" } },
+    { "mi", { "scale", "get_bin_scores", "get_entropy", "get_mi" } },
+    { "qrdecomp",
+      { "getColNorms" } },
+  };
+  return files;
 }
 
-static
-std::vector<std::string> & getFileKernels(std::string file)
+std::string kernelDir;
+
+// Each file is compiled once per precision: kernels are written in terms
+// of "real", which this prelude defines. #line keeps NVRTC's error line
+// numbers those of the .cu file.
+std::string prelude(bool isDouble)
 {
-  std::vector<std::string> * kernels;
-  if (file == "correlation") {  
-    std::string newKernels[] =
-      { "gpuSignif"
-      , "gpuMeans"
-      , "gpuSD"
-      , "gpuPMCC"
-      , "gpuMeansNoTest"
-      , "gpuSDNoTest"
-      , "gpuPMCCNoTest"
-      , "dUpdateSignif"
-      , "noNAsPmccMeans"
-      };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 9);
-  } else if (file == "distance") {
-    std::string newKernels[] = 
-      { "euclidean_kernel_same"
-      , "maximum_kernel_same"
-      , "manhattan_kernel_same"
-      , "canberra_kernel_same"
-      , "binary_kernel_same"
-      , "minkowski_kernel_same"
-      };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 6);
-  } else if (file == "granger") {
-    std::string newKernels[] = 
-      { "getRestricted"
-      , "getUnrestricted"
-      , "ftest"
-      , "getRestricted"
-      , "getUnrestricted"
-      , "ftest"
-      };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 6);
-  } else if (file == "hcluster") {
-    std::string newKernels[] = 
-      { "complete_kernel"
-      , "wpgma_kernel"
-      , "average_kernel"
-      , "median_kernel"
-      , "centroid_kernel"
-      , "flexible_group_kernel"
-      , "flexible_kernel"
-      , "ward_kernel"
-      , "mcquitty_kernel"
-      , "single_kernel"
-      , "convert_kernel"
-      , "find_min1_kernel"
-      , "find_min2_kernel"
-      };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 13);
-  } else if (file == "kendall") {
-    std::string newKernels[] = { "gpuKendall" };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 1);
-  } else if (file == "mi") {
-    std::string newKernels[] =
-      { "scale"
-      , "get_bin_scores"
-      , "get_entropy"
-      , "get_mi"
-      };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 4);
-  } else if (file == "qrdecomp") {
-    std::string newKernels[] =
-      { "getColNorms"
-      , "gpuFindMax"
-      , "gpuSwapCol"
-      , "makeHVector"
-      , "UpdateHHNorms"
-      };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 5);
-  } else {
-    kernels = new std::vector<std::string>();
+  return std::string("typedef ") + (isDouble ? "double" : "float") +
+    " real;\n"
+    "#define REAL_INF ((real) __int_as_float(0x7f800000U))\n"
+    "#define REAL_NAN ((real) __int_as_float(0x7fffffffU))\n"
+    "#line 1\n";
+}
+
+// A module per (device, file, precision), and the kernels found in it.
+typedef std::tuple<int, std::string, bool> ModuleKey;
+std::map<ModuleKey, CUmodule> modules;
+std::map<ModuleKey, CUfunction> kernels;
+
+template <typename F>
+F driverFunction(const char * name)
+{
+  void * fn = NULL;
+#if CUDART_VERSION >= 12050
+  cudaDriverEntryPointQueryResult found;
+  CUDART_CALL(cudaGetDriverEntryPointByVersion(name, &fn, CUDART_VERSION,
+                                               cudaEnableDefault, &found));
+#else
+  CUDART_CALL(cudaGetDriverEntryPoint(name, &fn, cudaEnableDefault));
+#endif
+  if (fn == NULL)
+    error("gputools: the CUDA driver has no %s", name);
+  return (F) fn;
+}
+
+struct Driver {
+  decltype(&cuGetErrorName) getErrorName;
+  decltype(&cuModuleLoadData) moduleLoadData;
+  decltype(&cuModuleGetFunction) moduleGetFunction;
+  decltype(&cuModuleUnload) moduleUnload;
+  decltype(&cuLaunchKernel) launchKernel;
+};
+
+const Driver & driver()
+{
+  static Driver d;
+  static bool found = false;
+  if (!found) {
+    d.getErrorName = driverFunction<decltype(d.getErrorName)>("cuGetErrorName");
+    d.moduleLoadData =
+      driverFunction<decltype(d.moduleLoadData)>("cuModuleLoadData");
+    d.moduleGetFunction =
+      driverFunction<decltype(d.moduleGetFunction)>("cuModuleGetFunction");
+    d.moduleUnload = driverFunction<decltype(d.moduleUnload)>("cuModuleUnload");
+    d.launchKernel = driverFunction<decltype(d.launchKernel)>("cuLaunchKernel");
+    found = true;
   }
-  return(*kernels);
+  return d;
 }
 
-extern "C"
-void cuCompile(const int * numFiles,
-               const char ** cuFilenames,
-               const char ** cuSrc)
+void driverCheck(CUresult status, const char * call)
 {
-  cudaKernels = new std::map<std::string, CudaKernel *>();
-  CUDA_SAFE_CALL(cuInit(0));
-
-  for (int i = 0; i < *numFiles; ++i) {
-    std::string file = cuFilenames[i];
-    const char * src = cuSrc[i];
-
-    nvrtcProgram * prog = new nvrtcProgram();
-    NVRTC_SAFE_CALL(
-      nvrtcCreateProgram(prog,   // prog
-        src,                     // buffer
-        file.c_str(),            // name
-        0,                       // numHeaders
-        NULL,                    // headers
-        NULL));                  // includeNames
-    
-    std::vector<std::string> kernels = getFileKernels(file);
-    for(int i = 0; i < kernels.size(); ++i) {
-      NVRTC_SAFE_CALL(nvrtcAddNameExpression(*prog, kernels[i].c_str()));
-    }
-    
-    const char * options[] = { "--use_fast_math" };
-
-    nvrtcResult compileResult = nvrtcCompileProgram(*prog, 1, options);
-    if (compileResult != NVRTC_SUCCESS) {
-      printCompileLog(*prog);
-      error("\ncuda kernel compile failed");
-    }
-
-    //  Obtain PTX from the program.
-    size_t ptxSize;
-    NVRTC_SAFE_CALL(nvrtcGetPTXSize(*prog, &ptxSize));
-
-    char * ptx = Calloc(ptxSize, char);
-    NVRTC_SAFE_CALL(nvrtcGetPTX(*prog, ptx));
-
-    for(int i = 0; i < kernels.size(); ++i) {
-      const char * name;
-      NVRTC_SAFE_CALL(nvrtcGetLoweredName(*prog, kernels[i].c_str(), &name));
-      (*cudaKernels)[kernels[i]] = new CudaKernel(name, ptx, prog); 
-    }
+  if (status != CUDA_SUCCESS) {
+    const char * name = "unknown error";
+    driver().getErrorName(status, &name);
+    error("gputools: %s failed: %s", call, name);
   }
 }
 
-extern "C"
-void unloadPackage()
+#define DRIVER_CALL(x) driverCheck((x), #x)
+
+std::map<int, cublasHandle_t> blasHandles;
+
+const KernelFile & fileForKernel(const std::string & kernelName)
 {
-  std::vector<const char *> ptxs;
-  std::vector<nvrtcProgram *> progs;
+  for (const KernelFile & kf : kernelFiles())
+    if (std::find(kf.kernels.begin(), kf.kernels.end(), kernelName)
+        != kf.kernels.end())
+      return kf;
+  error("gputools: no kernel named '%s'", kernelName.c_str());
+}
 
-  std::map<std::string, CudaKernel *>::iterator iter;  
-  for (iter = cudaKernels->begin(); iter != cudaKernels->end(); ++iter) {
-    ptxs.push_back(iter->second->ptx);
-    progs.push_back(iter->second->prog);
-    delete iter->second;
+std::string readSource(const std::string & file)
+{
+  std::string path = kernelDir + "/" + file + ".cu";
+  std::ifstream in(path.c_str());
+  if (!in)
+    error("gputools: cannot read kernel source %s", path.c_str());
+  std::stringstream buf;
+  buf << in.rdbuf();
+  return buf.str();
+}
+
+// The newest virtual architecture both this NVRTC and the device support,
+// so the driver JIT-compiles the PTX for the device.
+std::string archOption(int device)
+{
+  int major = 0, minor = 0;
+  cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
+  cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+  int want = 10 * major + minor;
+
+  int numArchs = 0;
+  NVRTC_SAFE_CALL(nvrtcGetNumSupportedArchs(&numArchs));
+  std::vector<int> archs(numArchs);
+  NVRTC_SAFE_CALL(nvrtcGetSupportedArchs(archs.data()));
+
+  int best = 0;
+  for (int a : archs)
+    if (a <= want && a > best) best = a;
+  if (best == 0)
+    error("gputools: device compute capability %d.%d is older than any "
+          "this CUDA toolkit supports", major, minor);
+  return "--gpu-architecture=compute_" + std::to_string(best);
+}
+
+struct Compiled {
+  std::string ptx;
+  std::vector<std::string> lowered;  // mangled names, parallel to kernels
+};
+
+Compiled compile(const KernelFile & kf, int device, bool isDouble)
+{
+  std::string src = prelude(isDouble) + readSource(kf.file);
+
+  nvrtcProgram prog;
+  NVRTC_SAFE_CALL(nvrtcCreateProgram(&prog, src.c_str(), kf.file,
+                                     0, NULL, NULL));
+  for (const std::string & k : kf.kernels)
+    NVRTC_SAFE_CALL(nvrtcAddNameExpression(prog, k.c_str()));
+
+  std::string arch = archOption(device);
+  const char * options[] = { "--use_fast_math", arch.c_str() };
+  nvrtcResult compiled = nvrtcCompileProgram(prog, 2, options);
+
+  if (compiled != NVRTC_SUCCESS) {
+    size_t logSize = 0;
+    nvrtcGetProgramLogSize(prog, &logSize);
+    std::string log(logSize, '\0');
+    nvrtcGetProgramLog(prog, &log[0]);
+    nvrtcDestroyProgram(&prog);
+    error("gputools: compiling %s.cu failed (%s, %s):\n%s", kf.file,
+          arch.c_str(), isDouble ? "double" : "single", log.c_str());
   }
-  
-  delete cudaKernels;
 
-  std::sort(ptxs.begin(), ptxs.end());
-  std::unique(ptxs.begin(), ptxs.end());
-  std::vector<const char *>::iterator ptx_i;
-  for (ptx_i = ptxs.begin(); ptx_i != ptxs.end(); ++ptx_i) {
-    Free(*ptx_i);
-    }
+  Compiled out;
+  size_t ptxSize = 0;
+  NVRTC_SAFE_CALL(nvrtcGetPTXSize(prog, &ptxSize));
+  out.ptx.resize(ptxSize);  // includes the terminating NUL
+  NVRTC_SAFE_CALL(nvrtcGetPTX(prog, &out.ptx[0]));
 
-  std::sort(progs.begin(), progs.end());
-  std::unique(progs.begin(), progs.end());
-  std::vector<nvrtcProgram *>::iterator prog_i;
-  for (prog_i = progs.begin(); prog_i != progs.end(); ++prog_i) {
-    NVRTC_SAFE_CALL(nvrtcDestroyProgram(*prog_i));
+  // lowered names belong to prog, so copy them before destroying it
+  for (const std::string & k : kf.kernels) {
+    const char * name;
+    NVRTC_SAFE_CALL(nvrtcGetLoweredName(prog, k.c_str(), &name));
+    out.lowered.push_back(name);
   }
+  nvrtcDestroyProgram(&prog);
+  return out;
+}
+
+void loadFile(const KernelFile & kf, int device, bool isDouble)
+{
+  Compiled c = compile(kf, device, isDouble);
+
+  CUmodule module;
+  DRIVER_CALL(driver().moduleLoadData(&module, c.ptx.c_str()));
+  modules[ModuleKey(device, kf.file, isDouble)] = module;
+
+  for (size_t i = 0; i < kf.kernels.size(); ++i) {
+    CUfunction kernel;
+    DRIVER_CALL(driver().moduleGetFunction(&kernel, module,
+                                           c.lowered[i].c_str()));
+    kernels[ModuleKey(device, kf.kernels[i], isDouble)] = kernel;
+  }
+}
+
+} // namespace
+
+cublasHandle_t gpuBlasHandle()
+{
+  int device = 0;
+  CUDART_CALL(cudaGetDevice(&device));
+  auto h = blasHandles.find(device);
+  if (h != blasHandles.end())
+    return h->second;
+  cublasHandle_t handle;
+  CUBLAS_CALL(cublasCreate(&handle));
+  blasHandles[device] = handle;
+  return handle;
+}
+
+void gpuBlasCheck(cublasStatus_t status, const char * call)
+{
+  if (status != CUBLAS_STATUS_SUCCESS)
+    error("gputools: %s failed: %s", call, cublasGetStatusString(status));
+}
+
+void gpuCudaCheck(cudaError_t status, const char * call)
+{
+  if (status != cudaSuccess)
+    error("gputools: %s failed: %s", call, cudaGetErrorString(status));
+}
+
+void requireDevice()
+{
+  int count = 0;
+  cudaError_t status = cudaGetDeviceCount(&count);
+  if (status != cudaSuccess) {
+    cudaGetLastError();  // clear it, so later checks do not report it again
+    error("gputools: no usable CUDA device: %s", cudaGetErrorString(status));
+  }
+  if (count == 0)
+    error("gputools: no CUDA device found");
 }
 
 void cudaLaunch(std::string kernelName,
                 void * args[],
                 const dim3 &gridDim, const dim3 &blockDim,
-                cudaStream_t stream)
+                Precision precision, cudaStream_t stream)
 {
-  const CudaKernel * cudaKernel = (*cudaKernels)[kernelName];
+  bool isDouble = precision == Precision::Double;
+  int device = 0;
+  CUDART_CALL(cudaGetDevice(&device));
+  // makes the device's primary context current for the driver API
+  CUDART_CALL(cudaFree(0));
 
-  CUmodule module;
-  CUDA_SAFE_CALL(cuModuleLoadDataEx(&module, cudaKernel->ptx, 0, 0, 0));
+  ModuleKey key(device, kernelName, isDouble);
+  auto k = kernels.find(key);
+  if (k == kernels.end()) {
+    loadFile(fileForKernel(kernelName), device, isDouble);
+    k = kernels.find(key);
+  }
 
-  CUfunction kernel;
-  CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, cudaKernel->name));
+  DRIVER_CALL(driver().launchKernel(k->second,
+                                    gridDim.x, gridDim.y, gridDim.z,
+                                    blockDim.x, blockDim.y, blockDim.z,
+                                    0, stream, args, NULL));
+}
 
-  CUDA_SAFE_CALL(
-    cuLaunchKernel(kernel,
-      gridDim.x, gridDim.y, gridDim.z,    // grid dim
-      blockDim.x, blockDim.y, blockDim.z, // block dim
-      0, stream,                    // shared mem and stream
-      args, 0));                  // arguments
-  //  CUDA_SAFE_CALL(cuCtxSynchronize());
-  CUDA_SAFE_CALL(cuModuleUnload(module));
+extern "C" {
+
+SEXP gputoolsSetKernelDir(SEXP dir)
+{
+  kernelDir = CHAR(STRING_ELT(dir, 0));
+  return R_NilValue;
+}
+
+SEXP gputoolsUnloadKernels()
+{
+  int current = 0;
+  cudaGetDevice(&current);
+  for (auto & m : modules) {
+    cudaSetDevice(std::get<0>(m.first));
+    driver().moduleUnload(m.second);
+  }
+  for (auto & h : blasHandles) {
+    cudaSetDevice(h.first);
+    cublasDestroy(h.second);
+  }
+  cudaSetDevice(current);
+  modules.clear();
+  kernels.clear();
+  blasHandles.clear();
+  return R_NilValue;
+}
+
 }

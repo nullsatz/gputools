@@ -1,0 +1,69 @@
+# Builds gputools against several CUDA toolkits and runs R CMD check.
+# GitHub's runners have no GPU, so the GPU tests skip themselves here; they
+# run on real hardware separately. Everything else -- configure, the C++
+# build, loading without a driver, the R code and the docs -- is checked.
+name: R-CMD-check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    name: CUDA ${{ matrix.cuda }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cuda: "11.8"
+            channels: nvidia/label/cuda-11.8.0,conda-forge
+            cuda-packages: cuda-nvcc cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev
+          - cuda: "12.6"
+            channels: conda-forge
+            cuda-packages: cuda-version=12.6 cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev
+          - cuda: "13.0"
+            channels: conda-forge
+            cuda-packages: cuda-version=13.0 cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          activate-environment: gputools
+          channels: ${{ matrix.channels }}
+          channel-priority: flexible
+          conda-remove-defaults: true
+
+      - name: Install R and CUDA
+        run: |
+          conda install -y r-base r-testthat r-knitr r-rmarkdown pandoc \
+            cxx-compiler c-compiler make \
+            ${{ matrix.cuda-packages }}
+          R --version | head -1
+          grep -m1 "define CUDART_VERSION" \
+            $(find $CONDA_PREFIX -name cuda_runtime_api.h | head -1)
+
+      - name: R CMD check
+        env:
+          _R_CHECK_FORCE_SUGGESTS_: false
+        run: |
+          export CUDA_HOME=$CONDA_PREFIX
+          R CMD build .
+          R CMD check --no-manual gputools_*.tar.gz || true
+          cat gputools.Rcheck/00check.log
+          if grep -qE "^\* .*(ERROR|WARNING)" gputools.Rcheck/00check.log; then
+            cat gputools.Rcheck/00install.out
+            exit 1
+          fi
+
+      - name: Upload check results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: check-cuda-${{ matrix.cuda }}
+          path: gputools.Rcheck

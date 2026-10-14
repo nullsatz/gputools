@@ -9,7 +9,8 @@
 }
 
 \usage{
-	gpuDistClust(points, distmethod = "euclidean", clustmethod = "complete") 
+	gpuDistClust(points, distmethod = "euclidean", clustmethod = "complete",
+		precision = getOption("gputools.precision", "single")) 
 }
 
 \arguments{
@@ -23,6 +24,10 @@
 		to be applied to distances.  Currently supported method names include
 		"average", "centroid", "complete", "flexible", "flexible group", 
 		"mcquitty", "median", "single", "ward", and "wpgma".}
+	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
+		the GPU computes in. Single precision is the default, set with
+		\code{options(gputools.precision = "double")}; it runs many times
+		faster on most consumer GPUs. Results are returned as doubles either way.}
 }
 
 \value{Copied from the native R function 'hclust' documentation.  A class of
@@ -50,11 +55,13 @@
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 numVectors <- 5
 dimension <- 10
 Vectors <- matrix(runif(numVectors*dimension), numVectors, dimension)
 myClust <- gpuDistClust(Vectors, "maximum", "mcquitty")
 plot(myClust)
+\dontshow{\}) # examplesIf}
 }
 
 \keyword{cluster}

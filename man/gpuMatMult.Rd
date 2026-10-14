@@ -22,9 +22,11 @@
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 matA <- matrix(runif(2*3), 2, 3)
 matB <- matrix(runif(3*4), 3, 4)
 gpuMatMult(matA, matB)
+\dontshow{\}) # examplesIf}
 }
 
 \keyword{array}

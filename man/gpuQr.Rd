@@ -12,7 +12,8 @@
 }
 
 \usage{
-gpuQr(x, tol = 1e-07)
+gpuQr(x, tol = 1e-07,
+		precision = getOption("gputools.precision", "single"))
 }
 
 \arguments{
@@ -21,6 +22,10 @@ gpuQr(x, tol = 1e-07)
 		factors.}
 	\item{tol}{a floating point value. It is used for estimating the rank
 		of matrix x.}
+	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
+		the GPU computes in. Single precision is the default, set with
+		\code{options(gputools.precision = "double")}; it runs many times
+		faster on most consumer GPUs. Results are returned as doubles either way.}
 }
 
 \value{
@@ -60,10 +65,12 @@ Golub, Gene H. and Van Loan, C. F. (1996)
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 # get some random data of any shape at all
 x <- matrix(runif(25), 5, 5)
 qr <- gpuQr(x)
 print(qr)
+\dontshow{\}) # examplesIf}
 }
 
 

@@ -1,4 +1,6 @@
-gpuSolve <- function(x, y=NULL) {
+gpuSolve <- function(x, y=NULL,
+	precision = getOption("gputools.precision", "single")) {
+	precision <- .precision(precision)
 	x <- as.matrix(x)
 	if(is.complex(x)) {
 		stop("complex gpuSolve not yet supported")
@@ -15,25 +17,16 @@ gpuSolve <- function(x, y=NULL) {
 	x.r <- qr.R(x.qr)
 
 	if(is.null(y)) {
-		myCall <- .C("rGetInverseFromQR",
-			as.integer(n), as.integer(p),
-			as.single(x.q), as.single(x.r),
-			inverse = single(n * p),
-			PACKAGE='gputools'
-		)
-		x.inverse <- matrix(myCall$inverse, p, n)
+		inverse <- .Call(C_gpuInverseFromQR, x.q, x.r,
+			as.integer(n), as.integer(p), precision)
+		x.inverse <- matrix(inverse, p, n)
 		return(x.inverse)
 	} else {
-		y <- as.single(y)
+		y <- as.double(y)
 		if(length(y) != n) {
 			stop("y must have length nrows(x)")
 		}
-		myCall <- .C("rSolveFromQR",
-			as.integer(n), as.integer(p),
-			as.single(x.q), as.single(x.r),
-			y, solution = single(p),
-			PACKAGE='gputools'
-		)
-		return(myCall$solution)
+		return(.Call(C_gpuSolveFromQR, x.q, x.r, y,
+			as.integer(n), as.integer(p), precision))
 	}
 }

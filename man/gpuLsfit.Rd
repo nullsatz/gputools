@@ -13,7 +13,8 @@
 
 \usage{
 gpuLsfit(x, y,
-  wt = NULL, intercept = TRUE, useSingle = TRUE,
+  wt = NULL, intercept = TRUE,
+  useSingle = getOption("gputools.precision", "single") == "single",
   tolerance=gpuLm.defaultTol(useSingle),
   yname = NULL)
 }
@@ -39,7 +40,10 @@ either the function \code{gpuQR} or, better still, \code{svd} should be used.
   left hand sides.}
 \item{wt}{an optional vector of weights for performing weighted least squares.}
 \item{intercept}{whether or not an intercept term should be used.}
-\item{useSingle}{whether to use single precision arithmetic on the gpu. Only the 'TRUE' option is implemented so far.}
+\item{useSingle}{logical: \code{TRUE} computes in single precision on the GPU,
+		\code{FALSE} in double. The default follows
+		\code{options(gputools.precision)}: single unless that is \code{"double"}.
+		It also sets the default tolerance (see \code{\link{gpuLm.defaultTol}}).}
 \item{tolerance}{the tolerance to be used in the matrix decomposition.
   This defaults to 1e-04 for single--precision GPU computation.}
 \item{yname}{names to be used for the response variables.}
@@ -82,9 +86,11 @@ by Mark Seligman at Rapid Biologics LLC.
 \code{\link{ls.print}}, \code{\link{ls.diag}}
 }
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 \dontshow{utils::example("lm", echo = FALSE)}
 ##-- Using the same data as the lm(.) example:
 lsD9 <- gpuLsfit(x = unclass(gl(2,10)), y = weight)
 ls.print(lsD9)
+\dontshow{\}) # examplesIf}
 }
 \keyword{regression}
