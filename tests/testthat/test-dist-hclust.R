@@ -34,3 +34,10 @@ test_that("gpuDistClust is gpuDist then gpuHclust", {
   expect_equal(gpuDistClust(pts)$height, gpuHclust(gpuDist(pts))$height,
                tolerance = tol)
 })
+
+test_that("non-finite input is an error, not garbage", {
+  skip_if_no_gpu()
+  bad <- pts
+  bad[2, 3] <- NA
+  expect_error(gpuDist(bad), "NA/NaN/Inf")
+})

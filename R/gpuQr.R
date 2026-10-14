@@ -8,24 +8,9 @@ gpuQr <- function(x, tol = 1e-07) {
 	n <- nrow(x)
 	p <- ncol(x)
 
-	mode(x) <- 'single'
-
-	res <- .C("rGetQRDecompRR",
-		as.integer(n),
-		as.integer(p),
-		as.double(tol),
-		qr = x,
-		pivot = as.integer(0L:(p-1)),
-		qraux = double(p),
-		rank = integer(1L),
-		PACKAGE='gputools'
-	)[c('qr', 'pivot', 'qraux', 'rank')]
+	res <- .Call(C_gpuQrDecomp, x, as.double(tol))
 
         res$pivot <- res$pivot + 1L
-        # .C leaves the "Csingle" attribute on the matrix; base R's qr.qy()
-        # and friends would then hand LINPACK a float buffer to write doubles
-        # into.
-        attr(res$qr, "Csingle") <- NULL
         
 	if(!is.null(cn <- colnames(x)))
 		colnames(res$qr) <- cn[res$pivot]

@@ -16,3 +16,9 @@ test_that("gpuCrossprod and gpuTcrossprod match base", {
 test_that("mismatched dimensions are an error", {
   expect_error(gpuMatMult(a, a), "mismatched")
 })
+
+test_that("integer matrices are multiplied as numbers", {
+  skip_if_no_gpu()
+  m <- matrix(1:6, 2, 3)
+  expect_equal(gpuMatMult(m, t(m)), m %*% t(m))
+})

@@ -183,9 +183,7 @@ gpuLm.fit <- function (x, y, w = NULL, offset = NULL, method = "qr",
 	}
 
 	## Ensures that coefficients and residuals are initialized to zero
-	## and that all persistent variables are passed in as floats.
 
-	qraux <- double(p)
 	coef <- mat.or.vec(p,ny)
 	resid <- mat.or.vec(n,ny)
 
@@ -197,30 +195,8 @@ gpuLm.fit <- function (x, y, w = NULL, offset = NULL, method = "qr",
 		yIn <- y * wts
 	}
 
-	mode(qr) <- "single"
-	mode(yIn) <- "single"
-	mode(coef) <- "single"
-	mode(resid) <- "single"
-
-	z <- .C("RgpuLSFit", PACKAGE="gputools",
-		qr = qr, n = as.integer(n), p = as.integer(p),
-		yIn, ny = as.integer(ny),
-		tol = as.double(tol),
-		coefficients = coef, residuals = resid,
-		effects = yIn,
-		rank = integer(1L), pivot = as.integer(0L:(p-1)),
-		qraux = qraux, useSingle
-               )[c('qr', 'n', 'p', 'ny', 'tol',
-			'coefficients', 'residuals', 'effects', 'rank', 'pivot',
-			'qraux')]
-
-    # Removes "Csingle" attribute, to prevent dangerous side-effects.
-	attr(qr, "Csingle") <- NULL
-	attr(yIn, "Csingle") <- NULL
-	attr(z$qr, "Csingle") <- NULL
-	attr(z$coefficients, "Csingle") <- NULL
-	attr(z$residuals, "Csingle") <- NULL
-	attr(z$effects, "Csingle") <- NULL
+	z <- .Call(C_gpuLSFit, qr, as.integer(n), as.integer(p), yIn,
+		as.integer(ny), as.double(tol), coef, resid, yIn)
 
 	if(!singular.ok && z$rank < p) {
 		stop("singular fit encountered")
@@ -377,38 +353,14 @@ gpuLsfit <- function(x, y, wt=NULL, intercept=TRUE, useSingle = TRUE,
     storage.mode(y) <- "double"
 
     ## Ensures that coefficients and residuals are initialized to zero
-    ## and that all persistent variables are passed in as floats.
 
-    qraux <- double(ncx)
     coef <- mat.or.vec(ncx,ncy)
     resid <- mat.or.vec(nrx,ncy)
     qr <- x
     yIn <- y
 
-    mode(qr) <- "single"
-    mode(yIn) <- "single"
-    mode(coef) <- "single"
-    mode(resid) <- "single"
-
-    z <- .C("RgpuLSFit", PACKAGE="gputools",
-		qr = qr, n = as.integer(nrx), p = as.integer(ncx),
-		yIn, ny = as.integer(ncy),
-		tol = as.double(tolerance),
-		coefficients = coef, residuals = resid,
-		effects = drop(yIn),
-		rank = integer(1L), pivot = as.integer(0L:(ncx-1)),
-		qraux = qraux, useSingle
-               )[c('qr', 'n', 'p', 'ny', 'tol',
-			'coefficients', 'residuals', 'effects', 'rank', 'pivot',
-			'qraux')]
-
-    # Removes "Csingle" attribute, to prevent dangerous side-effects.
-    attr(qr, "Csingle") <- NULL
-    attr(yIn, "Csingle") <- NULL
-    attr(z$qr, "Csingle") <- NULL
-    attr(z$coefficients, "Csingle") <- NULL
-    attr(z$residuals, "Csingle") <- NULL
-    attr(z$effects, "Csingle") <- NULL
+    z <- .Call(C_gpuLSFit, qr, as.integer(nrx), as.integer(ncx), yIn,
+		as.integer(ncy), as.double(tolerance), coef, resid, drop(yIn))
 
     # Compensates for C's zero-based indexing.
     #
@@ -692,9 +644,7 @@ gpuGlm.fit <-
 
 
 	## Ensures that coefficients and residuals are initialized to zero
-	## and that all persistent variables are passed in as floats.
 
-	qraux <- double(nvars)
 	coef <- double(nvars)
 	resid <- double(ngoodobs)
 
@@ -703,31 +653,11 @@ gpuGlm.fit <-
         effects <- yIn
 
 
-	mode(qr) <- "single"
-	mode(yIn) <- "single"
-	mode(coef) <- "single"
-	mode(resid) <- "single"
-        mode(effects) <- "single"
+	fit <- .Call(C_gpuLSFit, qr, as.integer(ngoodobs), as.integer(nvars),
+		yIn, 1L,
+		as.double(min(gpuLm.defaultTol(useSingle), control$epsilon/1000)),
+		coef, resid, effects)
 
-	fit <- .C("RgpuLSFit", PACKAGE="gputools",
-		qr = qr, n = as.integer(ngoodobs), p = as.integer(nvars),
-		yIn, ny = as.integer(1L),
-		tol = as.double(min(gpuLm.defaultTol(useSingle), control$epsilon/1000)),
-		coefficients = coef, residuals = resid,
-		effects = effects,
-		rank = integer(1L), pivot = as.integer(0L:(nvars-1)),
-		qraux = qraux, useSingle=useSingle
-               )[c('qr', 'n', 'p', 'ny', 'tol',
-			'coefficients', 'residuals', 'effects', 'rank', 'pivot',
-			'qraux')]
-
-    # Removes "Csingle" attribute, to prevent dangerous side-effects.
-	attr(qr, "Csingle") <- NULL
-	attr(yIn, "Csingle") <- NULL
-	attr(fit$qr, "Csingle") <- NULL
-	attr(fit$coefficients, "Csingle") <- NULL
-	attr(fit$residuals, "Csingle") <- NULL
-	attr(fit$effects, "Csingle") <- NULL
 
         fit$pivot <- fit$pivot + 1
             
