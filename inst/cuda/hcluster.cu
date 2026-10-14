@@ -388,7 +388,9 @@ __global__ void ward_kernel(float * dist, const size_t pitch_dist,
 	if((nr == -nk) || (col == col_winner) || (col == row_winner)) {
 		bot_val = CUDART_INF_F;
 	} else {
-		bot_val = (bot_val * (np + nk) + top_val * (nq + nk) - val[iter] * nk);
+		// Lance-Williams for Ward: top_val is the col_winner cluster (np
+		// members), bot_val the row_winner cluster (nq members)
+		bot_val = (top_val * (np + nk) + bot_val * (nq + nk) - val[iter] * nk);
 		bot_val /= (nr + nk);
 		if(isinf(bot_val)) {
 			bot_val = CUDART_INF_F;
