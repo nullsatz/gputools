@@ -93,7 +93,7 @@ void bSplineMutualInfo(int nbins, int order, int nsamples,
       &xpitch
     };
     cudaLaunch("scale", scaleArgs,
-                      grid, block, stream[i]);
+                      grid, block, Precision::Single, stream[i]);
 
     size_t pitch_bins_i = pitch_bins[i] / sizeof(float);
     void * gbsArgs[] = {
@@ -105,7 +105,7 @@ void bSplineMutualInfo(int nbins, int order, int nsamples,
       &pitch_bins_i
     };
     cudaLaunch("get_bin_scores", gbsArgs,
-                      grid, block, stream[i]);
+                      grid, block, Precision::Single, stream[i]);
 
     void * entropyArgs[] = {
       &nbins,
@@ -116,7 +116,7 @@ void bSplineMutualInfo(int nbins, int order, int nsamples,
       dentropy + i
     };
     cudaLaunch("get_entropy", entropyArgs,
-                      grid, block, stream[i]);
+                      grid, block, Precision::Single, stream[i]);
   }
   checkCudaError("bSplineMutualInfoSingle: 3");
 

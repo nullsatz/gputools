@@ -1,41 +1,38 @@
-// NVRTC does not pull in math_constants.h the way nvcc did; same definition.
-#define CUDART_INF_F __int_as_float(0x7f800000U)
-
 #define NUM_THREADS 32
 #define NUM_BLOCKS 1024
 
-__global__ void convert_kernel(float * dist, size_t pitch_dist, size_t n)
+__global__ void convert_kernel(real * dist, size_t pitch_dist, size_t n)
 {
   for(size_t index = threadIdx.x; index < n; index += NUM_THREADS) {
-    dist[index * pitch_dist + index] = CUDART_INF_F;
+    dist[index * pitch_dist + index] = REAL_INF;
   }
 }
 
-__global__ void find_min1_kernel(const float * dist, const size_t pitch_dist, 
-	const size_t n, const float * count, float * min_val, size_t * min_col, 
+__global__ void find_min1_kernel(const real * dist, const size_t pitch_dist, 
+	const size_t n, const real * count, real * min_val, size_t * min_col, 
 	const size_t row_offset)
 {
 	// Determine which row this block will handle
 	const size_t row = row_offset + blockIdx.x;
 
 	// If the row has already been merged, skip the work
-	if((threadIdx.x == 0) && (row < n) && (count[row] < 0.f)) {
-		min_val[row] = CUDART_INF_F;
+	if((threadIdx.x == 0) && (row < n) && (count[row] < real(0))) {
+		min_val[row] = REAL_INF;
 		min_col[row] = 0;		
 	}
 
-	if((row >= n) || (count[row] <= 0.f))
+	if((row >= n) || (count[row] <= real(0)))
 		return;
 
-	__shared__ float vals[NUM_THREADS];
+	__shared__ real vals[NUM_THREADS];
 	__shared__ size_t cols[NUM_THREADS];
 
 	// Initialize with identity
-	vals[threadIdx.x] = CUDART_INF_F;
+	vals[threadIdx.x] = REAL_INF;
 		
 	// Find the minimum
 	for(size_t col = threadIdx.x; col <= row; col += NUM_THREADS) {
-		float t = dist[row * pitch_dist + col];
+		real t = dist[row * pitch_dist + col];
 		if(t < vals[threadIdx.x]) {
 			vals[threadIdx.x] = t;
 			cols[threadIdx.x] = col;
@@ -61,19 +58,19 @@ __global__ void find_min1_kernel(const float * dist, const size_t pitch_dist,
 	}
 }
 
-__global__ void find_min2_kernel(const float * min_val, const size_t * min_col,
-	float * count, int * sub, int * sup, float * val, const size_t n, 
+__global__ void find_min2_kernel(const real * min_val, const size_t * min_col,
+	real * count, int * sub, int * sup, real * val, const size_t n, 
 	const size_t iter)
 {
-	__shared__ float vals[NUM_THREADS];
+	__shared__ real vals[NUM_THREADS];
 	__shared__ size_t cols[NUM_THREADS];
 
 	// Initialize with identity
-	vals[threadIdx.x] = CUDART_INF_F;
+	vals[threadIdx.x] = REAL_INF;
 		
 	// Find the minimum
 	for(size_t row = threadIdx.x; row < n; row += NUM_THREADS) {
-		float t = min_val[row];
+		real t = min_val[row];
 		if(t < vals[threadIdx.x]) {
 			vals[threadIdx.x] = t;
 			cols[threadIdx.x] = row;
@@ -104,14 +101,14 @@ __global__ void find_min2_kernel(const float * min_val, const size_t * min_col,
 		sup[iter] = row_winner;
 
 		count[row_winner] += count[col_winner];
-		count[col_winner] *= -1.f;
+		count[col_winner] *= -real(1);
 	}
 }
 
-__global__ void single_kernel(float * dist, const size_t pitch_dist, 
-	const size_t n, const int * sub, const int * sup, const float * count, 
-	const float * val, const size_t iter, const size_t col_offset, 
-	const float lambda, const float beta)
+__global__ void single_kernel(real * dist, const size_t pitch_dist, 
+	const size_t n, const int * sub, const int * sup, const real * count, 
+	const real * val, const size_t iter, const size_t col_offset, 
+	const real lambda, const real beta)
 {
   size_t col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
 
@@ -119,13 +116,13 @@ __global__ void single_kernel(float * dist, const size_t pitch_dist,
   if(col < n) {
     int col_winner = sub[iter];
     int row_winner = sup[iter];
-    float top_val = dist[col_winner * pitch_dist + col];
-    float bot_val = dist[row_winner * pitch_dist + col];
+    real top_val = dist[col_winner * pitch_dist + col];
+    real bot_val = dist[row_winner * pitch_dist + col];
     bot_val = min(bot_val, top_val);
     if(col == col_winner || col == row_winner) {
-      bot_val = CUDART_INF_F;
+      bot_val = REAL_INF;
     }
-    top_val = CUDART_INF_F;
+    top_val = REAL_INF;
     // Write out
     dist[col_winner * pitch_dist + col] = top_val;
     dist[col * pitch_dist + col_winner] = top_val;
@@ -134,10 +131,10 @@ __global__ void single_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-__global__ void complete_kernel(float * dist, const size_t pitch_dist, 
-	const size_t n, const int * sub, const int * sup, const float * count, 
-	const float * val, const size_t iter, const size_t col_offset, 
-	const float lambda, const float beta)
+__global__ void complete_kernel(real * dist, const size_t pitch_dist, 
+	const size_t n, const int * sub, const int * sup, const real * count, 
+	const real * val, const size_t iter, const size_t col_offset, 
+	const real lambda, const real beta)
 {
   const size_t col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
 
@@ -146,15 +143,15 @@ __global__ void complete_kernel(float * dist, const size_t pitch_dist,
 
     int 
 		col_winner = sub[iter], row_winner = sup[iter];
-    float 
+    real 
 		top_val = dist[col_winner * pitch_dist + col], 
 		bot_val = dist[row_winner * pitch_dist + col];
 
-    bot_val = fmaxf(bot_val, top_val);
+    bot_val = fmax(bot_val, top_val);
     if((col == col_winner) || (col == row_winner))
-		bot_val = CUDART_INF_F;
+		bot_val = REAL_INF;
 
-    top_val = CUDART_INF_F;
+    top_val = REAL_INF;
 
     // Write out
     dist[col_winner * pitch_dist + col] = top_val;
@@ -164,10 +161,10 @@ __global__ void complete_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-__global__ void wpgma_kernel(float * dist, const size_t pitch_dist, 
-	const size_t n, const int * sub, const int * sup, const float * count,  
-	const float * val, const size_t iter, const size_t col_offset, 
-	const float lambda, const float beta)
+__global__ void wpgma_kernel(real * dist, const size_t pitch_dist, 
+	const size_t n, const int * sub, const int * sup, const real * count,  
+	const real * val, const size_t iter, const size_t col_offset, 
+	const real lambda, const real beta)
 {
   const size_t col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
 
@@ -175,13 +172,13 @@ __global__ void wpgma_kernel(float * dist, const size_t pitch_dist,
   if(col < n) {
     int col_winner = sub[iter];
     int row_winner = sup[iter];
-    float top_val = dist[col_winner * pitch_dist + col];
-    float bot_val = dist[row_winner * pitch_dist + col];
+    real top_val = dist[col_winner * pitch_dist + col];
+    real bot_val = dist[row_winner * pitch_dist + col];
     bot_val = (bot_val + top_val) / 2.0;
     if(col == col_winner || col == row_winner) {
-      bot_val = CUDART_INF_F;
+      bot_val = REAL_INF;
     }
-    top_val = CUDART_INF_F;
+    top_val = REAL_INF;
     // Write out
     dist[col_winner * pitch_dist + col] = top_val;
     dist[col * pitch_dist + col_winner] = top_val;
@@ -190,10 +187,10 @@ __global__ void wpgma_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-__global__ void average_kernel(float * dist, const size_t pitch_dist, 
-	const size_t n, const int * sub, const int * sup, const float * count, 
-	const float * val, const size_t iter, const size_t col_offset, 
-	const float lambda, const float beta)
+__global__ void average_kernel(real * dist, const size_t pitch_dist, 
+	const size_t n, const int * sub, const int * sup, const real * count, 
+	const real * val, const size_t iter, const size_t col_offset, 
+	const real lambda, const real beta)
 {
   const size_t col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
 
@@ -201,16 +198,16 @@ __global__ void average_kernel(float * dist, const size_t pitch_dist,
   if(col < n) {
     int col_winner = sub[iter];
     int row_winner = sup[iter];
-    float top_val = dist[col_winner * pitch_dist + col];
-    float bot_val = dist[row_winner * pitch_dist + col];
-    float nr = count[row_winner];
-    float np = -1.0 * count[col_winner];
-    float nq = nr - np;
+    real top_val = dist[col_winner * pitch_dist + col];
+    real bot_val = dist[row_winner * pitch_dist + col];
+    real nr = count[row_winner];
+    real np = -1.0 * count[col_winner];
+    real nq = nr - np;
     bot_val = (top_val * np + bot_val * nq) / nr;
     if(col == col_winner || col == row_winner) {
-      bot_val = CUDART_INF_F;
+      bot_val = REAL_INF;
     }
-    top_val = CUDART_INF_F;
+    top_val = REAL_INF;
     // Write out
     dist[col_winner * pitch_dist + col] = top_val;
     dist[col * pitch_dist + col_winner] = top_val;
@@ -219,10 +216,10 @@ __global__ void average_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-__global__ void median_kernel(float * dist, const size_t pitch_dist, 
-	const size_t n, const int * sub, const int * sup, const float * count, 
-	const float * val, const size_t iter, const size_t col_offset, 
-	const float lambda, const float beta)
+__global__ void median_kernel(real * dist, const size_t pitch_dist, 
+	const size_t n, const int * sub, const int * sup, const real * count, 
+	const real * val, const size_t iter, const size_t col_offset, 
+	const real lambda, const real beta)
 {
   const size_t col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
 
@@ -230,13 +227,13 @@ __global__ void median_kernel(float * dist, const size_t pitch_dist,
   if(col < n) {
     int col_winner = sub[iter];
     int row_winner = sup[iter];
-    float top_val = dist[col_winner * pitch_dist + col];
-    float bot_val = dist[row_winner * pitch_dist + col];
+    real top_val = dist[col_winner * pitch_dist + col];
+    real bot_val = dist[row_winner * pitch_dist + col];
     bot_val = (bot_val + top_val) / 2.0 - val[iter] / 4.0;
     if(col == col_winner || col == row_winner) {
-      bot_val = CUDART_INF_F;
+      bot_val = REAL_INF;
     }
-    top_val = CUDART_INF_F;
+    top_val = REAL_INF;
     // Write out
     dist[col_winner * pitch_dist + col] = top_val;
     dist[col * pitch_dist + col_winner] = top_val;
@@ -245,10 +242,10 @@ __global__ void median_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-__global__ void mcquitty_kernel(float * dist, const size_t pitch_dist, 
-	const size_t n, const int * sub, const int * sup, const float * count, 
-	const float * val, const size_t iter, const size_t col_offset, 
-	const float lambda, const float beta)
+__global__ void mcquitty_kernel(real * dist, const size_t pitch_dist, 
+	const size_t n, const int * sub, const int * sup, const real * count, 
+	const real * val, const size_t iter, const size_t col_offset, 
+	const real lambda, const real beta)
 {
   const size_t col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
 
@@ -256,13 +253,13 @@ __global__ void mcquitty_kernel(float * dist, const size_t pitch_dist,
   if(col < n) {
     int col_winner = sub[iter];
     int row_winner = sup[iter];
-    float top_val = dist[col_winner * pitch_dist + col];
-    float bot_val = dist[row_winner * pitch_dist + col];
+    real top_val = dist[col_winner * pitch_dist + col];
+    real bot_val = dist[row_winner * pitch_dist + col];
     bot_val = (bot_val + top_val) / 2.0;
     if(col == col_winner || col == row_winner) {
-      bot_val = CUDART_INF_F;
+      bot_val = REAL_INF;
     }
-    top_val = CUDART_INF_F;
+    top_val = REAL_INF;
     // Write out
     dist[col_winner * pitch_dist + col] = top_val;
     dist[col * pitch_dist + col_winner] = top_val;
@@ -271,10 +268,10 @@ __global__ void mcquitty_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-__global__ void centroid_kernel(float * dist, size_t pitch_dist, 
-	size_t n, const int * sub, const int * sup, const float * count, 
-	const float * val, size_t iter, size_t col_offset, 
-	float lambda, float beta)
+__global__ void centroid_kernel(real * dist, size_t pitch_dist, 
+	size_t n, const int * sub, const int * sup, const real * count, 
+	const real * val, size_t iter, size_t col_offset, 
+	real lambda, real beta)
 {
 	size_t 
 		col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
@@ -282,7 +279,7 @@ __global__ void centroid_kernel(float * dist, size_t pitch_dist,
 	if(col < n) {		// don't run off the end of the arrays
     	int 
 			col_winner = sub[iter], row_winner = sup[iter];
-		float 
+		real 
 			top_val = dist[col_winner * pitch_dist + col],
     		bot_val = dist[row_winner * pitch_dist + col],
 			nr = count[row_winner], np = -count[col_winner],
@@ -293,15 +290,15 @@ __global__ void centroid_kernel(float * dist, size_t pitch_dist,
 //		bot_val = (nr * (bot_val * np + top_val * nq) - np * nq * val[iter]) 
 //			/ (nr * nr);
 /*
-    float nr = count[row_winner];
-    float np = -1.0 * count[col_winner];
-    float nq = nr - np;
+    real nr = count[row_winner];
+    real np = -1.0 * count[col_winner];
+    real nq = nr - np;
     bot_val = (top_val * np + bot_val * nq) / nr;
 */	
 		if(col == col_winner || col == row_winner)
-			bot_val = CUDART_INF_F;
+			bot_val = REAL_INF;
     
-		top_val = CUDART_INF_F;
+		top_val = REAL_INF;
 
 		dist[col_winner * pitch_dist + col] = top_val;
 		dist[col * pitch_dist + col_winner] = top_val;
@@ -310,10 +307,10 @@ __global__ void centroid_kernel(float * dist, size_t pitch_dist,
 	}
 }
 
-__global__ void flexible_group_kernel(float * dist, const size_t pitch_dist, 
-	const size_t n, const int * sub, const int * sup, const float * count, 
-	const float * val, const size_t iter, const size_t col_offset, 
-	const float lambda, const float beta)
+__global__ void flexible_group_kernel(real * dist, const size_t pitch_dist, 
+	const size_t n, const int * sub, const int * sup, const real * count, 
+	const real * val, const size_t iter, const size_t col_offset, 
+	const real lambda, const real beta)
 {
   const size_t col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
 
@@ -321,16 +318,16 @@ __global__ void flexible_group_kernel(float * dist, const size_t pitch_dist,
   if(col < n) {
     int col_winner = sub[iter];
     int row_winner = sup[iter];
-    float top_val = dist[col_winner * pitch_dist + col];
-    float bot_val = dist[row_winner * pitch_dist + col];
-    float nr = count[row_winner];
-    float np = -1.0 * count[col_winner];
-    float nq = nr - np;
+    real top_val = dist[col_winner * pitch_dist + col];
+    real bot_val = dist[row_winner * pitch_dist + col];
+    real nr = count[row_winner];
+    real np = -1.0 * count[col_winner];
+    real nq = nr - np;
     bot_val = (bot_val * (1.0 - lambda) * np + top_val * (1.0 - lambda) *  nq) / nr + beta * val[iter];
     if(col == col_winner || col == row_winner) {
-      bot_val = CUDART_INF_F;
+      bot_val = REAL_INF;
     }
-    top_val = CUDART_INF_F;
+    top_val = REAL_INF;
     // Write out
     dist[col_winner * pitch_dist + col] = top_val;
     dist[col * pitch_dist + col_winner] = top_val;
@@ -339,10 +336,10 @@ __global__ void flexible_group_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-__global__ void flexible_kernel(float * dist, const size_t pitch_dist, 
-	const size_t n, const int * sub, const int * sup, const float * count, 
-	const float * val, const size_t iter, const size_t col_offset, 
-	const float lambda, const float beta)
+__global__ void flexible_kernel(real * dist, const size_t pitch_dist, 
+	const size_t n, const int * sub, const int * sup, const real * count, 
+	const real * val, const size_t iter, const size_t col_offset, 
+	const real lambda, const real beta)
 {
   const size_t col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
 
@@ -350,13 +347,13 @@ __global__ void flexible_kernel(float * dist, const size_t pitch_dist,
   if(col < n) {
     int col_winner = sub[iter];
     int row_winner = sup[iter];
-    float top_val = dist[col_winner * pitch_dist + col];
-    float bot_val = dist[row_winner * pitch_dist + col];
+    real top_val = dist[col_winner * pitch_dist + col];
+    real bot_val = dist[row_winner * pitch_dist + col];
     bot_val = (bot_val * (1.0 - lambda) + top_val * (1.0 - lambda) ) / 2.0 + beta * val[iter];
     if(col == col_winner || col == row_winner) {
-      bot_val = CUDART_INF_F;
+      bot_val = REAL_INF;
     }
-    top_val = CUDART_INF_F;
+    top_val = REAL_INF;
     // Write out
     dist[col_winner * pitch_dist + col] = top_val;
     dist[col * pitch_dist + col_winner] = top_val;
@@ -365,10 +362,10 @@ __global__ void flexible_kernel(float * dist, const size_t pitch_dist,
   }
 }
 
-__global__ void ward_kernel(float * dist, const size_t pitch_dist, 
-	const size_t n, const int * sub, const int * sup, const float * count, 
-	const float * val, const size_t iter, const size_t col_offset, 
-	const float lambda, const float beta)
+__global__ void ward_kernel(real * dist, const size_t pitch_dist, 
+	const size_t n, const int * sub, const int * sup, const real * count, 
+	const real * val, const size_t iter, const size_t col_offset, 
+	const real lambda, const real beta)
 {
 	const size_t
 		col = col_offset + NUM_THREADS * blockIdx.x + threadIdx.x;
@@ -379,24 +376,24 @@ __global__ void ward_kernel(float * dist, const size_t pitch_dist,
 	int
 		col_winner = sub[iter], row_winner = sup[iter];
 
-    float
+    real
 		top_val = dist[col_winner * pitch_dist + col],
 		bot_val = dist[row_winner * pitch_dist + col],
 		nr = count[row_winner], np = -count[col_winner],
 		nq = nr - np, nk = count[col];
 
 	if((nr == -nk) || (col == col_winner) || (col == row_winner)) {
-		bot_val = CUDART_INF_F;
+		bot_val = REAL_INF;
 	} else {
 		// Lance-Williams for Ward: top_val is the col_winner cluster (np
 		// members), bot_val the row_winner cluster (nq members)
 		bot_val = (top_val * (np + nk) + bot_val * (nq + nk) - val[iter] * nk);
 		bot_val /= (nr + nk);
 		if(isinf(bot_val)) {
-			bot_val = CUDART_INF_F;
+			bot_val = REAL_INF;
 		}
 	}
-	top_val = CUDART_INF_F;
+	top_val = REAL_INF;
 	
 	dist[col_winner * pitch_dist + col] = top_val;
 	dist[col * pitch_dist + col_winner] = top_val;

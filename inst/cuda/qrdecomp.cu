@@ -1,11 +1,11 @@
 #define NTHREADS 512
 
-__global__ void getColNorms(int rows, int cols, float * da, int lda, 
-                            float * colNorms)
+__global__ void getColNorms(int rows, int cols, real * da, int lda, 
+                            real * colNorms)
 {
   int colIndex = threadIdx.x + blockIdx.x * blockDim.x;
-  float 
-    sum = 0.f, term,
+  real 
+    sum = real(0), term,
     * col;
 
   if(colIndex >= cols)

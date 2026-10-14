@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <tuple>
 
 #include "R.h"
 #include "Rinternals.h"
@@ -55,9 +56,22 @@ const std::vector<KernelFile> & kernelFiles()
 
 std::string kernelDir;
 
-// A module per (device, file), and the kernels found in it.
-std::map<std::pair<int, std::string>, CUmodule> modules;
-std::map<std::pair<int, std::string>, CUfunction> kernels;
+// Each file is compiled once per precision: kernels are written in terms
+// of "real", which this prelude defines. #line keeps NVRTC's error line
+// numbers those of the .cu file.
+std::string prelude(bool isDouble)
+{
+  return std::string("typedef ") + (isDouble ? "double" : "float") +
+    " real;\n"
+    "#define REAL_INF ((real) __int_as_float(0x7f800000U))\n"
+    "#define REAL_NAN ((real) __int_as_float(0x7fffffffU))\n"
+    "#line 1\n";
+}
+
+// A module per (device, file, precision), and the kernels found in it.
+typedef std::tuple<int, std::string, bool> ModuleKey;
+std::map<ModuleKey, CUmodule> modules;
+std::map<ModuleKey, CUfunction> kernels;
 
 template <typename F>
 F driverFunction(const char * name)
@@ -161,9 +175,9 @@ struct Compiled {
   std::vector<std::string> lowered;  // mangled names, parallel to kernels
 };
 
-Compiled compile(const KernelFile & kf, int device)
+Compiled compile(const KernelFile & kf, int device, bool isDouble)
 {
-  std::string src = readSource(kf.file);
+  std::string src = prelude(isDouble) + readSource(kf.file);
 
   nvrtcProgram prog;
   NVRTC_SAFE_CALL(nvrtcCreateProgram(&prog, src.c_str(), kf.file,
@@ -181,8 +195,8 @@ Compiled compile(const KernelFile & kf, int device)
     std::string log(logSize, '\0');
     nvrtcGetProgramLog(prog, &log[0]);
     nvrtcDestroyProgram(&prog);
-    error("gputools: compiling %s.cu failed (%s):\n%s", kf.file,
-          arch.c_str(), log.c_str());
+    error("gputools: compiling %s.cu failed (%s, %s):\n%s", kf.file,
+          arch.c_str(), isDouble ? "double" : "single", log.c_str());
   }
 
   Compiled out;
@@ -201,19 +215,19 @@ Compiled compile(const KernelFile & kf, int device)
   return out;
 }
 
-void loadFile(const KernelFile & kf, int device)
+void loadFile(const KernelFile & kf, int device, bool isDouble)
 {
-  Compiled c = compile(kf, device);
+  Compiled c = compile(kf, device, isDouble);
 
   CUmodule module;
   DRIVER_CALL(driver().moduleLoadData(&module, c.ptx.c_str()));
-  modules[{device, kf.file}] = module;
+  modules[ModuleKey(device, kf.file, isDouble)] = module;
 
   for (size_t i = 0; i < kf.kernels.size(); ++i) {
     CUfunction kernel;
     DRIVER_CALL(driver().moduleGetFunction(&kernel, module,
                                            c.lowered[i].c_str()));
-    kernels[{device, kf.kernels[i]}] = kernel;
+    kernels[ModuleKey(device, kf.kernels[i], isDouble)] = kernel;
   }
 }
 
@@ -259,17 +273,19 @@ void requireDevice()
 void cudaLaunch(std::string kernelName,
                 void * args[],
                 const dim3 &gridDim, const dim3 &blockDim,
-                cudaStream_t stream)
+                Precision precision, cudaStream_t stream)
 {
+  bool isDouble = precision == Precision::Double;
   int device = 0;
   CUDART_CALL(cudaGetDevice(&device));
   // makes the device's primary context current for the driver API
   CUDART_CALL(cudaFree(0));
 
-  auto k = kernels.find({device, kernelName});
+  ModuleKey key(device, kernelName, isDouble);
+  auto k = kernels.find(key);
   if (k == kernels.end()) {
-    loadFile(fileForKernel(kernelName), device);
-    k = kernels.find({device, kernelName});
+    loadFile(fileForKernel(kernelName), device, isDouble);
+    k = kernels.find(key);
   }
 
   DRIVER_CALL(driver().launchKernel(k->second,
@@ -291,7 +307,7 @@ SEXP gputoolsUnloadKernels()
   int current = 0;
   cudaGetDevice(&current);
   for (auto & m : modules) {
-    cudaSetDevice(m.first.first);
+    cudaSetDevice(std::get<0>(m.first));
     driver().moduleUnload(m.second);
   }
   for (auto & h : blasHandles) {

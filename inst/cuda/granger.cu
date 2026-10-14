@@ -8,13 +8,13 @@
 // mX has order rows x cols
 // vectY has length rows
 __global__ void getRestricted(int countx, int county, int rows, int cols, 
-                              float * mX, int mXdim, float * vY, int vYdim, float * mQ, int mQdim,
-                              float * mR, int mRdim, float * vectB, int vectBdim) {
+                              real * mX, int mXdim, real * vY, int vYdim, real * mQ, int mQdim,
+                              real * mR, int mRdim, real * vectB, int vectBdim) {
 
   int 
     m = blockIdx.x * THREADSPERDIM + threadIdx.x, n,
     i, j, k;
-  float 
+  real 
     sum, invnorm,
     * X, * Y, * Q, * R, * B,
     * coli, * colj, 
@@ -30,7 +30,7 @@ __global__ void getRestricted(int countx, int county, int rows, int cols,
   X = mX + (m * mXdim);
   // initialize the intercepts
   for(i = 0; i < rows; i++)
-    X[i] = 1.f;
+    X[i] = real(1);
 
   Y = vY + (m * countx + n) * vYdim;
   B = vectB + m * vectBdim;
@@ -48,16 +48,16 @@ __global__ void getRestricted(int countx, int county, int rows, int cols,
     colj = Q+rows*j;
     for(i = 0; i < j; i++) {
       coli = Q+rows*i;
-      sum = 0.f;
+      sum = real(0);
       for(k = 0; k < rows; k++)
         sum += coli[k] * colj[k];
       for(k = 0; k < rows; k++)
         colj[k] -= sum * coli[k];
     }
-    sum = 0.f;
+    sum = real(0);
     for(i = 0; i < rows; i++)
       sum += colj[i] * colj[i];
-    invnorm = 1.f / sqrtf(sum);
+    invnorm = real(1) / sqrt(sum);
     for(i = 0; i < rows; i++)
       colj[i] *= invnorm;
   }
@@ -66,12 +66,12 @@ __global__ void getRestricted(int countx, int county, int rows, int cols,
     // matmult Q * X -> R
     for(j = 0; j < cols; j++) {
       colX = X+j*rows;
-      sum = 0.f;
+      sum = real(0);
       for(k = 0; k < rows; k++)
         sum += colQ[k] * colX[k];
       R[i+j*cols] = sum;
     }
-    sum = 0.f;
+    sum = real(0);
     // compute the vector Q^t * Y -> B
     for(j = 0; j < rows; j++) 
       sum += colQ[j] * Y[j];
@@ -86,14 +86,14 @@ __global__ void getRestricted(int countx, int county, int rows, int cols,
 // mX has order rows x cols
 // vectY has length rows
 __global__ void getUnrestricted(int countx, int county, int rows, int cols, 
-                                float * mX, int mXdim, float * vY, int vYdim, float * mQ, int mQdim,
-                                float * mR, int mRdim, float * vectB, int vectBdim) {
+                                real * mX, int mXdim, real * vY, int vYdim, real * mQ, int mQdim,
+                                real * mR, int mRdim, real * vectB, int vectBdim) {
 
   int 
     n = blockIdx.x * THREADSPERDIM + threadIdx.x, 
     m = blockIdx.y * THREADSPERDIM + threadIdx.y, 
     i, j, k;
-  float 
+  real 
     sum, invnorm,
     * X, * Y, * Q, * R, * B,
     * coli, * colj, 
@@ -103,7 +103,7 @@ __global__ void getUnrestricted(int countx, int county, int rows, int cols,
   X = mX + (m * countx + n) * mXdim;
   // initialize the intercepts
   for(i = 0; i < rows; i++) 
-    X[i] = 1.f;
+    X[i] = real(1);
 
   Y = vY + (m*countx+n) * vYdim;
   B = vectB + (m*countx+n) * vectBdim;
@@ -121,16 +121,16 @@ __global__ void getUnrestricted(int countx, int county, int rows, int cols,
     colj = Q+rows*j;
     for(i = 0; i < j; i++) {
       coli = Q+rows*i;
-      sum = 0.f;
+      sum = real(0);
       for(k = 0; k < rows; k++)
         sum += coli[k] * colj[k];
       for(k = 0; k < rows; k++)
         colj[k] -= sum * coli[k];
     }
-    sum = 0.f;
+    sum = real(0);
     for(i = 0; i < rows; i++)
       sum += colj[i] * colj[i];
-    invnorm = 1.f / sqrtf(sum);
+    invnorm = real(1) / sqrt(sum);
     for(i = 0; i < rows; i++)
       colj[i] *= invnorm;
   }
@@ -139,12 +139,12 @@ __global__ void getUnrestricted(int countx, int county, int rows, int cols,
     // matmult Q * X -> R
     for(j = 0; j < cols; j++) {
       colX = X+j*rows;
-      sum = 0.f;
+      sum = real(0);
       for(k = 0; k < rows; k++)
         sum += colQ[k] * colX[k];
       R[i+j*cols] = sum;
     }
-    sum = 0.f;
+    sum = real(0);
     // compute the vector Q^t * Y -> B
     for(j = 0; j < rows; j++) 
       sum += colQ[j] * Y[j];
@@ -157,27 +157,27 @@ __global__ void getUnrestricted(int countx, int county, int rows, int cols,
 }
 
 __global__ void ftest(int diagFlag, int p, int rows, int colsx, int colsy, 
-                      int rCols, int unrCols, float * obs, int obsDim, 
-                      float * rCoeffs, int rCoeffsDim, float * unrCoeffs, int unrCoeffsDim, 
-                      float * rdata, int rdataDim, float * unrdata, int unrdataDim, 
-                      float * dfStats) // float * dpValues)
+                      int rCols, int unrCols, real * obs, int obsDim, 
+                      real * rCoeffs, int rCoeffsDim, real * unrCoeffs, int unrCoeffsDim, 
+                      real * rdata, int rdataDim, real * unrdata, int unrdataDim, 
+                      real * dfStats) // real * dpValues)
 {
   int 
     j = blockIdx.x * THREADSPERDIM + threadIdx.x, 
     i = blockIdx.y * THREADSPERDIM + threadIdx.y, 
     idx = i*colsx + j, k, m;
-  float 
-    kobs, fp = (float) p, frows = (float) rows,
+  real 
+    kobs, fp = (real) p, frows = (real) rows,
     rSsq, unrSsq,
     rEst, unrEst,
-    score = 0.f, 
+    score = real(0), 
     * tObs, * tRCoeffs, * tUnrCoeffs, 
     * tRdata, * tUnrdata; 
 
   if((i >= colsy) || (j >= colsx)) return;
   if((!diagFlag) && (i == j)) {
-    dfStats[idx] = 0.f;
-    // dpValues[idx] = 0.f;
+    dfStats[idx] = real(0);
+    // dpValues[idx] = real(0);
     return;
   }
 
@@ -189,9 +189,9 @@ __global__ void ftest(int diagFlag, int p, int rows, int colsx, int colsy,
   tUnrCoeffs = unrCoeffs + (i*colsx+j)*unrCoeffsDim;
   tUnrdata = unrdata + (i*colsx+j)*unrdataDim;
 
-  rSsq = unrSsq = 0.f;
+  rSsq = unrSsq = real(0);
   for(k = 0; k < rows; k++) {
-    unrEst = rEst = 0.f;
+    unrEst = rEst = real(0);
     kobs = tObs[k];
     for(m = 0; m < rCols; m++)
       rEst += tRCoeffs[m] * tRdata[k+m*rows];
@@ -201,10 +201,10 @@ __global__ void ftest(int diagFlag, int p, int rows, int colsx, int colsy,
     unrSsq += (kobs - unrEst) * (kobs - unrEst);
 
   }
-  score = ((rSsq - unrSsq)*(frows-2.f*fp-1.f)) / (fp*unrSsq);
+  score = ((rSsq - unrSsq)*(frows-real(2)*fp-real(1))) / (fp*unrSsq);
 
   if(!isfinite(score))
-    score = 0.f;
+    score = real(0);
 
   dfStats[idx] = score;
 }
