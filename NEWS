@@ -57,14 +57,14 @@ notes section)
 changes in gputools 0.1.3
 
 - Mac os x and nvidia cards with compute capability less than 1.3 are now
-supported. Systems lacking a gpu altogether also recieve some support. See the
+supported. Systems lacking a gpu altogether also receive some support. See the
 file INSTALL for details.
 
 - gpuHclust, gpuDist, and gpuQr now output the same classes as R's base hclust,
 dist, and qr functions.
 
 - The c code now uses r's api. Host memory allocation and error reporting
-have recieved a facelift.
+have received a facelift.
 
 - gpuGranger now reports the correct p-values and is slightly faster for small
 data sets.
