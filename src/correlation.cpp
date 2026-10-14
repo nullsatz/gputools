@@ -14,12 +14,13 @@
 #define NUMTHREADS 16
 #define THREADWORK 32
 
-void testSignif(const float * goodPairs, const float * coeffs, 
-                size_t n, float * tscores)
+template <typename T>
+void testSignif(const T * goodPairs, const T * coeffs, 
+                size_t n, T * tscores)
 {
   size_t
-    fbytes = sizeof(float), size = n*fbytes;
-  float
+    fbytes = sizeof(T), size = n*fbytes;
+  T
     * gpuPairs, * gpuCoeffs, * gpuTs;
 
   cudaMalloc((void **)&gpuPairs, size);
@@ -40,7 +41,7 @@ void testSignif(const float * goodPairs, const float * coeffs,
     &n,
     &gpuTs
   };
-  cudaLaunch("gpuSignif", args, tgrid, tblock);
+  cudaLaunch("gpuSignif", args, tgrid, tblock, precisionOf<T>());
 
   cudaMemcpy(tscores, gpuTs, size, cudaMemcpyDeviceToHost);
   cudaFree(gpuPairs);
@@ -48,32 +49,34 @@ void testSignif(const float * goodPairs, const float * coeffs,
   cudaFree(gpuTs);
 }
 
-void hostSignif(const float * goodPairs, const float * coeffs, size_t n, 
-                float * tscores)
+template <typename T>
+void hostSignif(const T * goodPairs, const T * coeffs, size_t n, 
+                T * tscores)
 {
-  float cor, radicand;
+  T cor, radicand;
   for(size_t i = 0; i < n; i++) {
     cor = coeffs[i];
-    if(cor >= 0.999f) 
-      tscores[i] = 10000.0f;
+    if(cor >= T(0.999)) 
+      tscores[i] = T(10000.0);
     else {
-      radicand = (goodPairs[i] - 2.f) / (1.f - cor * cor);
+      radicand = (goodPairs[i] - T(2)) / (T(1) - cor * cor);
       tscores[i] = cor * sqrtf(radicand);
     }
   }
 }
 
+template <typename T>
 void pmcc(UseObs whichObs,
-    const float * vectsa, size_t na,
-    const float * vectsb, size_t nb,
-    size_t dim, float * numPairs, float * correlations,
-          float * signifs)
+    const T * vectsa, size_t na,
+    const T * vectsb, size_t nb,
+    size_t dim, T * numPairs, T * correlations,
+          T * signifs)
 {
   size_t 
-    fbytes = sizeof(float);
+    fbytes = sizeof(T);
   int 
     same = (vectsa == vectsb);
-  float
+  T
     * gpuVA, * gpuVB,
     * gpuNumPairs, * gpumean, * gpuSds, 
     * gpuCorrelations;
@@ -124,18 +127,18 @@ void pmcc(UseObs whichObs,
 
   switch(whichObs) {
   case pairwiseComplete:
-    cudaLaunch("gpuMeans", argsMeans, grid, block);
+    cudaLaunch("gpuMeans", argsMeans, grid, block, precisionOf<T>());
 
-    cudaLaunch("gpuSD", argsSD, grid, block);
+    cudaLaunch("gpuSD", argsSD, grid, block, precisionOf<T>());
 
-    cudaLaunch("gpuPMCC", argsPMCC, grid, block);
+    cudaLaunch("gpuPMCC", argsPMCC, grid, block, precisionOf<T>());
     break;
   default:
-    cudaLaunch("gpuMeansNoTest", argsMeans, grid, block);
+    cudaLaunch("gpuMeansNoTest", argsMeans, grid, block, precisionOf<T>());
 
-    cudaLaunch("gpuSDNoTest", argsSD, grid, block);
+    cudaLaunch("gpuSDNoTest", argsSD, grid, block, precisionOf<T>());
     
-    cudaLaunch("gpuPMCCNoTest", argsPMCC, grid, block);
+    cudaLaunch("gpuPMCCNoTest", argsPMCC, grid, block, precisionOf<T>());
   }
 
   cudaMemcpy(correlations, gpuCorrelations, na*nb*fbytes, 
@@ -170,3 +173,21 @@ void getDevice(int * device) {
   cudaGetDevice(device);
 }
 
+template void testSignif<float>(const float * goodPairs, const float * coeffs, 
+                size_t n, float * tscores);
+template void testSignif<double>(const double * goodPairs, const double * coeffs, 
+                size_t n, double * tscores);
+template void hostSignif<float>(const float * goodPairs, const float * coeffs, size_t n, 
+                float * tscores);
+template void hostSignif<double>(const double * goodPairs, const double * coeffs, size_t n, 
+                double * tscores);
+template void pmcc<float>(UseObs whichObs,
+    const float * vectsa, size_t na,
+    const float * vectsb, size_t nb,
+    size_t dim, float * numPairs, float * correlations,
+          float * signifs);
+template void pmcc<double>(UseObs whichObs,
+    const double * vectsa, size_t na,
+    const double * vectsb, size_t nb,
+    size_t dim, double * numPairs, double * correlations,
+          double * signifs);

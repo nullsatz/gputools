@@ -10,15 +10,16 @@
 
 #define NUMTHREADS 16
 
-void masterKendall(const float * x, size_t nx, 
-                   const float * y, size_t ny,
+template <typename T>
+void masterKendall(const T * x, size_t nx, 
+                   const T * y, size_t ny,
                    size_t sampleSize, double * results)
 {
 	size_t 
 		outputLength = nx * ny, outputBytes = outputLength*sizeof(double),
-		xBytes = nx*sampleSize*sizeof(float), 
-		yBytes = ny*sampleSize*sizeof(float); 
-	float
+		xBytes = nx*sampleSize*sizeof(T), 
+		yBytes = ny*sampleSize*sizeof(T); 
+	T
 		* gpux, * gpuy; 
 	double
 		* gpuResults;
@@ -45,7 +46,7 @@ void masterKendall(const float * x, size_t nx,
     , &gpuResults
     };
   cudaLaunch("gpuKendall", args,
-      grid, block);
+      grid, block, precisionOf<T>());
 
   cudaFree(gpux);
   cudaFree(gpuy);
@@ -53,3 +54,10 @@ void masterKendall(const float * x, size_t nx,
   cudaFree(gpuResults);
   checkCudaError("copying results from gpu and cleaning up");
 }
+
+template void masterKendall<float>(const float * x, size_t nx, 
+                   const float * y, size_t ny,
+                   size_t sampleSize, double * results);
+template void masterKendall<double>(const double * x, size_t nx, 
+                   const double * y, size_t ny,
+                   size_t sampleSize, double * results);

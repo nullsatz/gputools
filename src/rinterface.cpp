@@ -181,6 +181,49 @@ void depthFirst(const int len, const int * merge, int level, int * otop,
 namespace {
 
 template <typename T>
+SEXP pmccT(UseObs obs, SEXP x, int na, SEXP y, int nb, int size)
+{
+  std::vector<T>
+    a = narrow<T>(x, "x", true), b = narrow<T>(y, "y", true),
+    pairs(na * nb), corr(na * nb), ts(na * nb);
+  pmcc(obs, a.data(), na, b.data(), nb, size,
+       pairs.data(), corr.data(), ts.data());
+
+  const char * names[] = { "pairs", "corr", "ts", "" };
+  SEXP values[] = {
+    PROTECT(doubles(pairs.data(), na * nb)),
+    PROTECT(doubles(corr.data(), na * nb)),
+    PROTECT(doubles(ts.data(), na * nb))
+  };
+  SEXP out = namedList(names, values);
+  UNPROTECT(3);
+  return out;
+}
+
+template <typename T>
+SEXP ttestT(SEXP goodPairs, SEXP coeffs)
+{
+  std::vector<T>
+    pairs = narrow<T>(goodPairs, "goodPairs", true),
+    cors = narrow<T>(coeffs, "coeffs", true),
+    ts(pairs.size());
+  if (cors.size() != pairs.size())
+    error("gputools: goodPairs and coeffs differ in length");
+  testSignif(pairs.data(), cors.data(), pairs.size(), ts.data());
+  return doubles(ts.data(), ts.size());
+}
+
+template <typename T>
+SEXP kendallT(SEXP x, int na, SEXP y, int nb, int size)
+{
+  std::vector<T> a = narrow<T>(x, "x"), b = narrow<T>(y, "y");
+  SEXP out = PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb));
+  masterKendall(a.data(), na, b.data(), nb, size, REAL(out));
+  UNPROTECT(1);
+  return out;
+}
+
+template <typename T>
 SEXP distT(SEXP points, int n, int k, SEXP method, SEXP p)
 {
   std::vector<T> pts = narrow<T>(points, "points"), d((size_t) n * n);
@@ -239,31 +282,19 @@ SEXP distClustT(SEXP distMethod, SEXP clustMethod, SEXP points, int n,
 
 extern "C" {
 
-SEXP gpuPmcc(SEXP use, SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size)
+SEXP gpuPmcc(SEXP use, SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
+             SEXP precision)
 {
   requireDevice();
-  UseObs obs;
+  UseObs obs = everything;
   switch (asInteger(use)) {
   case 0: obs = everything; break;
   case 1: obs = pairwiseComplete; break;
   default: error("gputools: unknown use method");
   }
-  int na = asInteger(nx), nb = asInteger(ny);
-  std::vector<float>
-    a = floats(x, "x", true), b = floats(y, "y", true),
-    pairs(na * nb), corr(na * nb), ts(na * nb);
-  pmcc(obs, a.data(), na, b.data(), nb, asInteger(size),
-       pairs.data(), corr.data(), ts.data());
-
-  const char * names[] = { "pairs", "corr", "ts", "" };
-  SEXP values[] = {
-    PROTECT(doubles(pairs.data(), na * nb)),
-    PROTECT(doubles(corr.data(), na * nb)),
-    PROTECT(doubles(ts.data(), na * nb))
-  };
-  SEXP out = namedList(names, values);
-  UNPROTECT(3);
-  return out;
+  int na = asInteger(nx), nb = asInteger(ny), n = asInteger(size);
+  return isDouble(precision) ? pmccT<double>(obs, x, na, y, nb, n)
+                             : pmccT<float>(obs, x, na, y, nb, n);
 }
 
 SEXP gpuSetDevice(SEXP device)
@@ -281,28 +312,20 @@ SEXP gpuGetDevice()
   return ScalarInteger(device);
 }
 
-SEXP gpuTtest(SEXP goodPairs, SEXP coeffs)
+SEXP gpuTtest(SEXP goodPairs, SEXP coeffs, SEXP precision)
 {
   requireDevice();
-  std::vector<float>
-    pairs = floats(goodPairs, "goodPairs", true),
-    cors = floats(coeffs, "coeffs", true),
-    ts(pairs.size());
-  if (cors.size() != pairs.size())
-    error("gputools: goodPairs and coeffs differ in length");
-  testSignif(pairs.data(), cors.data(), pairs.size(), ts.data());
-  return doubles(ts.data(), ts.size());
+  return isDouble(precision) ? ttestT<double>(goodPairs, coeffs)
+                             : ttestT<float>(goodPairs, coeffs);
 }
 
-SEXP gpuKendall(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size)
+SEXP gpuKendall(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
+                SEXP precision)
 {
   requireDevice();
-  int na = asInteger(nx), nb = asInteger(ny);
-  std::vector<float> a = floats(x, "x"), b = floats(y, "y");
-  SEXP out = PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb));
-  masterKendall(a.data(), na, b.data(), nb, asInteger(size), REAL(out));
-  UNPROTECT(1);
-  return out;
+  int na = asInteger(nx), nb = asInteger(ny), n = asInteger(size);
+  return isDouble(precision) ? kendallT<double>(x, na, y, nb, n)
+                             : kendallT<float>(x, na, y, nb, n);
 }
 
 SEXP gpuGranger(SEXP x, SEXP rows, SEXP cols, SEXP lag)
@@ -492,11 +515,11 @@ SEXP gpuLSFit(SEXP x, SEXP n, SEXP p, SEXP y, SEXP ny, SEXP tol,
 
 static const R_CallMethodDef callMethods[] = {
   CALLDEF(gpuMatMult, 2),
-  CALLDEF(gpuPmcc, 6),
+  CALLDEF(gpuPmcc, 7),
   CALLDEF(gpuSetDevice, 1),
   CALLDEF(gpuGetDevice, 0),
-  CALLDEF(gpuTtest, 2),
-  CALLDEF(gpuKendall, 5),
+  CALLDEF(gpuTtest, 3),
+  CALLDEF(gpuKendall, 6),
   CALLDEF(gpuGranger, 4),
   CALLDEF(gpuGrangerXY, 6),
   CALLDEF(gpuDist, 6),

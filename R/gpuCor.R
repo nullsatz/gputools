@@ -1,4 +1,6 @@
-gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
+gpuCor <- function(x, y = NULL, use = "everything", method = "pearson",
+    precision = getOption("gputools.precision", "single")) {
+    precision <- .precision(precision)
     x <- as.matrix(x)
     nx <- ncol(x)
     size <- nrow(x)
@@ -32,7 +34,7 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
 
     if(methods[method] == "pearson") {
         answer <- .Call(C_gpuPmcc, as.integer(use - 1), x, as.integer(nx),
-                        y, as.integer(ny), as.integer(size))
+                        y, as.integer(ny), as.integer(size), precision)
 
         pairs <- t(matrix(answer$pairs, ny, nx))
         corr <- t(matrix(answer$corr, ny, nx))
@@ -47,7 +49,7 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
         }
 
         result <- .Call(C_gpuKendall, x, as.integer(nx), y, as.integer(ny),
-                        as.integer(size))
+                        as.integer(size), precision)
 
         pairs <- matrix(size, nx, ny)
         return(list(coefficients = matrix(result, nx, ny), pairs = pairs))
@@ -56,6 +58,8 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson") {
     }
 }
 
-gpuTtest <- function(goodPairs, coeffs) {
-    .Call(C_gpuTtest, as.double(goodPairs), as.double(coeffs))
+gpuTtest <- function(goodPairs, coeffs,
+    precision = getOption("gputools.precision", "single")) {
+    precision <- .precision(precision)
+    .Call(C_gpuTtest, as.double(goodPairs), as.double(coeffs), precision)
 }

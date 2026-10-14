@@ -9,7 +9,8 @@
 }
 
 \usage{
-	gpuTtest(goodPairs, coeffs)
+	gpuTtest(goodPairs, coeffs,
+		precision = getOption("gputools.precision", "single"))
 }
 
 \arguments{
@@ -18,6 +19,10 @@
 		value of the 'coeffs' argument.}
 	\item{coeffs}{a vector of floating point values representing
 		Pearson correlation coefficients.}
+	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
+		the GPU computes in. Single precision is the default, set with
+		\code{options(gputools.precision = "double")}; it runs many times
+		faster on most consumer GPUs. Results are returned as doubles either way.}
 }
 
 \value{a vector of single precision floating point values.  The i-th entry

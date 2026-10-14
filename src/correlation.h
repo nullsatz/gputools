@@ -1,21 +1,18 @@
 typedef enum useObs {everything, pairwiseComplete} UseObs; 
 
-void pmcc(UseObs whichObs, const float * vectsa, size_t na,
-	const float * vectsb, size_t nb, size_t dim, float * numPairs, 
-          float * correlations, float * signifs);
+template <typename T>
+void pmcc(UseObs whichObs, const T * vectsa, size_t na,
+	const T * vectsb, size_t nb, size_t dim, T * numPairs, 
+          T * correlations, T * signifs);
 
 void setDevice(int device);
 void getDevice(int * device);
 
+template <typename T>
+void testSignif(const T * goodPairs, const T * coeffs, 
+                size_t n, T * tscores);
 
+template <typename T>
+void hostSignif(const T * goodPairs, const T * coeffs, 
+	size_t n, T * tscores);
 
-void testSignif(const float * goodPairs, const float * coeffs, 
-                size_t n, float * tscores);
-
-void hostSignif(const float * goodPairs, const float * coeffs, 
-	size_t n, float * tscores);
-
-
-
-void masterKendall(const float * x,  size_t nx, const float * y, size_t ny, 
-                   size_t sampleSize, double * results);
