@@ -7,24 +7,16 @@
 #include "nvrtc.h"
 #include "cuda_runtime_api.h"
 
-#define NVRTC_SAFE_CALL(x)                           \
-  do {                                               \
-    nvrtcResult result = x;                          \
-    if (result != NVRTC_SUCCESS) {                   \
-      error("\nerror: %d failed with error %s\n", x, \
-            nvrtcGetErrorString(result));            \
-    }                                                \
+#define NVRTC_SAFE_CALL(x)                                  \
+  do {                                                      \
+    nvrtcResult result = x;                                 \
+    if (result != NVRTC_SUCCESS)                            \
+      error("gputools: %s failed: %s", #x,                  \
+            nvrtcGetErrorString(result));                   \
   } while(0)
 
-#define CUDA_SAFE_CALL(x)                                       \
-  do {                                                          \
-    CUresult result = x;                                        \
-    if (result != CUDA_SUCCESS) {                               \
-      const char *msg;                                          \
-      cuGetErrorName(result, &msg);                             \
-      error("\nerror: %d failed with error %s\n", x, msg);      \
-    }                                                           \
-  } while(0)
+// Raises an R error unless a CUDA device can be used.
+void requireDevice();
 
 void cudaLaunch(std::string kernelName,
                 void * args[],

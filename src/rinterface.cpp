@@ -20,6 +20,7 @@
 #include "qrdecomp.h"
 
 #include "rinterface.h"
+#include "cudaUtils.h"
 
 // The .Call entry points. The kernels work in single precision: inputs
 // arrive as R doubles and are narrowed here, results are widened back to
@@ -164,6 +165,7 @@ extern "C" {
 
 SEXP gpuPmcc(SEXP use, SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size)
 {
+  requireDevice();
   UseObs obs;
   switch (asInteger(use)) {
   case 0: obs = everything; break;
@@ -190,12 +192,14 @@ SEXP gpuPmcc(SEXP use, SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size)
 
 SEXP gpuSetDevice(SEXP device)
 {
+  requireDevice();
   setDevice(asInteger(device));
   return R_NilValue;
 }
 
 SEXP gpuGetDevice()
 {
+  requireDevice();
   int device = 0;
   getDevice(&device);
   return ScalarInteger(device);
@@ -203,6 +207,7 @@ SEXP gpuGetDevice()
 
 SEXP gpuTtest(SEXP goodPairs, SEXP coeffs)
 {
+  requireDevice();
   std::vector<float>
     pairs = floats(goodPairs, "goodPairs", true),
     cors = floats(coeffs, "coeffs", true),
@@ -215,6 +220,7 @@ SEXP gpuTtest(SEXP goodPairs, SEXP coeffs)
 
 SEXP gpuKendall(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size)
 {
+  requireDevice();
   int na = asInteger(nx), nb = asInteger(ny);
   std::vector<float> a = floats(x, "x"), b = floats(y, "y");
   SEXP out = PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb));
@@ -225,6 +231,7 @@ SEXP gpuKendall(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size)
 
 SEXP gpuGranger(SEXP x, SEXP rows, SEXP cols, SEXP lag)
 {
+  requireDevice();
   int n = asInteger(cols);
   std::vector<float> a = floats(x, "x"), f(n * n), p(n * n);
   granger(asInteger(rows), n, a.data(), asInteger(lag), f.data(), p.data());
@@ -241,6 +248,7 @@ SEXP gpuGranger(SEXP x, SEXP rows, SEXP cols, SEXP lag)
 SEXP gpuGrangerXY(SEXP x, SEXP rows, SEXP colsx, SEXP y, SEXP colsy,
                   SEXP lag)
 {
+  requireDevice();
   int nx = asInteger(colsx), ny = asInteger(colsy);
   std::vector<float>
     a = floats(x, "x"), b = floats(y, "y"), f(nx * ny), p(nx * ny);
@@ -258,6 +266,7 @@ SEXP gpuGrangerXY(SEXP x, SEXP rows, SEXP colsx, SEXP y, SEXP colsy,
 
 SEXP gpuDist(SEXP points, SEXP numPoints, SEXP dim, SEXP method, SEXP p)
 {
+  requireDevice();
   int n = asInteger(numPoints), k = asInteger(dim);
   std::vector<float> pts = floats(points, "points"), d((size_t) n * n);
   distance(pts.data(), k * sizeof(float), n, pts.data(), k * sizeof(float),
@@ -284,6 +293,7 @@ SEXP clusteringResult(int n, const int * sub, const int * sup,
 
 SEXP gpuHclust(SEXP distMat, SEXP numPoints, SEXP method)
 {
+  requireDevice();
   int n = asInteger(numPoints);
   std::vector<float> d = floats(distMat, "distances"), heights(n - 1);
   std::vector<int> sub(n - 1), sup(n - 1);
@@ -295,6 +305,7 @@ SEXP gpuHclust(SEXP distMat, SEXP numPoints, SEXP method)
 SEXP gpuDistClust(SEXP distMethod, SEXP clustMethod, SEXP points,
                   SEXP numPoints, SEXP dim)
 {
+  requireDevice();
   int n = asInteger(numPoints);
   std::vector<float> pts = floats(points, "points"), heights(n - 1);
   std::vector<int> sub(n - 1), sup(n - 1);
@@ -311,6 +322,7 @@ SEXP gpuDistClust(SEXP distMethod, SEXP clustMethod, SEXP points,
 
 SEXP gpuQrDecomp(SEXP x, SEXP tol)
 {
+  requireDevice();
   SEXP dim = getAttrib(x, R_DimSymbol);
   int rows = INTEGER(dim)[0], cols = INTEGER(dim)[1];
   std::vector<float> a = floats(x, "x");
@@ -345,6 +357,7 @@ SEXP gpuQrDecomp(SEXP x, SEXP tol)
 
 SEXP gpuInverseFromQR(SEXP q, SEXP r, SEXP rows, SEXP cols)
 {
+  requireDevice();
   int n = asInteger(rows), p = asInteger(cols);
   std::vector<float> fq = floats(q, "q"), fr = floats(r, "r"), inv(n * p);
 
@@ -369,6 +382,7 @@ SEXP gpuInverseFromQR(SEXP q, SEXP r, SEXP rows, SEXP cols)
 
 SEXP gpuSolveFromQR(SEXP q, SEXP r, SEXP y, SEXP rows, SEXP cols)
 {
+  requireDevice();
   int n = asInteger(rows), p = asInteger(cols);
   std::vector<float>
     fq = floats(q, "q"), fr = floats(r, "r"), fy = floats(y, "y"), b(p);
@@ -379,6 +393,7 @@ SEXP gpuSolveFromQR(SEXP q, SEXP r, SEXP y, SEXP rows, SEXP cols)
 SEXP gpuMutualInfo(SEXP bins, SEXP splineOrder, SEXP nsamples,
                    SEXP x, SEXP nx, SEXP y, SEXP ny)
 {
+  requireDevice();
   int na = asInteger(nx), nb = asInteger(ny);
   std::vector<float> a = floats(x, "x"), b = floats(y, "y"), mi(na * nb);
   bSplineMutualInfo(asInteger(bins), asInteger(splineOrder),
@@ -393,6 +408,7 @@ SEXP gpuMutualInfo(SEXP bins, SEXP splineOrder, SEXP nsamples,
 SEXP gpuLSFit(SEXP x, SEXP n, SEXP p, SEXP y, SEXP ny, SEXP tol,
               SEXP coef, SEXP resid, SEXP effects)
 {
+  requireDevice();
   int rows = asInteger(n), cols = asInteger(p), ycols = asInteger(ny);
   std::vector<float>
     fx = floats(x, "x"), fy = floats(y, "y"),

@@ -17,6 +17,10 @@
 // Kernels are compiled from inst/cuda/<file>.cu with NVRTC the first time
 // one of them is launched, for the architecture of the current device, and
 // the loaded module is kept for the rest of the session.
+//
+// The few driver API functions needed are looked up through the runtime
+// rather than linked, so the package does not depend on libcuda and still
+// loads on a machine without the NVIDIA driver.
 
 namespace {
 
@@ -51,9 +55,61 @@ const std::vector<KernelFile> & kernelFiles()
 
 std::string kernelDir;
 
-// A module per (device, file), and the functions found in it.
+// A module per (device, file), and the kernels found in it.
 std::map<std::pair<int, std::string>, CUmodule> modules;
-std::map<std::pair<int, std::string>, CUfunction> functions;
+std::map<std::pair<int, std::string>, CUfunction> kernels;
+
+template <typename F>
+F driverFunction(const char * name)
+{
+  void * fn = NULL;
+#if CUDART_VERSION >= 12050
+  cudaDriverEntryPointQueryResult found;
+  CUDART_CALL(cudaGetDriverEntryPointByVersion(name, &fn, CUDART_VERSION,
+                                               cudaEnableDefault, &found));
+#else
+  CUDART_CALL(cudaGetDriverEntryPoint(name, &fn, cudaEnableDefault));
+#endif
+  if (fn == NULL)
+    error("gputools: the CUDA driver has no %s", name);
+  return (F) fn;
+}
+
+struct Driver {
+  decltype(&cuGetErrorName) getErrorName;
+  decltype(&cuModuleLoadData) moduleLoadData;
+  decltype(&cuModuleGetFunction) moduleGetFunction;
+  decltype(&cuModuleUnload) moduleUnload;
+  decltype(&cuLaunchKernel) launchKernel;
+};
+
+const Driver & driver()
+{
+  static Driver d;
+  static bool found = false;
+  if (!found) {
+    d.getErrorName = driverFunction<decltype(d.getErrorName)>("cuGetErrorName");
+    d.moduleLoadData =
+      driverFunction<decltype(d.moduleLoadData)>("cuModuleLoadData");
+    d.moduleGetFunction =
+      driverFunction<decltype(d.moduleGetFunction)>("cuModuleGetFunction");
+    d.moduleUnload = driverFunction<decltype(d.moduleUnload)>("cuModuleUnload");
+    d.launchKernel = driverFunction<decltype(d.launchKernel)>("cuLaunchKernel");
+    found = true;
+  }
+  return d;
+}
+
+void driverCheck(CUresult status, const char * call)
+{
+  if (status != CUDA_SUCCESS) {
+    const char * name = "unknown error";
+    driver().getErrorName(status, &name);
+    error("gputools: %s failed: %s", call, name);
+  }
+}
+
+#define DRIVER_CALL(x) driverCheck((x), #x)
 
 std::map<int, cublasHandle_t> blasHandles;
 
@@ -150,13 +206,14 @@ void loadFile(const KernelFile & kf, int device)
   Compiled c = compile(kf, device);
 
   CUmodule module;
-  CUDA_SAFE_CALL(cuModuleLoadData(&module, c.ptx.c_str()));
+  DRIVER_CALL(driver().moduleLoadData(&module, c.ptx.c_str()));
   modules[{device, kf.file}] = module;
 
   for (size_t i = 0; i < kf.kernels.size(); ++i) {
-    CUfunction fn;
-    CUDA_SAFE_CALL(cuModuleGetFunction(&fn, module, c.lowered[i].c_str()));
-    functions[{device, kf.kernels[i]}] = fn;
+    CUfunction kernel;
+    DRIVER_CALL(driver().moduleGetFunction(&kernel, module,
+                                           c.lowered[i].c_str()));
+    kernels[{device, kf.kernels[i]}] = kernel;
   }
 }
 
@@ -187,28 +244,38 @@ void gpuCudaCheck(cudaError_t status, const char * call)
     error("gputools: %s failed: %s", call, cudaGetErrorString(status));
 }
 
+void requireDevice()
+{
+  int count = 0;
+  cudaError_t status = cudaGetDeviceCount(&count);
+  if (status != cudaSuccess) {
+    cudaGetLastError();  // clear it, so later checks do not report it again
+    error("gputools: no usable CUDA device: %s", cudaGetErrorString(status));
+  }
+  if (count == 0)
+    error("gputools: no CUDA device found");
+}
+
 void cudaLaunch(std::string kernelName,
                 void * args[],
                 const dim3 &gridDim, const dim3 &blockDim,
                 cudaStream_t stream)
 {
   int device = 0;
-  CUDA_SAFE_CALL(cuInit(0));
-  // makes the device's primary context current for the driver API calls
-  cudaFree(0);
-  cudaGetDevice(&device);
+  CUDART_CALL(cudaGetDevice(&device));
+  // makes the device's primary context current for the driver API
+  CUDART_CALL(cudaFree(0));
 
-  auto fn = functions.find({device, kernelName});
-  if (fn == functions.end()) {
+  auto k = kernels.find({device, kernelName});
+  if (k == kernels.end()) {
     loadFile(fileForKernel(kernelName), device);
-    fn = functions.find({device, kernelName});
+    k = kernels.find({device, kernelName});
   }
 
-  CUDA_SAFE_CALL(
-    cuLaunchKernel(fn->second,
-      gridDim.x, gridDim.y, gridDim.z,
-      blockDim.x, blockDim.y, blockDim.z,
-      0, stream, args, 0));
+  DRIVER_CALL(driver().launchKernel(k->second,
+                                    gridDim.x, gridDim.y, gridDim.z,
+                                    blockDim.x, blockDim.y, blockDim.z,
+                                    0, stream, args, NULL));
 }
 
 extern "C" {
@@ -225,7 +292,7 @@ SEXP gputoolsUnloadKernels()
   cudaGetDevice(&current);
   for (auto & m : modules) {
     cudaSetDevice(m.first.first);
-    cuModuleUnload(m.second);
+    driver().moduleUnload(m.second);
   }
   for (auto & h : blasHandles) {
     cudaSetDevice(h.first);
@@ -233,7 +300,7 @@ SEXP gputoolsUnloadKernels()
   }
   cudaSetDevice(current);
   modules.clear();
-  functions.clear();
+  kernels.clear();
   blasHandles.clear();
   return R_NilValue;
 }

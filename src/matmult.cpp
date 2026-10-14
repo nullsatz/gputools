@@ -1,10 +1,13 @@
 #include "R.h"
 #include "Rinternals.h"
 
+#include "cudaUtils.h"
 #include "gpublas.h"
 #include "matmult.h"
 
 SEXP gpuMatMult(SEXP a, SEXP b) {
+  requireDevice();
+
   SEXP
     dima = getAttrib(a, R_DimSymbol),
     dimb = getAttrib(b, R_DimSymbol);
