@@ -1,0 +1,5 @@
+# shell scripts must keep LF endings, even in a Windows checkout
+configure text eol=lf
+cleanup text eol=lf
+*.sh text eol=lf
+*.ac text eol=lf

@@ -7,15 +7,28 @@
 #include "Rinternals.h"
 #include "R_ext/Rdynload.h"
 
+// configure writes the reason; Windows runs no configure (Makevars.win)
+#if __has_include("nocuda-reason.h")
 #include "nocuda-reason.h"
+#else
+#define GPUTOOLS_NO_CUDA_REASON "gputools has no CUDA support on Windows"
+#endif
 #include "routines.h"
+
+#ifdef _WIN32
+#define GPUTOOLS_GUIDANCE \
+  "To use them, install gputools on Linux with an NVIDIA GPU and the CUDA " \
+  "toolkit (11.7 or later)."
+#else
+#define GPUTOOLS_GUIDANCE \
+  "To use them, install the NVIDIA CUDA toolkit (11.7 or later), make it " \
+  "findable -- set CUDA_HOME to its directory, or put nvcc on the PATH -- " \
+  "and reinstall gputools from source. See the package's INSTALL file."
+#endif
 
 static const char * message =
   "gputools was installed without CUDA (" GPUTOOLS_NO_CUDA_REASON "), "
-  "so its GPU functions cannot run. To use them, install the NVIDIA CUDA "
-  "toolkit (11.7 or later), make it findable -- set CUDA_HOME to its "
-  "directory, or put nvcc on the PATH -- and reinstall gputools from "
-  "source. See the package's INSTALL file.";
+  "so its GPU functions cannot run. " GPUTOOLS_GUIDANCE;
 
 #define ARGS_0
 #define ARGS_1 SEXP
