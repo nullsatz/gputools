@@ -44,7 +44,7 @@ float * getMatFromFile(int rows, int cols, const char * fn)
 	matFile = fopen(fn, "r");
 	if(matFile == NULL)
 		error("unable to open file %s", fn);
-	float * mat = Calloc(rows*cols, float);
+	float * mat = R_Calloc(rows*cols, float);
 	int i, j, err;
 	for(i = 0; i < rows; i++) {
 		for(j = 0; j < cols; j++) {

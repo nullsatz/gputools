@@ -188,8 +188,8 @@ void Rdistclust(const char ** distmethod, const char ** clustmethod,
   int 
     * presub, * presup;
 
-  presub = Calloc(len, int);
-  presup = Calloc(len, int);
+  presub = R_Calloc(len, int);
+  presup = R_Calloc(len, int);
 
   hclusterPreparedDistances(gpuDistances, dpitch, *numPoints, 
                             presub, presup,
@@ -199,8 +199,8 @@ void Rdistclust(const char ** distmethod, const char ** clustmethod,
 
   formatClustering(len, presub, presup, merge, order);
 
-  Free(presub);
-  Free(presup);
+  R_Free(presub);
+  R_Free(presup);
 }
 
 void Rdistances(const float * points, const int * numPoints, const int * dim,
@@ -226,16 +226,16 @@ void Rhcluster(const float * distMat, const int * numPoints,
   int 
     * presub, * presup;
 
-  presub = Calloc(len, int);
-  presup = Calloc(len, int);
+  presub = R_Calloc(len, int);
+  presup = R_Calloc(len, int);
 
   hcluster(distMat, pitch, *numPoints, presub, presup, val, nummethod,
            lambda, beta);
 
   formatClustering(len, presub, presup, merge, order);
 
-  Free(presub);
-  Free(presup);
+  R_Free(presub);
+  R_Free(presup);
 }
 
 void formatClustering(const int len, const int * sub,  const int * sup, 

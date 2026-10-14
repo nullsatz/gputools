@@ -82,7 +82,7 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 	int maxIdx = std::min(rank, rows - 1);
 
 	float
-		* diags = Calloc(rank * fbytes, float),
+		* diags = R_Calloc(rank * fbytes, float),
 		* dDiags, *dResids, *dCoeffs, *dEffects;
 
 	cublasAlloc(rank, fbytes, (void **) &dDiags);
@@ -96,11 +96,11 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 	cublasScopy(rank, dQR, stride + 1, dDiags, 1);
 	cublasGetVector(rank, fbytes, dDiags, 1, diags, 1);
 
-	float *qrAuxFloat = Calloc(maxIdx * fbytes, float);
+	float *qrAuxFloat = R_Calloc(maxIdx * fbytes, float);
 	for (int i = 0; i < maxIdx; i++)
 	  qrAuxFloat[i] = qrAux[i];
 	cublasSetVector(maxIdx, fbytes, qrAuxFloat, 1, dQR, stride + 1);
-	Free(qrAuxFloat);
+	R_Free(qrAuxFloat);
 
 	cublasSetMatrix(cols, yCols, fbytes, coeffs, cols, dCoeffs, cols);
 	cublasSetMatrix(rows, yCols, fbytes, effects, rows, dEffects, rows);
@@ -165,7 +165,7 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 		}
 		cublasSscal(1, 1.f / diags[0], pCoeffs, 1);
 	}
-	Free(diags);
+	R_Free(diags);
 
 	cublasGetMatrix(cols, yCols, fbytes, dCoeffs, cols, coeffs, cols);
 	cublasGetMatrix(rows, yCols, fbytes, dResids, rows, resids, rows);

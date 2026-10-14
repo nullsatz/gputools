@@ -153,7 +153,7 @@ void cuCompile(const int * numFiles,
     size_t ptxSize;
     NVRTC_SAFE_CALL(nvrtcGetPTXSize(*prog, &ptxSize));
 
-    char * ptx = Calloc(ptxSize, char);
+    char * ptx = R_Calloc(ptxSize, char);
     NVRTC_SAFE_CALL(nvrtcGetPTX(*prog, ptx));
 
     for(int i = 0; i < kernels.size(); ++i) {
@@ -183,7 +183,7 @@ void unloadPackage()
   std::unique(ptxs.begin(), ptxs.end());
   std::vector<const char *>::iterator ptx_i;
   for (ptx_i = ptxs.begin(); ptx_i != ptxs.end(); ++ptx_i) {
-    Free(*ptx_i);
+    R_Free(*ptx_i);
     }
 
   std::sort(progs.begin(), progs.end());

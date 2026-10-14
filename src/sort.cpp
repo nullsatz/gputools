@@ -13,12 +13,12 @@ void copyVect(int n, double * from, int incFrom, double * to, int incTo)
 //Swap rows in a col major array
 void swapRows(int rows, int cols, double * array, int rowA, int rowB)
 {
-	double * tempRow  = Calloc(cols, double);
+	double * tempRow  = R_Calloc(cols, double);
 
 	copyVect(cols, array+rowA, rows, tempRow, 1);
 	copyVect(cols, array+rowB, rows, array+rowA, rows);
 	copyVect(cols, tempRow, 1, array+rowB, rows);
-	Free(tempRow);
+	R_Free(tempRow);
 }
 
 //Find the index of the Median of the elements

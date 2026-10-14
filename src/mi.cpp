@@ -17,7 +17,7 @@ static int initKnots(int nbins, int order, float ** knots) {
     dpo = degree + order,
     nknots = dpo + 1;
 
-  *knots = Calloc(nknots, float); 
+  *knots = R_Calloc(nknots, float); 
   for(int i = 0; i < nknots; i++) {
     if(i <= om1)
       (*knots)[i] = 0.f;
@@ -50,7 +50,7 @@ void bSplineMutualInfo(int nbins, int order, int nsamples,
   float knot_max = knots[nknots - 1];
   cudaMalloc((void **)&dknots, nknots * sizeof(float));
   cudaMemcpy(dknots, knots, nknots * sizeof(float), cudaMemcpyHostToDevice);
-  Free(knots);
+  R_Free(knots);
 
   checkCudaError("bSplineMutualInfoSingle: 1");
         

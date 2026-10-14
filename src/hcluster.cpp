@@ -64,7 +64,7 @@ void hclusterPreparedDistances(float * gpuDist, size_t pitch_dist_d, size_t n,
   cudaMalloc((void**)&hcluster_merge_val_d, (n - 1) * sizeof(float));
 
   // Every element starts in its own cluster
-  float * pre_count = Calloc(n, float);
+  float * pre_count = R_Calloc(n, float);
   for(size_t i = 0; i < n; ++i)
     pre_count[i] = 1.0;
 
@@ -72,7 +72,7 @@ void hclusterPreparedDistances(float * gpuDist, size_t pitch_dist_d, size_t n,
              cudaMemcpyHostToDevice);
   checkCudaError("hcluster : malloc and memcpy");
 
-  Free(pre_count);
+  R_Free(pre_count);
 
   dim3 
     grid0(NUM_BLOCKS, 1, 1), block0(NUM_THREADS, 1, 1),

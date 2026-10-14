@@ -398,7 +398,7 @@ void cublasPMCC(const float * sampsa, size_t numSampsA,
     same = (sampsa == sampsb);
   float
     * gpua, * gpub, * gpuRes,
-    * aRecipSD = Calloc(numSampsA, float);
+    * aRecipSD = R_Calloc(numSampsA, float);
 
   cublasInit();
   cublasAlloc(numSampsA*sampSize, sizeof(float), (void **)&gpua);
@@ -429,11 +429,11 @@ void cublasPMCC(const float * sampsa, size_t numSampsA,
   }
   for(size_t i = 0; i < numSampsA; i++) // div each sample by sqrt of s-o-s
     cublasSscal(sampSize, aRecipSD[i], gpua+i*sampSize, 1); 
-  Free(aRecipSD);
+  R_Free(aRecipSD);
   checkCublasError("PMCC : vector ops for A");
 
   if(!same) {
-    float * bRecipSD = Calloc(numSampsB, float);
+    float * bRecipSD = R_Calloc(numSampsB, float);
         
     cublasAlloc(numSampsB*sampSize, sizeof(float), (void **)&gpub);
     cublasSetVector(numSampsB*sampSize, sizeof(float), sampsb, 1, gpub, 1);
@@ -469,7 +469,7 @@ void cublasPMCC(const float * sampsa, size_t numSampsA,
     }
     for(size_t i = 0; i < numSampsB; i++) // div by s-o-s
       cublasSscal(sampSize, bRecipSD[i], gpub+i*sampSize, 1); 
-    Free(bRecipSD);
+    R_Free(bRecipSD);
     checkCublasError("PMCC : setup for matrix B");
   } else {
     gpub = gpua;

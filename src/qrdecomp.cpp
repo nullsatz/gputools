@@ -53,7 +53,7 @@ void getQRDecomp(int rows, int cols, float * dq, float * da,
   if(nRowBlocks*nthreads < rows) nRowBlocks++;
 
   // the ident is needed as a term for the householder xfrm
-  ident = Calloc(rows * rows, float);
+  ident = R_Calloc(rows * rows, float);
   memset(ident, 0, rows*rows*fbytes);
 
   for(int i = 0; i < rows; i++)
@@ -61,7 +61,7 @@ void getQRDecomp(int rows, int cols, float * dq, float * da,
 
   cublasAlloc(rows*rows, fbytes, (void **)&dIdent);
   cublasSetMatrix(rows, rows, fbytes, ident, rows, dIdent, rows);
-  Free(ident);
+  R_Free(ident);
 
   cublasAlloc(cols, fbytes, (void **)&dColNorms);
   cublasAlloc(cols, fbytes, (void **)&dPivot);
@@ -170,7 +170,7 @@ void qrSolver(int rows, int cols, float * matX, float * vectY, float * vectB)
   int * pivot;
   float * matQ;
 
-  pivot = Calloc(cols, int);
+  pivot = R_Calloc(cols, int);
   cublasAlloc(rows * rows, sizeof(float), (void **)&matQ);
   checkCublasError("qrSolver");
 
@@ -190,7 +190,7 @@ void qrSolver(int rows, int cols, float * matX, float * vectY, float * vectB)
     }
   }
   checkCublasError("qrSolver");
-  Free(pivot);
+  R_Free(pivot);
 }
 
 // vv a work in progress not ready for primetime
@@ -209,8 +209,8 @@ void qrSolver2(int rows, int cols, float * dX, float * dY, float * dB)
     * dQR, * dQ, * drInverse, * dxInverse;
 
   double * qrAux;
-  pivot = Calloc(cols, int);
-  qrAux = Calloc(maxRank, double);
+  pivot = R_Calloc(cols, int);
+  qrAux = R_Calloc(maxRank, double);
 
   cublasAlloc(rows * cols, sizeof(float), (void **)&dQR);
   cublasAlloc(rows * cols, sizeof(float), (void **)&dQ);
@@ -223,7 +223,7 @@ void qrSolver2(int rows, int cols, float * dX, float * dY, float * dB)
   getQRDecompRR(rows, cols, 0.00001, dQR, pivot, qrAux, &rank);
   checkCublasError("qrSolver2:");
 
-  hostIdent = (float *) Calloc(cols * cols, float);
+  hostIdent = (float *) R_Calloc(cols * cols, float);
   for(int i = 0; i < cols; i++)
     hostIdent[i + i * cols] = 1.f;
 
@@ -231,7 +231,7 @@ void qrSolver2(int rows, int cols, float * dX, float * dY, float * dB)
   cublasSetMatrix(cols, cols, sizeof(float), hostIdent, cols,
                   drInverse, cols);
   checkCublasError("qrSolver2:");
-  Free(hostIdent);
+  R_Free(hostIdent);
 
   cublasStrsm('L', 'U', 'N', 'N', cols, cols, 1.f, dQR, rows,
               drInverse, cols);
@@ -255,8 +255,8 @@ void qrSolver2(int rows, int cols, float * dX, float * dY, float * dB)
   }
   checkCublasError("qrlsSolver2:");
 
-  Free(pivot);
-  Free(qrAux);
+  R_Free(pivot);
+  R_Free(qrAux);
 }
 
 // finds inverse for X where X has QR decomp X = QR
@@ -275,14 +275,14 @@ void getInverseFromQR(int rows, int cols, const float * dQ, const float * dR,
   if((rows <= 0) || (cols <= 0))
     error("getInverseFromQR: invalid rows or cols argument");
 
-  hostIdent = (float *) Calloc(cols * cols, float);
+  hostIdent = (float *) R_Calloc(cols * cols, float);
   for(int i = 0; i < cols; i++)
     hostIdent[i + i * cols] = 1.f;
 
   cublasAlloc(cols * cols, sizeof(float), (void **)&rInverse);
   cublasSetMatrix(cols, cols, sizeof(float), hostIdent, cols, rInverse, cols);
   checkCublasError("getInverseFromQR:");
-  Free(hostIdent);
+  R_Free(hostIdent);
 
   cublasStrsm('L', 'U', 'N', 'N', cols, cols, 1.f, dR, cols, rInverse, cols);
   cublasSgemm('N', 'T', cols, rows, cols, 1.f, rInverse, cols, dQ, rows,
@@ -366,7 +366,7 @@ void qrdecompMGS(int rows, int cols, float * da, float * dq, float * dr,
     * colQ, * colA,
     * rowR;
 
-  rowR = Calloc(cols, float);
+  rowR = R_Calloc(cols, float);
 
   for(int i = 0; i < cols; i++)
     pivots[i] = i;
@@ -393,7 +393,7 @@ void qrdecompMGS(int rows, int cols, float * da, float * dq, float * dr,
     }
     cublasSetVector(cols, fbytes, rowR, 1, dr+k, cols);
   }
-  Free(rowR);
+  R_Free(rowR);
 }
 
 // Computes the QR decomposition of the matrix residing in "dQR":
@@ -427,9 +427,9 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
   // in the main loop.
   //
   float
-    * zeroes = (float *) Calloc(rows*cols, float);
+    * zeroes = (float *) R_Calloc(rows*cols, float);
   cublasSetMatrix(rows, cols, fbytes, zeroes, rows, dV, rows);
-  Free(zeroes);
+  R_Free(zeroes);
 
   checkCublasError("getQRDecompRR:");
 
