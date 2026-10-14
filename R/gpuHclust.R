@@ -80,7 +80,7 @@ gpuHclust <- function(distances, method = "complete")
 
     merge <- matrix(a$merge, numpoints-1, 2)
 
-    tree <- list(merge = merge, height= a$val, order = a$order,
+    tree <- list(merge = merge, height = as.vector(a$val), order = a$order,
                  labels = attr(distances, "Labels"),
                  method = method,
                  call = match.call(),
@@ -134,7 +134,7 @@ gpuDistClust <- function(points, distmethod = "euclidean",
 
     merge <- matrix(a$merge, nump-1, 2)
 
-    tree <- list(merge = merge, height = a$val, order = a$order,
+    tree <- list(merge = merge, height = as.vector(a$val), order = a$order,
                  labels = dimnames(points)[[1L]],
                  method = clustmethod,
                  call = match.call(),

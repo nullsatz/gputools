@@ -34,6 +34,6 @@ gpuSolve <- function(x, y=NULL) {
 			y, solution = single(p),
 			PACKAGE='gputools'
 		)
-		return(myCall$solution)
+		return(as.vector(myCall$solution))
 	}
 }

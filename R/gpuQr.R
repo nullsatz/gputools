@@ -21,7 +21,11 @@ gpuQr <- function(x, tol = 1e-07) {
 		PACKAGE='gputools'
 	)[c('qr', 'pivot', 'qraux', 'rank')]
 
-        res$pivot <- res$pivot + 1
+        res$pivot <- res$pivot + 1L
+        # .C leaves the "Csingle" attribute on the matrix; base R's qr.qy()
+        # and friends would then hand LINPACK a float buffer to write doubles
+        # into.
+        attr(res$qr, "Csingle") <- NULL
         
 	if(!is.null(cn <- colnames(x)))
 		colnames(res$qr) <- cn[res$pivot]

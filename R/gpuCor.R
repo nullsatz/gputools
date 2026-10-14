@@ -67,8 +67,8 @@ gpuTtest <- function(goodPairs, coeffs) {
 
     n <- as.integer(length(goodPairs))
 
-    .C("rtestT", NAOK = TRUE,
+    as.vector(.C("rtestT", NAOK = TRUE,
        goodPairs, coeffs, n,
        results = single(n),
-       PACKAGE = 'gputools')$results
+       PACKAGE = 'gputools')$results)
 }
