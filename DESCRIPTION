@@ -7,6 +7,8 @@ Authors@R: c(person("Josh", "Buckner", email = "nullsatz@gmail.com",
   person("Fan", "Meng", email = "mengf@umich.edu", role = "aut"),
   person("Justin", "Wilson", role = "ctb"))
 Depends: R (>= 3.1.2)
+Suggests: testthat (>= 3.0.0)
+Config/testthat/edition: 3
 SystemRequirements: Nvidia's CUDA toolkit (>= release 7.0)
 Description: Provides R interfaces to a handful of common
         functions implemented using the Nvidia CUDA toolkit. Some of the
