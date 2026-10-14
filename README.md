@@ -1,6 +1,7 @@
 # gputools
 
 [![R-CMD-check](https://github.com/nullsatz/gputools/actions/workflows/R-CMD-check.yml/badge.svg)](https://github.com/nullsatz/gputools/actions/workflows/R-CMD-check.yml)
+[![r-universe](https://nullsatz.r-universe.dev/badges/gputools)](https://nullsatz.r-universe.dev/gputools)
 
 GPU versions of some common statistical computations in R, using NVIDIA
 CUDA:
@@ -22,12 +23,25 @@ in double.
 ## Installing
 
 You need an NVIDIA CUDA toolkit, 11.7 or later, to build the package, and
-an NVIDIA GPU and driver to run the GPU functions. From GitHub:
+an NVIDIA GPU and driver to run the GPU functions. Install from
+[r-universe](https://nullsatz.r-universe.dev):
+
+```r
+install.packages("gputools",
+  repos = c("https://nullsatz.r-universe.dev", "https://cloud.r-project.org"))
+```
+
+or from GitHub:
 
 ```r
 # install.packages("remotes")
 remotes::install_github("nullsatz/gputools")
 ```
+
+Either way, on Linux gputools is compiled on your machine against your
+CUDA toolkit. The prebuilt packages r-universe offers (Windows, macOS, and
+its opt-in Linux binaries) are built without CUDA: they install and load,
+but their GPU functions cannot run.
 
 `configure` finds CUDA through `CUDA_HOME`, `CUDA_PATH`, `nvcc` on the
 `PATH`, or `/usr/local/cuda`; in a conda environment set
