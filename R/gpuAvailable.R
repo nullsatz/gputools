@@ -1,4 +1,7 @@
 gpuAvailable <- function()
 {
-	isTRUE(tryCatch(is.integer(getGpuId()), error = function(e) FALSE))
+	reason <- tryCatch({ getGpuId(); NULL },
+		error = function(e) conditionMessage(e))
+	if (is.null(reason)) return(TRUE)
+	structure(FALSE, reason = reason)
 }

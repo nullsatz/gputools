@@ -639,6 +639,8 @@ ac_includes_default="\
 ac_header_cxx_list=
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+NO_CUDA_REASON
+GPUTOOLS_OBJECTS
 CUDA_LIBS
 CUDA_CPPFLAGS
 OBJEXT
@@ -2229,6 +2231,8 @@ if test -z "${cuda_lib}" && test -n "${cuda_home}"; then
   done
 fi
 
+no_cuda=
+
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for the CUDA headers" >&5
 printf %s "checking for the CUDA headers... " >&6; }
 if test -n "${cuda_include}" && test -f "${cuda_include}/cuda_runtime.h"; then
@@ -2237,30 +2241,31 @@ printf "%s\n" "${cuda_include}" >&6; }
 else
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
-  as_fn_error $? "CUDA toolkit not found. Set CUDA_HOME, put nvcc on the PATH,
-or pass --configure-args=\"--with-cuda-home=DIR\"." "$LINENO" 5
+  no_cuda="the CUDA toolkit was not found"
 fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for the CUDA libraries" >&5
+if test -z "${no_cuda}"; then
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for the CUDA libraries" >&5
 printf %s "checking for the CUDA libraries... " >&6; }
-if test -n "${cuda_lib}"; then
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: ${cuda_lib}" >&5
+  if test -n "${cuda_lib}"; then
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: ${cuda_lib}" >&5
 printf "%s\n" "${cuda_lib}" >&6; }
-else
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+  else
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
-  as_fn_error $? "CUDA libraries (libcudart) not found; pass
---configure-args=\"--with-cuda-lib=DIR\"." "$LINENO" 5
+    no_cuda="the CUDA runtime library (libcudart) was not found"
+  fi
 fi
 
-: ${R_HOME=`R RHOME`}
-if test -z "${R_HOME}"; then
-  as_fn_error $? "could not determine R_HOME" "$LINENO" 5
-fi
-CXX=`"${R_HOME}/bin/R" CMD config CXX`
-CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
-CPPFLAGS="-I${cuda_include} `"${R_HOME}/bin/R" CMD config CPPFLAGS`"
-LDFLAGS="-L${cuda_lib} `"${R_HOME}/bin/R" CMD config LDFLAGS`"
-ac_ext=cpp
+if test -z "${no_cuda}"; then
+    : ${R_HOME=`R RHOME`}
+  if test -z "${R_HOME}"; then
+    as_fn_error $? "could not determine R_HOME" "$LINENO" 5
+  fi
+  CXX=`"${R_HOME}/bin/R" CMD config CXX`
+  CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
+  CPPFLAGS="-I${cuda_include} `"${R_HOME}/bin/R" CMD config CPPFLAGS`"
+  LDFLAGS="-L${cuda_lib} `"${R_HOME}/bin/R" CMD config LDFLAGS`"
+  ac_ext=cpp
 ac_cpp='$CXXCPP $CPPFLAGS'
 ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
@@ -2959,15 +2964,18 @@ then :
 _ACEOF
 
 else case e in #(
-  e) as_fn_error $? "CUDA header $ac_header not found in ${cuda_include}" "$LINENO" 5 ;;
+  e) no_cuda="CUDA header $ac_header is missing from ${cuda_include}"
+     break ;;
 esac
 fi
 
 done
+fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for CUDA 11.7 or later" >&5
+if test -z "${no_cuda}"; then
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for CUDA 11.7 or later" >&5
 printf %s "checking for CUDA 11.7 or later... " >&6; }
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <cuda_runtime_api.h>
 #if CUDART_VERSION < 11070
@@ -2988,12 +2996,14 @@ printf "%s\n" "yes" >&6; }
 else case e in #(
   e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
-   as_fn_error $? "gputools needs CUDA 11.7 or later" "$LINENO" 5 ;;
+     no_cuda="the CUDA toolkit in ${cuda_include} is older than 11.7" ;;
 esac
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing cudaGetDriverEntryPoint" >&5
+if test -z "${no_cuda}"; then
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing cudaGetDriverEntryPoint" >&5
 printf %s "checking for library containing cudaGetDriverEntryPoint... " >&6; }
 if test ${ac_cv_search_cudaGetDriverEntryPoint+y}
 then :
@@ -3052,11 +3062,13 @@ then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else case e in #(
-  e) as_fn_error $? "no CUDA runtime library (libcudart) in ${cuda_lib}" "$LINENO" 5 ;;
+  e) no_cuda="no CUDA runtime library (libcudart) in ${cuda_lib}" ;;
 esac
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing nvrtcCreateProgram" >&5
+fi
+if test -z "${no_cuda}"; then
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing nvrtcCreateProgram" >&5
 printf %s "checking for library containing nvrtcCreateProgram... " >&6; }
 if test ${ac_cv_search_nvrtcCreateProgram+y}
 then :
@@ -3115,11 +3127,13 @@ then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else case e in #(
-  e) as_fn_error $? "no NVRTC library (libnvrtc) in ${cuda_lib}" "$LINENO" 5 ;;
+  e) no_cuda="no NVRTC library (libnvrtc) in ${cuda_lib}" ;;
 esac
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing cublasCreate_v2" >&5
+fi
+if test -z "${no_cuda}"; then
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing cublasCreate_v2" >&5
 printf %s "checking for library containing cublasCreate_v2... " >&6; }
 if test ${ac_cv_search_cublasCreate_v2+y}
 then :
@@ -3178,16 +3192,52 @@ then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else case e in #(
-  e) as_fn_error $? "no cuBLAS library (libcublas) in ${cuda_lib}" "$LINENO" 5 ;;
+  e) no_cuda="no cuBLAS library (libcublas) in ${cuda_lib}" ;;
 esac
 fi
 
+fi
 
-CUDA_CPPFLAGS="-I${cuda_include}"
-CUDA_LIBS="-L${cuda_lib} -Wl,-rpath,${cuda_lib} ${LIBS}"
+if test -z "${no_cuda}"; then
+  CUDA_CPPFLAGS="-I${cuda_include}"
+  CUDA_LIBS="-L${cuda_lib} -Wl,-rpath,${cuda_lib} ${LIBS}"
+  GPUTOOLS_OBJECTS=
+  for f in src/*.cpp; do
+    case "$f" in
+      src/nocuda.cpp) ;;
+      *) GPUTOOLS_OBJECTS="${GPUTOOLS_OBJECTS} `basename "$f" .cpp`.o" ;;
+    esac
+  done
+else
+  CUDA_CPPFLAGS=
+  CUDA_LIBS=
+  GPUTOOLS_OBJECTS=nocuda.o
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING:
+
+*** gputools is being installed WITHOUT CUDA: ${no_cuda}.
+*** The package will load, but none of its GPU functions will run.
+***
+*** To use the GPU, install the NVIDIA CUDA toolkit (11.7 or later),
+*** make it findable -- set CUDA_HOME to its directory, or put nvcc on
+*** the PATH -- and reinstall gputools. See the INSTALL file.
+" >&5
+printf "%s\n" "$as_me: WARNING:
+
+*** gputools is being installed WITHOUT CUDA: ${no_cuda}.
+*** The package will load, but none of its GPU functions will run.
+***
+*** To use the GPU, install the NVIDIA CUDA toolkit (11.7 or later),
+*** make it findable -- set CUDA_HOME to its directory, or put nvcc on
+*** the PATH -- and reinstall gputools. See the INSTALL file.
+" >&2;}
+fi
+NO_CUDA_REASON=${no_cuda}
 
 
-ac_config_files="$ac_config_files src/Makevars"
+
+
+
+ac_config_files="$ac_config_files src/Makevars src/nocuda-reason.h"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -3891,6 +3941,7 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "src/Makevars") CONFIG_FILES="$CONFIG_FILES src/Makevars" ;;
+    "src/nocuda-reason.h") CONFIG_FILES="$CONFIG_FILES src/nocuda-reason.h" ;;
 
   *) as_fn_error $? "invalid argument: '$ac_config_target'" "$LINENO" 5;;
   esac

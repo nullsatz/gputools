@@ -1,0 +1,31 @@
+#ifndef _ROUTINES_H_
+#define _ROUTINES_H_
+
+/* The GPU entry points R calls, with their number of arguments. Both
+   builds register exactly these: rinterface.cpp with CUDA, nocuda.cpp
+   without. */
+#define GPUTOOLS_GPU_ROUTINES(X) \
+  X(gpuMatMult, 2)               \
+  X(gpuPmcc, 7)                  \
+  X(gpuSetDevice, 1)             \
+  X(gpuGetDevice, 0)             \
+  X(gpuTtest, 3)                 \
+  X(gpuKendall, 6)               \
+  X(gpuGranger, 5)               \
+  X(gpuGrangerXY, 7)             \
+  X(gpuDist, 6)                  \
+  X(gpuHclust, 4)                \
+  X(gpuDistClust, 6)             \
+  X(gpuQrDecomp, 3)              \
+  X(gpuInverseFromQR, 5)         \
+  X(gpuSolveFromQR, 6)           \
+  X(gpuMutualInfo, 8)            \
+  X(gpuLSFit, 10)
+
+/* and the housekeeping ones .onLoad, .onUnload and .onAttach use */
+#define GPUTOOLS_OTHER_ROUTINES(X) \
+  X(gputoolsSetKernelDir, 1)       \
+  X(gputoolsUnloadKernels, 0)      \
+  X(gputoolsBuildInfo, 0)
+
+#endif /* _ROUTINES_H_ */

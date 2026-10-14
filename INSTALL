@@ -12,6 +12,12 @@ Running the GPU functions needs an NVIDIA GPU and driver. The package
 installs and loads without them; the GPU functions then stop with an error
 saying no CUDA device is usable.
 
+If configure cannot find the CUDA toolkit it still installs gputools, but
+without its GPU code, and says so loudly ("installed WITHOUT CUDA") in the
+install log and when the package is attached. That is also what you get
+from a binary built on a machine without CUDA. Make the toolkit findable
+(below) and reinstall from source.
+
 Finding CUDA
 ------------
 
