@@ -1,33 +1,30 @@
 gputools
+========
 
-=========
+Building gputools needs the NVIDIA CUDA toolkit, version 11.7 or later
+(https://developer.nvidia.com/cuda-downloads), or the equivalent conda
+packages:
 
-To install the package, you must first install Nvidia's CUDA Toolkit available from
+    conda install -c conda-forge cuda-nvcc cuda-nvrtc-dev cuda-cudart-dev \
+        cuda-driver-dev libcublas-dev
 
-http://developer.nvidia.com/cuda-downloads
+Running the GPU functions needs an NVIDIA GPU and driver. The package
+installs and loads without them; the GPU functions then stop with an error
+saying no CUDA device is usable.
 
-You will need an Nvidia GPU of compute capability >= 2.
+Finding CUDA
+------------
 
-=========
+configure looks for the toolkit in this order:
 
-Installation
+  1. --with-cuda-home=DIR, or --with-cuda-include=DIR / --with-cuda-lib=DIR
+  2. the CUDA_HOME, then CUDA_PATH, environment variable
+  3. the directory above nvcc, if nvcc is on the PATH
+  4. /usr/local/cuda
 
-If the package installation fails with an error:
+For a conda environment, set CUDA_HOME=$CONDA_PREFIX. To pass options:
 
-Set the environment variable CUDA_HOME to the root of your CUDA toolkit installation.
+    R CMD INSTALL --configure-args="--with-cuda-home=/opt/cuda" gputools
 
-If that doesn't help, there are several 'configure options' that may be set from the command line:
-
-R CMD INSTALL --configure-args="<gputools configure options>" gputools_0.5.tar.gz
-
-<gputools configure options> include:
---with-nvcc=<path to nvcc>
---with-cuda=<path to CUDA toolkit root>
---with-r=<path to root of R install>
---with-r-include=<path to R header files>
---with-r-lib=<path to libR.so or libR.dylib>
-
-For example:
-R CMD INSTALL --configure-args="--with-nvcc=/usr/local/cuda/bin/nvcc --with-r-lib=/usr/local/share/R/lib64" gputools_0.5.tar.gz
-
-Enjoy!
+Kernels are compiled for the GPU in use the first time each is needed, so
+the first call to a function is slower than the ones after it.
