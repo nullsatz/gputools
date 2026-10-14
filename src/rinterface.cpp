@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<string.h>
 
-#include "cublas.h"
+#include "cuda_runtime.h"
 
 #include "R.h"
 #include "Rinternals.h"

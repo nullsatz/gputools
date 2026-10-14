@@ -3,7 +3,7 @@
 #include <string.h>
 #include <algorithm>
 
-#include "cublas.h"
+#include "gpublas.h"
 #include "R.h"
 
 #include"cuseful.h"
@@ -33,16 +33,14 @@ void getInverseFromQR(int rows, int cols, const float * dQ, const float * dR,
   for(int i = 0; i < cols; i++)
     hostIdent[i + i * cols] = 1.f;
 
-  cublasAlloc(cols * cols, sizeof(float), (void **)&rInverse);
-  cublasSetMatrix(cols, cols, sizeof(float), hostIdent, cols, rInverse, cols);
-  checkCublasError("getInverseFromQR:");
+  rInverse = gpuAlloc<float>(cols * cols);
+  blas::setMatrix(cols, cols, sizeof(float), hostIdent, cols, rInverse, cols);
   R_Free(hostIdent);
 
-  cublasStrsm('L', 'U', 'N', 'N', cols, cols, 1.f, dR, cols, rInverse, cols);
-  cublasSgemm('N', 'T', cols, rows, cols, 1.f, rInverse, cols, dQ, rows,
+  blas::trsmLeftUpper(cols, cols, 1.f, dR, cols, rInverse, cols);
+  blas::gemm('N', 'T', cols, rows, cols, 1.f, rInverse, cols, dQ, rows,
               0.f, dInverse, cols);
-  checkCublasError("getInverseFromQR:");
-  cublasFree(rInverse);
+  cudaFree(rInverse);
 }
 
 // solves XB=Y for B where X has QR decomp X = QR
@@ -64,37 +62,30 @@ void solveFromQR(int rows, int cols, const float * matQ, const float * matR,
   if((rows <= 0) || (cols <= 0))
     error("solveFromQR: invalid rows or cols argument");
 
-  cublasAlloc(rows * cols, sizeof(float), (void **)&dQ);
-  cublasSetMatrix(rows, cols, sizeof(float), matQ, rows, dQ, rows);
-  checkCublasError("solveFromQR:");
+  dQ = gpuAlloc<float>(rows * cols);
+  blas::setMatrix(rows, cols, sizeof(float), matQ, rows, dQ, rows);
 
-  cublasAlloc(cols * cols, sizeof(float), (void **)&dR);
-  cublasSetMatrix(cols, cols, sizeof(float), matR, cols, dR, cols);
-  checkCublasError("solveFromQR:");
+  dR = gpuAlloc<float>(cols * cols);
+  blas::setMatrix(cols, cols, sizeof(float), matR, cols, dR, cols);
 
-  cublasAlloc(rows * cols, sizeof(float), (void **)&xInverse);
-  checkCublasError("solveFromQR:");
+  xInverse = gpuAlloc<float>(rows * cols);
 
   getInverseFromQR(rows, cols, dQ, dR, xInverse);
-  cublasFree(dQ);
-  cublasFree(dR);
+  cudaFree(dQ);
+  cudaFree(dR);
 
-  cublasAlloc(rows, sizeof(float), (void **)&dY);
-  cublasSetVector(rows, sizeof(float), vectY, 1, dY, 1);
-  checkCublasError("solveFromQR:");
+  dY = gpuAlloc<float>(rows);
+  blas::setVector(rows, sizeof(float), vectY, 1, dY, 1);
 
-  cublasAlloc(cols, sizeof(float), (void **)&dB);
-  checkCublasError("solveFromQR:");
+  dB = gpuAlloc<float>(cols);
 
-  cublasSgemv('N', cols, rows, 1.f, xInverse, cols, dY, 1, 0.f, dB, 1);
-  checkCublasError("solveFromQR:");
+  blas::gemv('N', cols, rows, 1.f, xInverse, cols, dY, 1, 0.f, dB, 1);
 
-  cublasFree(xInverse);
-  cublasFree(dY);
+  cudaFree(xInverse);
+  cudaFree(dY);
 
-  cublasGetVector(cols, sizeof(float), dB, 1, vectB, 1);
-  checkCublasError("solveFromQR:");
-  cublasFree(dB);
+  blas::getVector(cols, sizeof(float), dB, 1, vectB, 1);
+  cudaFree(dB);
 }
 
 // implements the Modified Gram-Schmidt QR decomp
@@ -129,10 +120,9 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
     * dColNorms,
     * dV, * dw;
 
-  cublasAlloc(cols, fbytes, (void **) &dColNorms);
-  cublasAlloc(rows*cols, fbytes, (void **) &dV);
-  cublasAlloc(cols, fbytes, (void**) &dw);
-  checkCublasError("getQRDecompRR:");
+  dColNorms = gpuAlloc<float>(cols);
+  dV = gpuAlloc<float>(rows*cols);
+  dw = gpuAlloc<float>(cols);
 
   // Presets the matrix of Householder vectors, dV, to zero.
   // Padding with zeroes appears to offer better performance than
@@ -141,10 +131,9 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
   //
   float
     * zeroes = (float *) R_Calloc(rows*cols, float);
-  cublasSetMatrix(rows, cols, fbytes, zeroes, rows, dV, rows);
+  blas::setMatrix(rows, cols, fbytes, zeroes, rows, dV, rows);
   R_Free(zeroes);
 
-  checkCublasError("getQRDecompRR:");
 
   int k;
   double minElt; // Minimum tolerable diagonal element
@@ -175,10 +164,10 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
       // at column 'k'.
       if (colsk > 1) {
         int
-          idx = cublasIsamax(colsk, dColNorms + k, 1) + k - 1;
+          idx = blas::iamax(colsk, dColNorms + k, 1) + k - 1;
         if (idx != k) {
-          cublasSswap(1, dColNorms + k, 1, dColNorms + idx, 1);
-          cublasSswap(rows, pdQRcol, 1, dQR + idx * rows, 1);
+          blas::swap(1, dColNorms + k, 1, dColNorms + idx, 1);
+          blas::swap(rows, pdQRcol, 1, dQR + idx * rows, 1);
 
           int
             tempIdx = pivot[idx];
@@ -191,7 +180,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
       // Places nonzero elements of V into subdiagonal, although
       // leading element scaled and placed in qrAux.
       //
-      cublasScopy(rowsk, pdQRcol + k, 1, pdVdiag, 1);
+      blas::copy(rowsk, pdQRcol + k, 1, pdVdiag, 1);
 
 
       // This should probably be moved to the device.
@@ -207,7 +196,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
       // Tolerance should be positve.
       //
       float
-        normV = cublasSnrm2(rowsk, pdVdiag, 1);
+        normV = blas::nrm2(rowsk, pdVdiag, 1);
 
       if (k == 0) {
         if (normV < tol) {
@@ -225,7 +214,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
       //      V_1 += sign(V_1) * normV.
 
       float v1;
-      cublasGetVector(1, fbytes, pdVdiag, 1, &v1, 1);
+      blas::getVector(1, fbytes, pdVdiag, 1, &v1, 1);
 
       double
         v1Abs = fabs(v1);
@@ -236,7 +225,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
         double recipNormV = 1.0 / normV;
         qrAux[k] = 1.0 + v1Abs * recipNormV;
 
-        cublasSscal(1, (float) fac, pdVdiag, 1);
+        blas::scal(1, (float) fac, pdVdiag, 1);
                   
         // Beta = -2 v^t v :  updates squared norm on host side.
 
@@ -244,18 +233,18 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
 
         // w = Beta R^t v
 
-        cublasSgemv('T', rows, cols, (float) beta, dQR, rows, pdVcol, 1,
+        blas::gemv('T', rows, cols, (float) beta, dQR, rows, pdVcol, 1,
                     0.f, dw, 1);
                                        
         // R = R + v w^t
 
-        cublasSger(rows, cols, 1.0f, pdVcol, 1, dw, 1, dQR, rows);
+        blas::ger(rows, cols, 1.0f, pdVcol, 1, dw, 1, dQR, rows);
 
         // Subdiagonal of V scaled by reciprocal of original signed norm.
 
         float
           scale = (v1 >= 0.f ? 1.f : -1.f) * recipNormV;
-        cublasSscal(rowsk - 1, scale, pdVdiag + 1, 1);
+        blas::scal(rowsk - 1, scale, pdVdiag + 1, 1);
 
         // Recomputes the squared norms of the remaining columns over the
         // rows still to be reduced; these choose the next pivot.
@@ -271,7 +260,6 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
       else
         qrAux[k] = v1Abs;  // The bottom row is not scaled
 
-      checkCublasError("getQRDecompRR:");
       checkCudaError("getQRDecompRR:");
     }
 
@@ -281,7 +269,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
     offs = 1;
 
   for (k = 0; k < *rank; k++, offs += (rows + 1))
-    cublasScopy(rows - k - 1, dV + offs, 1, dQR + offs, 1);
+    blas::copy(rows - k - 1, dV + offs, 1, dQR + offs, 1);
 
   // dQR now contains the upper-triangular portion of the factorization,
   // R.
@@ -290,11 +278,10 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
   // diagonal is saved in qrAux, while the sub-diagonal portion is
   // written onto QR.
 
-  cublasFree(dV);
-  cublasFree(dw);
-  cublasFree(dColNorms);
+  cudaFree(dV);
+  cudaFree(dw);
+  cudaFree(dColNorms);
         
-  checkCublasError("getQRDecompRR:");
 }
 
 // use householder xfrms and column pivoting to get the R factor of the
@@ -320,7 +307,6 @@ void getQRDecompBlocked(int rows, int cols, double tol,
   float
     * dV, * dW, *du, *dWtR, *dT, *dColNorms;
 
-  checkCublasError("getQRDecompBlocked:");
 
   nblocks = cols / nthreads;
   if(nblocks * nthreads < cols)
@@ -331,14 +317,16 @@ void getQRDecompBlocked(int rows, int cols, double tol,
   // direct operations on submatrices:  aligned access helps
   // ensure coalescing.
   //
-  cublasAlloc(stride * blockSize, fbytes, (void**) &dV);
-  cublasAlloc(stride * blockSize, fbytes, (void**) &dW);
-  cublasAlloc(blockSize * blockSize, fbytes, (void**) &dT);
-  cublasAlloc(stride, fbytes, (void**) &du);
-  cublasAlloc(blockSize * (cols - blockSize), fbytes, (void**) &dWtR);
-  cublasAlloc(cols, fbytes, (void**) &dColNorms);
+  dV = gpuAlloc<float>(stride * blockSize);
+  dW = gpuAlloc<float>(stride * blockSize);
+  dT = gpuAlloc<float>(blockSize * blockSize);
+  du = gpuAlloc<float>(stride);
+  // only the update to the right of a block uses it, so not if cols fit
+  // in one block
+  dWtR = cols > blockSize ? gpuAlloc<float>(blockSize * (cols - blockSize))
+                          : NULL;
+  dColNorms = gpuAlloc<float>(cols);
 
-  checkCublasError("getQRDecompBlocked allocation:");
 
   // Obtains the highest valued norm in order to approximate a condition-
   // based lower bound, "minElt".
@@ -349,8 +337,8 @@ void getQRDecompBlocked(int rows, int cols, double tol,
   };
   cudaLaunch("getColNorms", argsCN, grid, block);
 
-  int maxIdx = cublasIsamax(cols, dColNorms, 1)-1;
-  float maxNorm = cublasSnrm2(rows, dQR + stride * maxIdx, 1);
+  int maxIdx = blas::iamax(cols, dColNorms, 1)-1;
+  float maxNorm = blas::nrm2(rows, dQR + stride * maxIdx, 1);
   int rk = 0; // Local value of rank;
   int maxRank;
   double minElt; // Lowest acceptable norm under given tolerance.
@@ -379,14 +367,14 @@ void getQRDecompBlocked(int rows, int cols, double tol,
     //
     int blockEnd = 0;
     for (int i = k; i < k + blockSize && i < maxRank && i <= maxCol; i++) {
-      float colNorm = cublasSnrm2(rows, dQR + i * stride, 1);
+      float colNorm = blas::nrm2(rows, dQR + i * stride, 1);
       while ( (colNorm < minElt) && (maxCol > i)) {
-        cublasSswap(rows, dQR + i * stride, 1, dQR + maxCol*stride, 1);
+        blas::swap(rows, dQR + i * stride, 1, dQR + maxCol*stride, 1);
         int tempIdx = pivot[maxCol];
         pivot[maxCol] = pivot[i];
         pivot[i] = tempIdx;
         maxCol--;
-        colNorm = cublasSnrm2(rows, dQR + i * stride, 1);
+        colNorm = blas::nrm2(rows, dQR + i * stride, 1);
       }
       if (colNorm >= minElt)
         blockEnd++;
@@ -404,19 +392,19 @@ void getQRDecompBlocked(int rows, int cols, double tol,
     for (int colIdx = 0; colIdx < blockEnd; colIdx++, pdVcol += rowsk, pdVdiag += (rowsk + 1),
            pdQRdiag += (stride + 1), k++) {
 
-      cublasScopy(rowsk - colIdx, pdQRdiag, 1, pdVdiag, 1);
+      blas::copy(rowsk - colIdx, pdQRdiag, 1, pdVdiag, 1);
 
       // Builds Householder vector from maximal column just copied.
       // For now, uses slow memory transfers to modify leading element:
       //      V_1 += sign(V_1) * normV.
       //
       float v1;         
-      cublasGetVector(1, fbytes, pdVdiag, rowsk + 1, &v1, 1);
+      blas::getVector(1, fbytes, pdVdiag, rowsk + 1, &v1, 1);
       double v1Abs = fabs(v1);
       if (k == maxRow) // The bottom row is not scaled.
         qrAux[k] = v1Abs;
       else { // zero-valued "normV" should already have been ruled out.
-        float normV = cublasSnrm2(rowsk - colIdx, pdQRdiag, 1);
+        float normV = blas::nrm2(rowsk - colIdx, pdQRdiag, 1);
         double recipNormV = 1.0 / normV;
         qrAux[k] = 1.0 + v1Abs * recipNormV;
         scales[colIdx] = (v1 >= 0.f ? 1.f : -1.f) * recipNormV;
@@ -424,7 +412,7 @@ void getQRDecompBlocked(int rows, int cols, double tol,
         // Scales leading nonzero element of vector.
         //
         double fac = 1.0 + normV / v1Abs;
-        cublasSscal(1, (float) fac, pdVdiag, 1);
+        blas::scal(1, (float) fac, pdVdiag, 1);
                   
         // Beta = -2 v^t v :  updates squared norm on host side.
         //
@@ -433,11 +421,11 @@ void getQRDecompBlocked(int rows, int cols, double tol,
         // Rank-one update of the remainder of the block, "B":
         // u = Beta B^t v
         //
-        cublasSgemv('T', rowsk, std::min(blockSize,colsk), (float) Beta[colIdx], pdQRBlock, stride, pdVcol, 1, 0.f, du, 1);
+        blas::gemv('T', rowsk, std::min(blockSize,colsk), (float) Beta[colIdx], pdQRBlock, stride, pdVcol, 1, 0.f, du, 1);
                                        
         // B = B + v u^t
         //
-        cublasSger(rowsk, std::min(blockSize,colsk), 1.0f, pdVcol, 1, du, 1, pdQRBlock, stride);
+        blas::ger(rowsk, std::min(blockSize,colsk), 1.0f, pdVcol, 1, du, 1, pdQRBlock, stride);
       }
     }
 
@@ -454,18 +442,18 @@ void getQRDecompBlocked(int rows, int cols, double tol,
       //
       //  T = V^t V
       //
-      cublasSsyrk('U', 'T', blockSize, rowsk, 1.f, dV, rowsk, 0.f, dT, blockSize);
+      blas::syrk('U', 'T', blockSize, rowsk, 1.f, dV, rowsk, 0.f, dT, blockSize);
 
       float *pdTcol = dT;
       float *pdWcol = dW;
       pdVcol = dV;
       for (int m = 0; m < blockSize; m++, pdWcol += rowsk, pdVcol += rowsk, pdTcol += blockSize) {
-        cublasScopy(rowsk, pdVcol, 1, pdWcol, 1);
-        cublasSscal(rowsk, Beta[m], pdWcol, 1);
+        blas::copy(rowsk, pdVcol, 1, pdWcol, 1);
+        blas::scal(rowsk, Beta[m], pdWcol, 1);
         // w_m = w_m + Beta W T(.,m)
         //
         if (m > 0) {
-          cublasSgemv('N', rowsk, m, Beta[m], dW, rowsk, pdTcol, 1, 1.f, pdWcol, 1);
+          blas::gemv('N', rowsk, m, Beta[m], dW, rowsk, pdTcol, 1, 1.f, pdWcol, 1);
         }
       }
 
@@ -475,12 +463,12 @@ void getQRDecompBlocked(int rows, int cols, double tol,
 
       // WtR = W^t R
       //
-      cublasSgemm('T','N', blockSize, colsk - blockSize, rowsk, 1.f, dW, rowsk, 
+      blas::gemm('T','N', blockSize, colsk - blockSize, rowsk, 1.f, dW, rowsk, 
                   pdQRBlock + blockSize * stride, stride, 0.f, dWtR, blockSize);
 
       // R = V WtR + R
       //
-      cublasSgemm('N', 'N', rowsk, colsk - blockSize, blockSize, 1.f, dV,
+      blas::gemm('N', 'N', rowsk, colsk - blockSize, blockSize, 1.f, dV,
                   rowsk, dWtR, blockSize, 1.f, pdQRBlock+ blockSize * stride, stride);
     }
 
@@ -491,8 +479,8 @@ void getQRDecompBlocked(int rows, int cols, double tol,
     pdVdiag = dV;
     pdQRdiag = pdQRBlock;
     for (int l = 0; l < blockEnd; l++, pdVdiag += (rowsk + 1), pdQRdiag += (stride + 1)) {
-      cublasSscal(rowsk - (l + 1), scales[l], pdVdiag + 1, 1);
-      cublasScopy(rowsk - (l + 1), pdVdiag + 1, 1, pdQRdiag + 1, 1);
+      blas::scal(rowsk - (l + 1), scales[l], pdVdiag + 1, 1);
+      blas::copy(rowsk - (l + 1), pdVdiag + 1, 1, pdQRdiag + 1, 1);
     }
 
     pdQRBlock += blockSize * (stride + 1);
@@ -501,7 +489,6 @@ void getQRDecompBlocked(int rows, int cols, double tol,
   }
 
   *rank = rk; 
-  checkCublasError("getQRDecompBlocked, postblock:");
   checkCudaError("getQRDecompBlocked:");
      
   // dQR now contains the upper-triangular portion of the factorization,
@@ -511,12 +498,11 @@ void getQRDecompBlocked(int rows, int cols, double tol,
   // diagonal is saved in qrAux, while the sub-diagonal portion is
   // written onto QR.
 
-  cublasFree(dT);
-  cublasFree(dV);
-  cublasFree(dW);
-  cublasFree(du);
-  cublasFree(dWtR);
-  cublasFree(dColNorms);
+  cudaFree(dT);
+  cudaFree(dV);
+  cudaFree(dW);
+  cudaFree(du);
+  cudaFree(dWtR);
+  cudaFree(dColNorms);
 
-  checkCublasError("getQRDecompBlocked, freed memory:");
 }

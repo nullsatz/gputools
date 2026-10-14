@@ -31,3 +31,14 @@ test_that("gpuGlm matches glm() (gaussian and binomial)", {
   expect_equal(coef(gpuGlm(z ~ a + b, binomial, d)),
                coef(glm(z ~ a + b, binomial, d)), tolerance = 1e-3)
 })
+
+test_that("gpuLsfit matches lsfit() past one 128-column block", {
+  skip_if_no_gpu()
+  # the blocked QR only updates to the right of a block when there is more
+  # than one block of columns
+  set.seed(8)
+  X <- matrix(rnorm(400 * 150), 400, 150)
+  yy <- drop(X %*% rnorm(150)) + rnorm(400)
+  expect_equal(gpuLsfit(X, yy)$coefficients, lsfit(X, yy)$coefficients,
+               tolerance = 1e-3, ignore_attr = TRUE)
+})

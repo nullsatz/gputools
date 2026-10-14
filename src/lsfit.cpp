@@ -3,7 +3,7 @@
 #include <string.h>
 #include <algorithm>
 
-#include "cublas.h"
+#include "gpublas.h"
 
 #include "R.h"
 
@@ -39,27 +39,25 @@ void gpuLSFitF(float * X, int rows, int cols, float * Y, int yCols,
 
 	int stride = alignBlock(rows, blockExp);
 	
-	cublasInit();
-	cublasAlloc(stride * cols, fbytes, (void **)&dQR);
+	dQR = gpuAlloc<float>(stride * cols);
 
 	// This is overkill:  just need to zero the padding.
 	//
 	cudaMemset2D(dQR, cols * fbytes, 0.f, cols * fbytes, stride); 
-	cublasSetMatrix(rows, cols, fbytes, X, rows, dQR, stride);
+	blas::setMatrix(rows, cols, fbytes, X, rows, dQR, stride);
 
   // On return we have dQR in pivoted, packed QR form.
   
   getQRDecompBlocked(rows, cols, tol, dQR, 1 << blockExp,
                      stride, pivot, qrAux, rank);
-	cublasGetMatrix(rows, cols, fbytes, dQR, stride, X, rows);
+	blas::getMatrix(rows, cols, fbytes, dQR, stride, X, rows);
 
 	if(*rank > 0)
 		getCRE(dQR, rows, cols, stride, *rank, qrAux, yCols, coeffs, resids, effects);
 	else // Residuals copied from Y.
 		memcpy(resids, Y, rows * yCols * fbytes);
 
-   	cublasFree(dQR);
-	cublasShutdown();
+   	cudaFree(dQR);
 }
 
 void gpuLSFitD(double *X, int n, int p, double *Y, int nY,
@@ -85,26 +83,26 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 		* diags = R_Calloc(rank * fbytes, float),
 		* dDiags, *dResids, *dCoeffs, *dEffects;
 
-	cublasAlloc(rank, fbytes, (void **) &dDiags);
+	dDiags = gpuAlloc<float>(rank);
 
-	cublasAlloc(cols * yCols, fbytes, (void **) &dCoeffs);
-	cublasAlloc(rows * yCols, fbytes, (void **) &dResids);
-	cublasAlloc(rows * yCols, fbytes, (void **) &dEffects);
+	dCoeffs = gpuAlloc<float>(cols * yCols);
+	dResids = gpuAlloc<float>(rows * yCols);
+	dEffects = gpuAlloc<float>(rows * yCols);
 
 	// Temporarily swaps diagonals with qrAux.
 
-	cublasScopy(rank, dQR, stride + 1, dDiags, 1);
-	cublasGetVector(rank, fbytes, dDiags, 1, diags, 1);
+	blas::copy(rank, dQR, stride + 1, dDiags, 1);
+	blas::getVector(rank, fbytes, dDiags, 1, diags, 1);
 
 	float *qrAuxFloat = R_Calloc(maxIdx * fbytes, float);
 	for (int i = 0; i < maxIdx; i++)
 	  qrAuxFloat[i] = qrAux[i];
-	cublasSetVector(maxIdx, fbytes, qrAuxFloat, 1, dQR, stride + 1);
+	blas::setVector(maxIdx, fbytes, qrAuxFloat, 1, dQR, stride + 1);
 	R_Free(qrAuxFloat);
 
-	cublasSetMatrix(cols, yCols, fbytes, coeffs, cols, dCoeffs, cols);
-	cublasSetMatrix(rows, yCols, fbytes, effects, rows, dEffects, rows);
-	cublasSetMatrix(rows, yCols, fbytes, resids, rows, dResids, rows);
+	blas::setMatrix(cols, yCols, fbytes, coeffs, cols, dCoeffs, cols);
+	blas::setMatrix(rows, yCols, fbytes, effects, rows, dEffects, rows);
+	blas::setMatrix(rows, yCols, fbytes, resids, rows, dResids, rows);
 
 	// Computes the effects matrix, intialized by caller to Y.
 
@@ -117,10 +115,10 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 
 		for (int k = 0; k < maxIdx; k++, pQR += (stride + 1)) {
 			double
-				t = cublasSdot(rows - k, pQR, 1, pEffects +  k, 1);
+				t = blas::dot(rows - k, pQR, 1, pEffects +  k, 1);
 
 			t *= -1.0 / qrAux[k];
-			cublasSaxpy(rows - k, t, pQR, 1, pEffects + k, 1);
+			blas::axpy(rows - k, t, pQR, 1, pEffects + k, 1);
 		}
 	}
 
@@ -130,7 +128,7 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 
 	if(rank < rows) {
 		for(int i = 0; i < yCols; i++) {
-			cublasScopy(rows - rank,  dEffects + i*rows + rank, 1,
+			blas::copy(rows - rank,  dEffects + i*rows + rank, 1,
 				dResids + i*rows + rank, 1);
 		}
 	}
@@ -142,12 +140,12 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 		for (int k = maxIdx - 1; k >= 0; k--) {
 			double
 				t = -(1.0 / qrAux[k])
-					* cublasSdot(rows - k, dQR + k*stride + k, 1, pResids + k, 1);
+					* blas::dot(rows - k, dQR + k*stride + k, 1, pResids + k, 1);
 
-			cublasSaxpy(rows -k, t, dQR + k*stride + k, 1, pResids + k, 1);
+			blas::axpy(rows -k, t, dQR + k*stride + k, 1, pResids + k, 1);
 		}
 	}
-	cublasScopy(maxIdx, dDiags, 1, dQR, stride + 1);
+	blas::copy(maxIdx, dDiags, 1, dQR, stride + 1);
 
 	// Computes the coefficients matrix, initialized by caller to zero.
 
@@ -155,24 +153,24 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 		* pCoeffs = dCoeffs;
 
 	for(int i = 0; i < yCols; i++, pCoeffs += cols) {
-		cublasScopy(rank, dEffects + i*rows, 1, pCoeffs, 1);
+		blas::copy(rank, dEffects + i*rows, 1, pCoeffs, 1);
 
 		float t;
 		for(int k = rank - 1; k > 0; k--) {
-		        cublasSscal(1, 1.f / diags[k], pCoeffs + k, 1);
-			cublasGetVector(1, fbytes, pCoeffs + k, 1, &t, 1);
-			cublasSaxpy(k, -t, dQR + k*stride, 1, pCoeffs, 1);
+		        blas::scal(1, 1.f / diags[k], pCoeffs + k, 1);
+			blas::getVector(1, fbytes, pCoeffs + k, 1, &t, 1);
+			blas::axpy(k, -t, dQR + k*stride, 1, pCoeffs, 1);
 		}
-		cublasSscal(1, 1.f / diags[0], pCoeffs, 1);
+		blas::scal(1, 1.f / diags[0], pCoeffs, 1);
 	}
 	R_Free(diags);
 
-	cublasGetMatrix(cols, yCols, fbytes, dCoeffs, cols, coeffs, cols);
-	cublasGetMatrix(rows, yCols, fbytes, dResids, rows, resids, rows);
-	cublasGetMatrix(rows, yCols, fbytes, dEffects, rows, effects, rows);
+	blas::getMatrix(cols, yCols, fbytes, dCoeffs, cols, coeffs, cols);
+	blas::getMatrix(rows, yCols, fbytes, dResids, rows, resids, rows);
+	blas::getMatrix(rows, yCols, fbytes, dEffects, rows, effects, rows);
 
-	cublasFree(dDiags);
-	cublasFree(dCoeffs);
-	cublasFree(dResids);
-	cublasFree(dEffects);
+	cudaFree(dDiags);
+	cudaFree(dCoeffs);
+	cudaFree(dResids);
+	cudaFree(dEffects);
 }

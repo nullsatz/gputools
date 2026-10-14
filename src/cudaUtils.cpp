@@ -12,6 +12,7 @@
 #include "cuda_runtime.h"
 
 #include "cudaUtils.h"
+#include "gpublas.h"
 
 // Kernels are compiled from inst/cuda/<file>.cu with NVRTC the first time
 // one of them is launched, for the architecture of the current device, and
@@ -53,6 +54,8 @@ std::string kernelDir;
 // A module per (device, file), and the functions found in it.
 std::map<std::pair<int, std::string>, CUmodule> modules;
 std::map<std::pair<int, std::string>, CUfunction> functions;
+
+std::map<int, cublasHandle_t> blasHandles;
 
 const KernelFile & fileForKernel(const std::string & kernelName)
 {
@@ -159,6 +162,31 @@ void loadFile(const KernelFile & kf, int device)
 
 } // namespace
 
+cublasHandle_t gpuBlasHandle()
+{
+  int device = 0;
+  CUDART_CALL(cudaGetDevice(&device));
+  auto h = blasHandles.find(device);
+  if (h != blasHandles.end())
+    return h->second;
+  cublasHandle_t handle;
+  CUBLAS_CALL(cublasCreate(&handle));
+  blasHandles[device] = handle;
+  return handle;
+}
+
+void gpuBlasCheck(cublasStatus_t status, const char * call)
+{
+  if (status != CUBLAS_STATUS_SUCCESS)
+    error("gputools: %s failed: %s", call, cublasGetStatusString(status));
+}
+
+void gpuCudaCheck(cudaError_t status, const char * call)
+{
+  if (status != cudaSuccess)
+    error("gputools: %s failed: %s", call, cudaGetErrorString(status));
+}
+
 void cudaLaunch(std::string kernelName,
                 void * args[],
                 const dim3 &gridDim, const dim3 &blockDim,
@@ -199,9 +227,14 @@ SEXP gputoolsUnloadKernels()
     cudaSetDevice(m.first.first);
     cuModuleUnload(m.second);
   }
+  for (auto & h : blasHandles) {
+    cudaSetDevice(h.first);
+    cublasDestroy(h.second);
+  }
   cudaSetDevice(current);
   modules.clear();
   functions.clear();
+  blasHandles.clear();
   return R_NilValue;
 }
 

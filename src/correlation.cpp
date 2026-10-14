@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<math.h>
-#include<cublas.h>
+#include "cuda_runtime.h"
 #include<cuseful.h>
 #include<R.h>
 #include<Rinternals.h>
@@ -125,19 +125,15 @@ void pmcc(UseObs whichObs,
   switch(whichObs) {
   case pairwiseComplete:
     cudaLaunch("gpuMeans", argsMeans, grid, block);
-    cudaThreadSynchronize();
 
     cudaLaunch("gpuSD", argsSD, grid, block);
-    cudaThreadSynchronize();
 
     cudaLaunch("gpuPMCC", argsPMCC, grid, block);
     break;
   default:
     cudaLaunch("gpuMeansNoTest", argsMeans, grid, block);
-    cudaThreadSynchronize();
 
     cudaLaunch("gpuSDNoTest", argsSD, grid, block);
-    cudaThreadSynchronize();
     
     cudaLaunch("gpuPMCCNoTest", argsPMCC, grid, block);
   }
