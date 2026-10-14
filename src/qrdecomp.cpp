@@ -544,15 +544,16 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
           scale = (v1 >= 0.f ? 1.f : -1.f) * recipNormV;
         cublasSscal(rowsk - 1, scale, pdVdiag + 1, 1);
 
-        // Updates norms of remaining columns.
-        int colsUp = colsk - 1;
+        // Recomputes the squared norms of the remaining columns over the
+        // rows still to be reduced; these choose the next pivot.
+        int rowsUp = rowsk - 1, colsUp = colsk - 1;
         float
-          * diag1 = pdVdiag + 1,
+          * trailing = dQR + (k + 1) + (k + 1) * rows,
           * dcnk1 = dColNorms + k + 1;
         void * argsUp[] = {
-          &colsUp, &diag1, &dcnk1
+          &rowsUp, &colsUp, &trailing, &rows, &dcnk1
         };
-        cudaLaunch("UpdateHHNorms", argsUp, grid, block);
+        cudaLaunch("getColNorms", argsUp, grid, block);
       }
       else
         qrAux[k] = v1Abs;  // The bottom row is not scaled

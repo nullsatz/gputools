@@ -106,9 +106,8 @@ std::vector<std::string> & getFileKernels(std::string file)
       , "gpuFindMax"
       , "gpuSwapCol"
       , "makeHVector"
-      , "UpdateHHNorms"
       };
-    kernels = new std::vector<std::string>(newKernels, newKernels + 5);
+    kernels = new std::vector<std::string>(newKernels, newKernels + 4);
   } else {
     kernels = new std::vector<std::string>();
   }
