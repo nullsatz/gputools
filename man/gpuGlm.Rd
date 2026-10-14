@@ -24,12 +24,14 @@
 }
 \usage{
 gpuGlm(formula, family = gaussian, data, weights, subset,
-	na.action, start = NULL, etastart, mustart, offset, useSingle = TRUE,
+	na.action, start = NULL, etastart, mustart, offset,
+	useSingle = getOption("gputools.precision", "single") == "single",
 	control = gpuGlm.control(useSingle, ...), model = TRUE,
 	method = "gpuGlm.fit", x = FALSE, y = TRUE, contrasts = NULL, ...)
 
 gpuGlm.fit(x, y, weights = rep(1, nobs), start = NULL, etastart = NULL,
-	mustart = NULL, offset = rep(0, nobs), family = gaussian(), useSingle,
+	mustart = NULL, offset = rep(0, nobs), family = gaussian(),
+	useSingle = getOption("gputools.precision", "single") == "single",
 	control = gpuGlm.control(useSingle), intercept = TRUE)
 }
 \arguments{
@@ -76,8 +78,10 @@ gpuGlm.fit(x, y, weights = rep(1, nobs), start = NULL, etastart = NULL,
     included in the formula instead or as well, and if more than one is
     specified their sum is used.  See \code{\link{model.offset}}.}
 
-	\item{useSingle}{whether to use single precision arithmetic on the gpu.
-		Only the 'TRUE' option is implemented so far.}
+	\item{useSingle}{logical: \code{TRUE} computes in single precision on the GPU,
+		\code{FALSE} in double. The default follows
+		\code{options(gputools.precision)}: single unless that is \code{"double"}.
+		It also sets the default tolerance (see \code{\link{gpuLm.defaultTol}}).}
 
   \item{control}{a list of parameters for controlling the fitting
     process.  See the documentation for \code{\link{glm.control}}

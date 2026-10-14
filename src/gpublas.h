@@ -3,7 +3,8 @@
 
 // cuBLAS v2 behind the call shapes of the legacy cuBLAS API the QR and
 // least-squares code was written against: no handle argument, scalars by
-// value, transpose/side/fill as characters. Every call checks its status
+// value, transpose/side/fill as characters. Overloaded on float/double, so
+// templated callers get the S or D routine. Every call checks its status
 // and raises an R error on failure.
 
 #include <cstddef>
@@ -140,6 +141,91 @@ inline void trsmLeftUpper(int m, int n, float alpha, const float * a,
                           int lda, float * b, int ldb)
 {
   CUBLAS_CALL(cublasStrsm(gpuBlasHandle(), CUBLAS_SIDE_LEFT,
+                          CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_N,
+                          CUBLAS_DIAG_NON_UNIT, m, n, &alpha, a, lda, b, ldb));
+}
+
+// the same in double precision
+
+inline void copy(int n, const double * x, int incx, double * y, int incy)
+{
+  CUBLAS_CALL(cublasDcopy(gpuBlasHandle(), n, x, incx, y, incy));
+}
+
+inline void swap(int n, double * x, int incx, double * y, int incy)
+{
+  CUBLAS_CALL(cublasDswap(gpuBlasHandle(), n, x, incx, y, incy));
+}
+
+inline void scal(int n, double alpha, double * x, int incx)
+{
+  CUBLAS_CALL(cublasDscal(gpuBlasHandle(), n, &alpha, x, incx));
+}
+
+inline void axpy(int n, double alpha, const double * x, int incx,
+                 double * y, int incy)
+{
+  CUBLAS_CALL(cublasDaxpy(gpuBlasHandle(), n, &alpha, x, incx, y, incy));
+}
+
+inline double dot(int n, const double * x, int incx, const double * y, int incy)
+{
+  double result;
+  CUBLAS_CALL(cublasDdot(gpuBlasHandle(), n, x, incx, y, incy, &result));
+  return result;
+}
+
+inline double nrm2(int n, const double * x, int incx)
+{
+  double result;
+  CUBLAS_CALL(cublasDnrm2(gpuBlasHandle(), n, x, incx, &result));
+  return result;
+}
+
+inline int iamax(int n, const double * x, int incx)
+{
+  int result;
+  CUBLAS_CALL(cublasIdamax(gpuBlasHandle(), n, x, incx, &result));
+  return result;
+}
+
+inline void gemv(char trans, int m, int n, double alpha, const double * a,
+                 int lda, const double * x, int incx, double beta, double * y,
+                 int incy)
+{
+  CUBLAS_CALL(cublasDgemv(gpuBlasHandle(), op(trans), m, n, &alpha, a, lda,
+                          x, incx, &beta, y, incy));
+}
+
+inline void ger(int m, int n, double alpha, const double * x, int incx,
+                const double * y, int incy, double * a, int lda)
+{
+  CUBLAS_CALL(cublasDger(gpuBlasHandle(), m, n, &alpha, x, incx, y, incy,
+                         a, lda));
+}
+
+inline void gemm(char transa, char transb, int m, int n, int k, double alpha,
+                 const double * a, int lda, const double * b, int ldb,
+                 double beta, double * c, int ldc)
+{
+  CUBLAS_CALL(cublasDgemm(gpuBlasHandle(), op(transa), op(transb), m, n, k,
+                          &alpha, a, lda, b, ldb, &beta, c, ldc));
+}
+
+inline void syrk(char uplo, char trans, int n, int k, double alpha,
+                 const double * a, int lda, double beta, double * c, int ldc)
+{
+  cublasFillMode_t fill =
+    (uplo == 'U' || uplo == 'u') ? CUBLAS_FILL_MODE_UPPER
+                                 : CUBLAS_FILL_MODE_LOWER;
+  CUBLAS_CALL(cublasDsyrk(gpuBlasHandle(), fill, op(trans), n, k, &alpha,
+                          a, lda, &beta, c, ldc));
+}
+
+inline void trsmLeftUpper(int m, int n, double alpha, const double * a,
+                          int lda, double * b, int ldb)
+{
+  CUBLAS_CALL(cublasDtrsm(gpuBlasHandle(), CUBLAS_SIDE_LEFT,
                           CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_N,
                           CUBLAS_DIAG_NON_UNIT, m, n, &alpha, a, lda, b, ldb));
 }

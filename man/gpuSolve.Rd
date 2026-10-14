@@ -13,12 +13,17 @@
 }
 
 \usage{
-	gpuSolve(x, y=NULL)
+	gpuSolve(x, y=NULL,
+		precision = getOption("gputools.precision", "single"))
 }
 
 \arguments{
 	\item{x}{a matrix of floating point numbers.}  
 	\item{y}{a vector of floating point numbers of length nrow(x).}
+	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
+		the GPU computes in. Single precision is the default, set with
+		\code{options(gputools.precision = "double")}; it runs many times
+		faster on most consumer GPUs. Results are returned as doubles either way.}
 }
 
 \value{

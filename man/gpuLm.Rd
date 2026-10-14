@@ -29,7 +29,8 @@
 \usage{
 gpuLm(formula, data, subset, weights, na.action,
    method = "qr", model = TRUE, x = FALSE, y = FALSE, qr = TRUE,
-   singular.ok = TRUE, contrasts = NULL, useSingle = TRUE, offset, \dots)
+   singular.ok = TRUE, contrasts = NULL, 
+   useSingle = getOption("gputools.precision", "single") == "single", offset, \dots)
 }
 
 \arguments{
@@ -74,9 +75,10 @@ gpuLm(formula, data, subset, weights, na.action,
   \item{contrasts}{an optional list. See the \code{contrasts.arg}
     of \code{\link{model.matrix.default}}.}
 
-	\item{useSingle}{an optional logical. In the future, setting this to
-		\code{FALSE} will result in using double precision arithmetic on the
-		gpu, but this is not yet implemented}
+	\item{useSingle}{logical: \code{TRUE} computes in single precision on the GPU,
+		\code{FALSE} in double. The default follows
+		\code{options(gputools.precision)}: single unless that is \code{"double"}.
+		It also sets the default tolerance (see \code{\link{gpuLm.defaultTol}}).}
 
   \item{offset}{this can be used to specify an \emph{a priori} known
     component to be included in the linear predictor during fitting.

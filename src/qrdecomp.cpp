@@ -18,10 +18,11 @@
 // dR has order cols x cols
 // please allocate space for dInverse before calling getInverseFromQR
 // dQ, dR, and dInverse all live on the gpu device
-void getInverseFromQR(int rows, int cols, const float * dQ, const float * dR,
-                      float * dInverse)
+template <typename T>
+void getInverseFromQR(int rows, int cols, const T * dQ, const T * dR,
+                      T * dInverse)
 {
-  float
+  T
     * rInverse, * hostIdent;
 
   if((dQ == NULL) || (dR == NULL) || (dInverse == NULL))
@@ -29,17 +30,17 @@ void getInverseFromQR(int rows, int cols, const float * dQ, const float * dR,
   if((rows <= 0) || (cols <= 0))
     error("getInverseFromQR: invalid rows or cols argument");
 
-  hostIdent = (float *) R_Calloc(cols * cols, float);
+  hostIdent = (T *) R_Calloc(cols * cols, T);
   for(int i = 0; i < cols; i++)
-    hostIdent[i + i * cols] = 1.f;
+    hostIdent[i + i * cols] = T(1);
 
-  rInverse = gpuAlloc<float>(cols * cols);
-  blas::setMatrix(cols, cols, sizeof(float), hostIdent, cols, rInverse, cols);
+  rInverse = gpuAlloc<T>(cols * cols);
+  blas::setMatrix(cols, cols, sizeof(T), hostIdent, cols, rInverse, cols);
   R_Free(hostIdent);
 
-  blas::trsmLeftUpper(cols, cols, 1.f, dR, cols, rInverse, cols);
-  blas::gemm('N', 'T', cols, rows, cols, 1.f, rInverse, cols, dQ, rows,
-              0.f, dInverse, cols);
+  blas::trsmLeftUpper(cols, cols, T(1), dR, cols, rInverse, cols);
+  blas::gemm('N', 'T', cols, rows, cols, T(1), rInverse, cols, dQ, rows,
+              T(0), dInverse, cols);
   cudaFree(rInverse);
 }
 
@@ -49,10 +50,11 @@ void getInverseFromQR(int rows, int cols, const float * dQ, const float * dR,
 // vectY has length rows
 // vectB has length cols
 // please allocate space for vectB before calling solveFromQR
-void solveFromQR(int rows, int cols, const float * matQ, const float * matR,
-                 const float * vectY,  float * vectB)
+template <typename T>
+void solveFromQR(int rows, int cols, const T * matQ, const T * matR,
+                 const T * vectY,  T * vectB)
 {
-  float
+  T
     * dQ, * dR,
     * dY, * dB,
     * xInverse;
@@ -62,29 +64,29 @@ void solveFromQR(int rows, int cols, const float * matQ, const float * matR,
   if((rows <= 0) || (cols <= 0))
     error("solveFromQR: invalid rows or cols argument");
 
-  dQ = gpuAlloc<float>(rows * cols);
-  blas::setMatrix(rows, cols, sizeof(float), matQ, rows, dQ, rows);
+  dQ = gpuAlloc<T>(rows * cols);
+  blas::setMatrix(rows, cols, sizeof(T), matQ, rows, dQ, rows);
 
-  dR = gpuAlloc<float>(cols * cols);
-  blas::setMatrix(cols, cols, sizeof(float), matR, cols, dR, cols);
+  dR = gpuAlloc<T>(cols * cols);
+  blas::setMatrix(cols, cols, sizeof(T), matR, cols, dR, cols);
 
-  xInverse = gpuAlloc<float>(rows * cols);
+  xInverse = gpuAlloc<T>(rows * cols);
 
   getInverseFromQR(rows, cols, dQ, dR, xInverse);
   cudaFree(dQ);
   cudaFree(dR);
 
-  dY = gpuAlloc<float>(rows);
-  blas::setVector(rows, sizeof(float), vectY, 1, dY, 1);
+  dY = gpuAlloc<T>(rows);
+  blas::setVector(rows, sizeof(T), vectY, 1, dY, 1);
 
-  dB = gpuAlloc<float>(cols);
+  dB = gpuAlloc<T>(cols);
 
-  blas::gemv('N', cols, rows, 1.f, xInverse, cols, dY, 1, 0.f, dB, 1);
+  blas::gemv('N', cols, rows, T(1), xInverse, cols, dY, 1, T(0), dB, 1);
 
   cudaFree(xInverse);
   cudaFree(dY);
 
-  blas::getVector(cols, sizeof(float), dB, 1, vectB, 1);
+  blas::getVector(cols, sizeof(T), dB, 1, vectB, 1);
   cudaFree(dB);
 }
 
@@ -106,7 +108,8 @@ void solveFromQR(int rows, int cols, const float * matQ, const float * matR,
 // Employes a rank-revealing coulumn pivot, which will differ appreciably
 // from the behavior of R's qr() command.
 //
-void getQRDecompRR(int rows, int cols, double tol, float * dQR,
+template <typename T>
+void getQRDecompRR(int rows, int cols, double tol, T * dQR,
                    int * pivot, double * qrAux, int * rank)
 {
   // Copyright 2009, Mark Seligman at Rapid Biologics, LLC.  All rights
@@ -114,23 +117,23 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
   //
   int
     nblocks, nthreads = NTHREADS,
-    fbytes = sizeof(float),
+    fbytes = sizeof(T),
     rowsk, colsk;
-  float
+  T
     * dColNorms,
     * dV, * dw;
 
-  dColNorms = gpuAlloc<float>(cols);
-  dV = gpuAlloc<float>(rows*cols);
-  dw = gpuAlloc<float>(cols);
+  dColNorms = gpuAlloc<T>(cols);
+  dV = gpuAlloc<T>(rows*cols);
+  dw = gpuAlloc<T>(cols);
 
   // Presets the matrix of Householder vectors, dV, to zero.
   // Padding with zeroes appears to offer better performance than
   // direct operations on submatrices:  see commented-out section
   // in the main loop.
   //
-  float
-    * zeroes = (float *) R_Calloc(rows*cols, float);
+  T
+    * zeroes = (T *) R_Calloc(rows*cols, T);
   blas::setMatrix(rows, cols, fbytes, zeroes, rows, dV, rows);
   R_Free(zeroes);
 
@@ -146,11 +149,11 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
   void * argsCN[] = {
     &rows, &cols, &dQR, &rows, &dColNorms
   };
-  cudaLaunch("getColNorms", argsCN, grid, block);
+  cudaLaunch("getColNorms", argsCN, grid, block, precisionOf<T>());
 
   int
     maxRank = rows > cols ? cols : rows;
-  float
+  T
     * pdVdiag = dV, * pdVcol = dV,
     * pdQRcol = dQR;
 
@@ -195,7 +198,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
       //
       // Tolerance should be positve.
       //
-      float
+      T
         normV = blas::nrm2(rowsk, pdVdiag, 1);
 
       if (k == 0) {
@@ -213,7 +216,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
       // For now, uses slow memory transfers to modify leading element:
       //      V_1 += sign(V_1) * normV.
 
-      float v1;
+      T v1;
       blas::getVector(1, fbytes, pdVdiag, 1, &v1, 1);
 
       double
@@ -225,7 +228,7 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
         double recipNormV = 1.0 / normV;
         qrAux[k] = 1.0 + v1Abs * recipNormV;
 
-        blas::scal(1, (float) fac, pdVdiag, 1);
+        blas::scal(1, (T) fac, pdVdiag, 1);
                   
         // Beta = -2 v^t v :  updates squared norm on host side.
 
@@ -233,29 +236,29 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
 
         // w = Beta R^t v
 
-        blas::gemv('T', rows, cols, (float) beta, dQR, rows, pdVcol, 1,
-                    0.f, dw, 1);
+        blas::gemv('T', rows, cols, (T) beta, dQR, rows, pdVcol, 1,
+                    T(0), dw, 1);
                                        
         // R = R + v w^t
 
-        blas::ger(rows, cols, 1.0f, pdVcol, 1, dw, 1, dQR, rows);
+        blas::ger(rows, cols, T(1.0), pdVcol, 1, dw, 1, dQR, rows);
 
         // Subdiagonal of V scaled by reciprocal of original signed norm.
 
-        float
-          scale = (v1 >= 0.f ? 1.f : -1.f) * recipNormV;
+        T
+          scale = (v1 >= T(0) ? T(1) : -T(1)) * recipNormV;
         blas::scal(rowsk - 1, scale, pdVdiag + 1, 1);
 
         // Recomputes the squared norms of the remaining columns over the
         // rows still to be reduced; these choose the next pivot.
         int rowsUp = rowsk - 1, colsUp = colsk - 1;
-        float
+        T
           * trailing = dQR + (k + 1) + (k + 1) * rows,
           * dcnk1 = dColNorms + k + 1;
         void * argsUp[] = {
           &rowsUp, &colsUp, &trailing, &rows, &dcnk1
         };
-        cudaLaunch("getColNorms", argsUp, grid, block);
+        cudaLaunch("getColNorms", argsUp, grid, block, precisionOf<T>());
       }
       else
         qrAux[k] = v1Abs;  // The bottom row is not scaled
@@ -287,8 +290,9 @@ void getQRDecompRR(int rows, int cols, double tol, float * dQR,
 // use householder xfrms and column pivoting to get the R factor of the
 // QR decomp of matrix da:  Q*A*P=R, equiv A*P = Q^t * R
 //
+template <typename T>
 void getQRDecompBlocked(int rows, int cols, double tol,
-                        float * dQR,
+                        T * dQR,
                         int blockSize, int stride, int * pivot,
                         double * qrAux, int * rank)
 {
@@ -298,13 +302,13 @@ void getQRDecompBlocked(int rows, int cols, double tol,
 
   int
     nblocks, nthreads = NTHREADS,
-    fbytes = sizeof(float),
+    fbytes = sizeof(T),
     rowsk = stride, // # unprocessed rows = stride - k
     colsk = cols,   // # unprocessed columns = cols - k
     maxCol = cols - 1,  // Highest candidate column:  not fixed.
     k = 0; // Number of columns processed.
   const int maxRow = rows - 1;
-  float
+  T
     * dV, * dW, *du, *dWtR, *dT, *dColNorms;
 
 
@@ -317,15 +321,15 @@ void getQRDecompBlocked(int rows, int cols, double tol,
   // direct operations on submatrices:  aligned access helps
   // ensure coalescing.
   //
-  dV = gpuAlloc<float>(stride * blockSize);
-  dW = gpuAlloc<float>(stride * blockSize);
-  dT = gpuAlloc<float>(blockSize * blockSize);
-  du = gpuAlloc<float>(stride);
+  dV = gpuAlloc<T>(stride * blockSize);
+  dW = gpuAlloc<T>(stride * blockSize);
+  dT = gpuAlloc<T>(blockSize * blockSize);
+  du = gpuAlloc<T>(stride);
   // only the update to the right of a block uses it, so not if cols fit
   // in one block
-  dWtR = cols > blockSize ? gpuAlloc<float>(blockSize * (cols - blockSize))
+  dWtR = cols > blockSize ? gpuAlloc<T>(blockSize * (cols - blockSize))
                           : NULL;
-  dColNorms = gpuAlloc<float>(cols);
+  dColNorms = gpuAlloc<T>(cols);
 
 
   // Obtains the highest valued norm in order to approximate a condition-
@@ -335,10 +339,10 @@ void getQRDecompBlocked(int rows, int cols, double tol,
   void * argsCN[] = {
     &rows, &cols, &dQR, &stride, &dColNorms
   };
-  cudaLaunch("getColNorms", argsCN, grid, block);
+  cudaLaunch("getColNorms", argsCN, grid, block, precisionOf<T>());
 
   int maxIdx = blas::iamax(cols, dColNorms, 1)-1;
-  float maxNorm = blas::nrm2(rows, dQR + stride * maxIdx, 1);
+  T maxNorm = blas::nrm2(rows, dQR + stride * maxIdx, 1);
   int rk = 0; // Local value of rank;
   int maxRank;
   double minElt; // Lowest acceptable norm under given tolerance.
@@ -350,7 +354,7 @@ void getQRDecompBlocked(int rows, int cols, double tol,
     maxRank = rows > cols ? cols : rows;
   }
 
-  float * pdQRBlock = dQR;
+  T * pdQRBlock = dQR;
 
   int blockCount = (cols + blockSize - 1) / blockSize;
   for (int bc = 0; bc < blockCount; bc++) {
@@ -367,7 +371,7 @@ void getQRDecompBlocked(int rows, int cols, double tol,
     //
     int blockEnd = 0;
     for (int i = k; i < k + blockSize && i < maxRank && i <= maxCol; i++) {
-      float colNorm = blas::nrm2(rows, dQR + i * stride, 1);
+      T colNorm = blas::nrm2(rows, dQR + i * stride, 1);
       while ( (colNorm < minElt) && (maxCol > i)) {
         blas::swap(rows, dQR + i * stride, 1, dQR + maxCol*stride, 1);
         int tempIdx = pivot[maxCol];
@@ -380,14 +384,14 @@ void getQRDecompBlocked(int rows, int cols, double tol,
         blockEnd++;
     }
     rk += blockEnd;
-    float scales[blockSize];
+    T scales[blockSize];
     double Beta[blockSize];
 
-    cudaMemset2D(dV, blockSize * fbytes, 0.f, blockSize * fbytes, rowsk);
+    cudaMemset2D(dV, blockSize * fbytes, T(0), blockSize * fbytes, rowsk);
 
-    float *pdVcol = dV;
-    float *pdVdiag = dV;
-    float *pdQRdiag = pdQRBlock;
+    T *pdVcol = dV;
+    T *pdVdiag = dV;
+    T *pdQRdiag = pdQRBlock;
 
     for (int colIdx = 0; colIdx < blockEnd; colIdx++, pdVcol += rowsk, pdVdiag += (rowsk + 1),
            pdQRdiag += (stride + 1), k++) {
@@ -398,21 +402,21 @@ void getQRDecompBlocked(int rows, int cols, double tol,
       // For now, uses slow memory transfers to modify leading element:
       //      V_1 += sign(V_1) * normV.
       //
-      float v1;         
+      T v1;         
       blas::getVector(1, fbytes, pdVdiag, rowsk + 1, &v1, 1);
       double v1Abs = fabs(v1);
       if (k == maxRow) // The bottom row is not scaled.
         qrAux[k] = v1Abs;
       else { // zero-valued "normV" should already have been ruled out.
-        float normV = blas::nrm2(rowsk - colIdx, pdQRdiag, 1);
+        T normV = blas::nrm2(rowsk - colIdx, pdQRdiag, 1);
         double recipNormV = 1.0 / normV;
         qrAux[k] = 1.0 + v1Abs * recipNormV;
-        scales[colIdx] = (v1 >= 0.f ? 1.f : -1.f) * recipNormV;
+        scales[colIdx] = (v1 >= T(0) ? T(1) : -T(1)) * recipNormV;
 
         // Scales leading nonzero element of vector.
         //
         double fac = 1.0 + normV / v1Abs;
-        blas::scal(1, (float) fac, pdVdiag, 1);
+        blas::scal(1, (T) fac, pdVdiag, 1);
                   
         // Beta = -2 v^t v :  updates squared norm on host side.
         //
@@ -421,11 +425,11 @@ void getQRDecompBlocked(int rows, int cols, double tol,
         // Rank-one update of the remainder of the block, "B":
         // u = Beta B^t v
         //
-        blas::gemv('T', rowsk, std::min(blockSize,colsk), (float) Beta[colIdx], pdQRBlock, stride, pdVcol, 1, 0.f, du, 1);
+        blas::gemv('T', rowsk, std::min(blockSize,colsk), (T) Beta[colIdx], pdQRBlock, stride, pdVcol, 1, T(0), du, 1);
                                        
         // B = B + v u^t
         //
-        blas::ger(rowsk, std::min(blockSize,colsk), 1.0f, pdVcol, 1, du, 1, pdQRBlock, stride);
+        blas::ger(rowsk, std::min(blockSize,colsk), T(1.0), pdVcol, 1, du, 1, pdQRBlock, stride);
       }
     }
 
@@ -442,10 +446,10 @@ void getQRDecompBlocked(int rows, int cols, double tol,
       //
       //  T = V^t V
       //
-      blas::syrk('U', 'T', blockSize, rowsk, 1.f, dV, rowsk, 0.f, dT, blockSize);
+      blas::syrk('U', 'T', blockSize, rowsk, T(1), dV, rowsk, T(0), dT, blockSize);
 
-      float *pdTcol = dT;
-      float *pdWcol = dW;
+      T *pdTcol = dT;
+      T *pdWcol = dW;
       pdVcol = dV;
       for (int m = 0; m < blockSize; m++, pdWcol += rowsk, pdVcol += rowsk, pdTcol += blockSize) {
         blas::copy(rowsk, pdVcol, 1, pdWcol, 1);
@@ -453,7 +457,7 @@ void getQRDecompBlocked(int rows, int cols, double tol,
         // w_m = w_m + Beta W T(.,m)
         //
         if (m > 0) {
-          blas::gemv('N', rowsk, m, Beta[m], dW, rowsk, pdTcol, 1, 1.f, pdWcol, 1);
+          blas::gemv('N', rowsk, m, Beta[m], dW, rowsk, pdTcol, 1, T(1), pdWcol, 1);
         }
       }
 
@@ -463,13 +467,13 @@ void getQRDecompBlocked(int rows, int cols, double tol,
 
       // WtR = W^t R
       //
-      blas::gemm('T','N', blockSize, colsk - blockSize, rowsk, 1.f, dW, rowsk, 
-                  pdQRBlock + blockSize * stride, stride, 0.f, dWtR, blockSize);
+      blas::gemm('T','N', blockSize, colsk - blockSize, rowsk, T(1), dW, rowsk, 
+                  pdQRBlock + blockSize * stride, stride, T(0), dWtR, blockSize);
 
       // R = V WtR + R
       //
-      blas::gemm('N', 'N', rowsk, colsk - blockSize, blockSize, 1.f, dV,
-                  rowsk, dWtR, blockSize, 1.f, pdQRBlock+ blockSize * stride, stride);
+      blas::gemm('N', 'N', rowsk, colsk - blockSize, blockSize, T(1), dV,
+                  rowsk, dWtR, blockSize, T(1), pdQRBlock+ blockSize * stride, stride);
     }
 
     // Flushes scaled Householder vectors to the subdiagonals of dQR,
@@ -506,3 +510,24 @@ void getQRDecompBlocked(int rows, int cols, double tol,
   cudaFree(dColNorms);
 
 }
+
+template void getInverseFromQR<float>(int rows, int cols, const float * dQ, const float * dR,
+                      float * dInverse);
+template void getInverseFromQR<double>(int rows, int cols, const double * dQ, const double * dR,
+                      double * dInverse);
+template void solveFromQR<float>(int rows, int cols, const float * matQ, const float * matR,
+                 const float * vectY,  float * vectB);
+template void solveFromQR<double>(int rows, int cols, const double * matQ, const double * matR,
+                 const double * vectY,  double * vectB);
+template void getQRDecompRR<float>(int rows, int cols, double tol, float * dQR,
+                   int * pivot, double * qrAux, int * rank);
+template void getQRDecompRR<double>(int rows, int cols, double tol, double * dQR,
+                   int * pivot, double * qrAux, int * rank);
+template void getQRDecompBlocked<float>(int rows, int cols, double tol,
+                        float * dQR,
+                        int blockSize, int stride, int * pivot,
+                        double * qrAux, int * rank);
+template void getQRDecompBlocked<double>(int rows, int cols, double tol,
+                        double * dQR,
+                        int blockSize, int stride, int * pivot,
+                        double * qrAux, int * rank);

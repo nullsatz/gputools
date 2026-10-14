@@ -21,6 +21,7 @@
 
 #include "rinterface.h"
 #include "cudaUtils.h"
+#include "gpublas.h"
 
 // The .Call entry points. The kernels work in single precision: inputs
 // arrive as R doubles and are narrowed here, results are widened back to
@@ -46,11 +47,6 @@ std::vector<T> narrow(SEXP x, const char * what, bool naok = false)
   }
   UNPROTECT(1);
   return out;
-}
-
-std::vector<float> floats(SEXP x, const char * what, bool naok = false)
-{
-  return narrow<float>(x, what, naok);
 }
 
 // A new double vector holding v.
@@ -263,6 +259,109 @@ SEXP mutualInfoT(int bins, int order, int nsamples, SEXP x, int na, SEXP y,
 }
 
 template <typename T>
+SEXP qrDecompT(SEXP x, SEXP tol)
+{
+  SEXP dim = getAttrib(x, R_DimSymbol);
+  int rows = INTEGER(dim)[0], cols = INTEGER(dim)[1];
+  std::vector<T> a = narrow<T>(x, "x");
+
+  const char * names[] = { "qr", "pivot", "qraux", "rank", "" };
+  SEXP values[] = {
+    R_NilValue,
+    PROTECT(allocVector(INTSXP, cols)),
+    PROTECT(allocVector(REALSXP, cols)),
+    PROTECT(allocVector(INTSXP, 1))
+  };
+  int * pivot = INTEGER(values[1]);
+  for (int i = 0; i < cols; ++i) pivot[i] = i;
+  memset(REAL(values[2]), 0, cols * sizeof(double));
+  INTEGER(values[3])[0] = 0;
+
+  T * dQR = gpuAlloc<T>(a.size());
+  CUDART_CALL(cudaMemcpy(dQR, a.data(), a.size() * sizeof(T),
+                         cudaMemcpyHostToDevice));
+  getQRDecompRR(rows, cols, asReal(tol), dQR, pivot, REAL(values[2]),
+                INTEGER(values[3]));
+  CUDART_CALL(cudaMemcpy(a.data(), dQR, a.size() * sizeof(T),
+                         cudaMemcpyDeviceToHost));
+  cudaFree(dQR);
+
+  values[0] = PROTECT(doublesLike(x, a.data()));
+  SEXP out = namedList(names, values);
+  UNPROTECT(4);
+  return out;
+}
+
+template <typename T>
+SEXP inverseFromQRT(SEXP q, SEXP r, int n, int p)
+{
+  std::vector<T> fq = narrow<T>(q, "q"), fr = narrow<T>(r, "r"), inv(n * p);
+
+  T * dQ = gpuAlloc<T>(n * p), * dR = gpuAlloc<T>(p * p),
+    * dInverse = gpuAlloc<T>(n * p);
+  CUDART_CALL(cudaMemcpy(dQ, fq.data(), n * p * sizeof(T),
+                         cudaMemcpyHostToDevice));
+  CUDART_CALL(cudaMemcpy(dR, fr.data(), p * p * sizeof(T),
+                         cudaMemcpyHostToDevice));
+
+  getInverseFromQR(n, p, dQ, dR, dInverse);
+
+  CUDART_CALL(cudaMemcpy(inv.data(), dInverse, n * p * sizeof(T),
+                         cudaMemcpyDeviceToHost));
+  cudaFree(dQ);
+  cudaFree(dR);
+  cudaFree(dInverse);
+  return doubles(inv.data(), inv.size());
+}
+
+template <typename T>
+SEXP solveFromQRT(SEXP q, SEXP r, SEXP y, int n, int p)
+{
+  std::vector<T>
+    fq = narrow<T>(q, "q"), fr = narrow<T>(r, "r"), fy = narrow<T>(y, "y"),
+    b(p);
+  solveFromQR(n, p, fq.data(), fr.data(), fy.data(), b.data());
+  return doubles(b.data(), p);
+}
+
+template <typename T>
+SEXP lsFitT(SEXP x, SEXP n, SEXP p, SEXP y, SEXP ny, SEXP tol, SEXP coef,
+            SEXP resid, SEXP effects)
+{
+  int rows = asInteger(n), cols = asInteger(p), ycols = asInteger(ny);
+  std::vector<T>
+    fx = narrow<T>(x, "x"), fy = narrow<T>(y, "y"),
+    fcoef = narrow<T>(coef, "coefficients"),
+    fresid = narrow<T>(resid, "residuals"),
+    feff = narrow<T>(effects, "effects");
+
+  const char * names[] = { "qr", "n", "p", "ny", "tol", "coefficients",
+                           "residuals", "effects", "rank", "pivot", "qraux",
+                           "" };
+  SEXP values[] = {
+    R_NilValue, n, p, ny, tol, R_NilValue, R_NilValue, R_NilValue,
+    PROTECT(allocVector(INTSXP, 1)),
+    PROTECT(allocVector(INTSXP, cols)),
+    PROTECT(allocVector(REALSXP, cols))
+  };
+  int * rank = INTEGER(values[8]), * pivot = INTEGER(values[9]);
+  double * qraux = REAL(values[10]);
+  *rank = 0;
+  for (int i = 0; i < cols; ++i) { pivot[i] = i; qraux[i] = 0.0; }
+
+  leastSquaresFit(fx.data(), rows, cols, fy.data(), ycols, asReal(tol),
+           fcoef.data(), fresid.data(), feff.data(), rank, pivot, qraux);
+
+  values[0] = PROTECT(doublesLike(x, fx.data()));
+  values[5] = PROTECT(doublesLike(coef, fcoef.data()));
+  values[6] = PROTECT(doublesLike(resid, fresid.data()));
+  values[7] = PROTECT(doublesLike(effects, feff.data()));
+  SEXP out = namedList(names, values);
+  UNPROTECT(7);
+  return out;
+}
+
+template <typename T>
 SEXP distT(SEXP points, int n, int k, SEXP method, SEXP p)
 {
   std::vector<T> pts = narrow<T>(points, "points"), d((size_t) n * n);
@@ -412,74 +511,28 @@ SEXP gpuDistClust(SEXP distMethod, SEXP clustMethod, SEXP points,
     : distClustT<float>(distMethod, clustMethod, points, n, k);
 }
 
-SEXP gpuQrDecomp(SEXP x, SEXP tol)
+SEXP gpuQrDecomp(SEXP x, SEXP tol, SEXP precision)
 {
   requireDevice();
-  SEXP dim = getAttrib(x, R_DimSymbol);
-  int rows = INTEGER(dim)[0], cols = INTEGER(dim)[1];
-  std::vector<float> a = floats(x, "x");
-
-  const char * names[] = { "qr", "pivot", "qraux", "rank", "" };
-  SEXP values[] = {
-    R_NilValue,
-    PROTECT(allocVector(INTSXP, cols)),
-    PROTECT(allocVector(REALSXP, cols)),
-    PROTECT(allocVector(INTSXP, 1))
-  };
-  int * pivot = INTEGER(values[1]);
-  for (int i = 0; i < cols; ++i) pivot[i] = i;
-  memset(REAL(values[2]), 0, cols * sizeof(double));
-  INTEGER(values[3])[0] = 0;
-
-  float * dQR;
-  cudaMalloc((void **) &dQR, a.size() * sizeof(float));
-  checkCudaError("gpuQr: allocating the matrix");
-  cudaMemcpy(dQR, a.data(), a.size() * sizeof(float), cudaMemcpyHostToDevice);
-  getQRDecompRR(rows, cols, asReal(tol), dQR, pivot, REAL(values[2]),
-                INTEGER(values[3]));
-  cudaMemcpy(a.data(), dQR, a.size() * sizeof(float), cudaMemcpyDeviceToHost);
-  cudaFree(dQR);
-  checkCudaError("gpuQr: copying back the decomposition");
-
-  values[0] = PROTECT(doublesLike(x, a.data()));
-  SEXP out = namedList(names, values);
-  UNPROTECT(4);
-  return out;
+  return isDouble(precision) ? qrDecompT<double>(x, tol)
+                             : qrDecompT<float>(x, tol);
 }
 
-SEXP gpuInverseFromQR(SEXP q, SEXP r, SEXP rows, SEXP cols)
+SEXP gpuInverseFromQR(SEXP q, SEXP r, SEXP rows, SEXP cols, SEXP precision)
 {
   requireDevice();
   int n = asInteger(rows), p = asInteger(cols);
-  std::vector<float> fq = floats(q, "q"), fr = floats(r, "r"), inv(n * p);
-
-  float * dQ, * dR, * dInverse;
-  cudaMalloc((void **) &dQ, n * p * sizeof(float));
-  cudaMalloc((void **) &dR, p * p * sizeof(float));
-  cudaMalloc((void **) &dInverse, n * p * sizeof(float));
-  checkCudaError("gpuSolve: allocating");
-  cudaMemcpy(dQ, fq.data(), n * p * sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(dR, fr.data(), p * p * sizeof(float), cudaMemcpyHostToDevice);
-
-  getInverseFromQR(n, p, dQ, dR, dInverse);
-
-  cudaMemcpy(inv.data(), dInverse, n * p * sizeof(float),
-             cudaMemcpyDeviceToHost);
-  cudaFree(dQ);
-  cudaFree(dR);
-  cudaFree(dInverse);
-  checkCudaError("gpuSolve: copying back the inverse");
-  return doubles(inv.data(), inv.size());
+  return isDouble(precision) ? inverseFromQRT<double>(q, r, n, p)
+                             : inverseFromQRT<float>(q, r, n, p);
 }
 
-SEXP gpuSolveFromQR(SEXP q, SEXP r, SEXP y, SEXP rows, SEXP cols)
+SEXP gpuSolveFromQR(SEXP q, SEXP r, SEXP y, SEXP rows, SEXP cols,
+                    SEXP precision)
 {
   requireDevice();
   int n = asInteger(rows), p = asInteger(cols);
-  std::vector<float>
-    fq = floats(q, "q"), fr = floats(r, "r"), fy = floats(y, "y"), b(p);
-  solveFromQR(n, p, fq.data(), fr.data(), fy.data(), b.data());
-  return doubles(b.data(), p);
+  return isDouble(precision) ? solveFromQRT<double>(q, r, y, n, p)
+                             : solveFromQRT<float>(q, r, y, n, p);
 }
 
 SEXP gpuMutualInfo(SEXP bins, SEXP splineOrder, SEXP nsamples,
@@ -496,39 +549,12 @@ SEXP gpuMutualInfo(SEXP bins, SEXP splineOrder, SEXP nsamples,
 // effects come in initialized (zeros, zeros, y) and go back filled in,
 // with the attributes they came with.
 SEXP gpuLSFit(SEXP x, SEXP n, SEXP p, SEXP y, SEXP ny, SEXP tol,
-              SEXP coef, SEXP resid, SEXP effects)
+              SEXP coef, SEXP resid, SEXP effects, SEXP precision)
 {
   requireDevice();
-  int rows = asInteger(n), cols = asInteger(p), ycols = asInteger(ny);
-  std::vector<float>
-    fx = floats(x, "x"), fy = floats(y, "y"),
-    fcoef = floats(coef, "coefficients"), fresid = floats(resid, "residuals"),
-    feff = floats(effects, "effects");
-
-  const char * names[] = { "qr", "n", "p", "ny", "tol", "coefficients",
-                           "residuals", "effects", "rank", "pivot", "qraux",
-                           "" };
-  SEXP values[] = {
-    R_NilValue, n, p, ny, tol, R_NilValue, R_NilValue, R_NilValue,
-    PROTECT(allocVector(INTSXP, 1)),
-    PROTECT(allocVector(INTSXP, cols)),
-    PROTECT(allocVector(REALSXP, cols))
-  };
-  int * rank = INTEGER(values[8]), * pivot = INTEGER(values[9]);
-  double * qraux = REAL(values[10]);
-  *rank = 0;
-  for (int i = 0; i < cols; ++i) { pivot[i] = i; qraux[i] = 0.0; }
-
-  gpuLSFitF(fx.data(), rows, cols, fy.data(), ycols, asReal(tol),
-            fcoef.data(), fresid.data(), feff.data(), rank, pivot, qraux);
-
-  values[0] = PROTECT(doublesLike(x, fx.data()));
-  values[5] = PROTECT(doublesLike(coef, fcoef.data()));
-  values[6] = PROTECT(doublesLike(resid, fresid.data()));
-  values[7] = PROTECT(doublesLike(effects, feff.data()));
-  SEXP out = namedList(names, values);
-  UNPROTECT(7);
-  return out;
+  return isDouble(precision)
+    ? lsFitT<double>(x, n, p, y, ny, tol, coef, resid, effects)
+    : lsFitT<float>(x, n, p, y, ny, tol, coef, resid, effects);
 }
 
 #define CALLDEF(name, n) {#name, (DL_FUNC) &name, n}
@@ -545,11 +571,11 @@ static const R_CallMethodDef callMethods[] = {
   CALLDEF(gpuDist, 6),
   CALLDEF(gpuHclust, 4),
   CALLDEF(gpuDistClust, 6),
-  CALLDEF(gpuQrDecomp, 2),
-  CALLDEF(gpuInverseFromQR, 4),
-  CALLDEF(gpuSolveFromQR, 5),
+  CALLDEF(gpuQrDecomp, 3),
+  CALLDEF(gpuInverseFromQR, 5),
+  CALLDEF(gpuSolveFromQR, 6),
   CALLDEF(gpuMutualInfo, 8),
-  CALLDEF(gpuLSFit, 9),
+  CALLDEF(gpuLSFit, 10),
   CALLDEF(gputoolsSetKernelDir, 1),
   CALLDEF(gputoolsUnloadKernels, 0),
   {NULL, NULL, 0}

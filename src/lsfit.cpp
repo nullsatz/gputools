@@ -22,12 +22,13 @@ int alignBlock(int length, unsigned blockExp) {
   return (length + blockSize - 1) & (((unsigned) -1)  << blockExp);
 }
 
-void gpuLSFitF(float * X, int rows, int cols, float * Y, int yCols,
-               double tol, float * coeffs, float * resids, float * effects,
+template <typename T>
+void leastSquaresFit(T * X, int rows, int cols, T * Y, int yCols,
+               double tol, T * coeffs, T * resids, T * effects,
                int * rank, int * pivot, double * qrAux)
 {
 	const int
-		fbytes = sizeof(float);
+		fbytes = sizeof(T);
 
 	// Should be >= 4, to satisfy alignment criterea for memory
 	// coalescence.  For larger arrays (> 1000 rows), best performance
@@ -35,15 +36,15 @@ void gpuLSFitF(float * X, int rows, int cols, float * Y, int yCols,
 	//
 	const unsigned blockExp = 7; // Gives blockSize = 2^7 = 128.
 
-	float *dQR;
+	T *dQR;
 
 	int stride = alignBlock(rows, blockExp);
 	
-	dQR = gpuAlloc<float>(stride * cols);
+	dQR = gpuAlloc<T>(stride * cols);
 
 	// This is overkill:  just need to zero the padding.
 	//
-	cudaMemset2D(dQR, cols * fbytes, 0.f, cols * fbytes, stride); 
+	cudaMemset2D(dQR, cols * fbytes, T(0), cols * fbytes, stride); 
 	blas::setMatrix(rows, cols, fbytes, X, rows, dQR, stride);
 
   // On return we have dQR in pivoted, packed QR form.
@@ -60,45 +61,38 @@ void gpuLSFitF(float * X, int rows, int cols, float * Y, int yCols,
    	cudaFree(dQR);
 }
 
-void gpuLSFitD(double *X, int n, int p, double *Y, int nY,
-	   double tol, double *coeffs, double *resids, double *effects,
-	   int *rank, int *pivot, double * qrAux) 
-{
-// NYI
-}
-
-
 // Fills in the coefficients, residuals and effects matrices.
 //
-void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
-	int yCols, float *coeffs, float *resids, float *effects)
+template <typename T>
+void getCRE(T *dQR, int rows, int cols, int stride, int rank, double *qrAux,
+	int yCols, T *coeffs, T *resids, T *effects)
 {
 	const int
-		fbytes = sizeof(float);
+		fbytes = sizeof(T);
         // Used by effects, residual computations.
 	//
 	int maxIdx = std::min(rank, rows - 1);
 
-	float
-		* diags = R_Calloc(rank * fbytes, float),
+	T
+		* diags = R_Calloc(rank * fbytes, T),
 		* dDiags, *dResids, *dCoeffs, *dEffects;
 
-	dDiags = gpuAlloc<float>(rank);
+	dDiags = gpuAlloc<T>(rank);
 
-	dCoeffs = gpuAlloc<float>(cols * yCols);
-	dResids = gpuAlloc<float>(rows * yCols);
-	dEffects = gpuAlloc<float>(rows * yCols);
+	dCoeffs = gpuAlloc<T>(cols * yCols);
+	dResids = gpuAlloc<T>(rows * yCols);
+	dEffects = gpuAlloc<T>(rows * yCols);
 
 	// Temporarily swaps diagonals with qrAux.
 
 	blas::copy(rank, dQR, stride + 1, dDiags, 1);
 	blas::getVector(rank, fbytes, dDiags, 1, diags, 1);
 
-	float *qrAuxFloat = R_Calloc(maxIdx * fbytes, float);
+	T *qrAuxT = R_Calloc(maxIdx * fbytes, T);
 	for (int i = 0; i < maxIdx; i++)
-	  qrAuxFloat[i] = qrAux[i];
-	blas::setVector(maxIdx, fbytes, qrAuxFloat, 1, dQR, stride + 1);
-	R_Free(qrAuxFloat);
+	  qrAuxT[i] = qrAux[i];
+	blas::setVector(maxIdx, fbytes, qrAuxT, 1, dQR, stride + 1);
+	R_Free(qrAuxT);
 
 	blas::setMatrix(cols, yCols, fbytes, coeffs, cols, dCoeffs, cols);
 	blas::setMatrix(rows, yCols, fbytes, effects, rows, dEffects, rows);
@@ -106,11 +100,11 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 
 	// Computes the effects matrix, intialized by caller to Y.
 
-	float
+	T
 		* pEffects = dEffects;
 
 	for (int i = 0; i < yCols; i++, pEffects += rows) {
-		float
+		T
 			* pQR = dQR;
 
 		for (int k = 0; k < maxIdx; k++, pQR += (stride + 1)) {
@@ -133,7 +127,7 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 		}
 	}
 
-	float
+	T
 		* pResids = dResids;
 
 	for (int i = 0; i < yCols; i++, pResids += rows) {
@@ -149,19 +143,19 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 
 	// Computes the coefficients matrix, initialized by caller to zero.
 
-	float
+	T
 		* pCoeffs = dCoeffs;
 
 	for(int i = 0; i < yCols; i++, pCoeffs += cols) {
 		blas::copy(rank, dEffects + i*rows, 1, pCoeffs, 1);
 
-		float t;
+		T t;
 		for(int k = rank - 1; k > 0; k--) {
-		        blas::scal(1, 1.f / diags[k], pCoeffs + k, 1);
+		        blas::scal(1, T(1) / diags[k], pCoeffs + k, 1);
 			blas::getVector(1, fbytes, pCoeffs + k, 1, &t, 1);
 			blas::axpy(k, -t, dQR + k*stride, 1, pCoeffs, 1);
 		}
-		blas::scal(1, 1.f / diags[0], pCoeffs, 1);
+		blas::scal(1, T(1) / diags[0], pCoeffs, 1);
 	}
 	R_Free(diags);
 
@@ -174,3 +168,14 @@ void getCRE(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
 	cudaFree(dResids);
 	cudaFree(dEffects);
 }
+
+template void leastSquaresFit<float>(float * X, int rows, int cols, float * Y, int yCols,
+               double tol, float * coeffs, float * resids, float * effects,
+               int * rank, int * pivot, double * qrAux);
+template void leastSquaresFit<double>(double * X, int rows, int cols, double * Y, int yCols,
+               double tol, double * coeffs, double * resids, double * effects,
+               int * rank, int * pivot, double * qrAux);
+template void getCRE<float>(float *dQR, int rows, int cols, int stride, int rank, double *qrAux,
+	int yCols, float *coeffs, float *resids, float *effects);
+template void getCRE<double>(double *dQR, int rows, int cols, int stride, int rank, double *qrAux,
+	int yCols, double *coeffs, double *resids, double *effects);

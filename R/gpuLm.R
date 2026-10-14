@@ -19,7 +19,7 @@
 gpuLm <- function (formula, data, subset, weights, na.action,
 		method = "qr", model = TRUE, x = FALSE, y = FALSE,
 		qr = TRUE, singular.ok = TRUE, contrasts = NULL,
-		useSingle = TRUE, offset, ...)
+		useSingle = getOption("gputools.precision", "single") == "single", offset, ...)
 {
 	ret.x <- x
 	ret.y <- y
@@ -34,9 +34,6 @@ gpuLm <- function (formula, data, subset, weights, na.action,
 	mf[[1L]] <- as.name("model.frame")
 	mf <- eval(mf, parent.frame())
 
-	if(useSingle != TRUE) {
-		stop("Double precision gpuLm not yet implemented.\n\tSorry for any inconvenience!")
-	}
 
 	if (method == "model.frame") {
 		return(mf)
@@ -113,12 +110,9 @@ gpuLm.defaultTol <- function(useSingle = TRUE) {
 }
 
 gpuLm.fit <- function (x, y, w = NULL, offset = NULL, method = "qr",
-	useSingle = TRUE, tol = gpuLm.defaultTol(useSingle), singular.ok = TRUE,
+	useSingle = getOption("gputools.precision", "single") == "single", tol = gpuLm.defaultTol(useSingle), singular.ok = TRUE,
 	...)
 {
-	if(useSingle != TRUE) {
-		stop("Double precision gpuLm not yet implemented.\n\tSorry for any inconvenience!")
-	}
 	if (is.null(n <- nrow(x))) {
 		stop("'x' must be a matrix")
 	}
@@ -196,7 +190,8 @@ gpuLm.fit <- function (x, y, w = NULL, offset = NULL, method = "qr",
 	}
 
 	z <- .Call(C_gpuLSFit, qr, as.integer(n), as.integer(p), yIn,
-		as.integer(ny), as.double(tol), coef, resid, yIn)
+		as.integer(ny), as.double(tol), coef, resid, yIn,
+		if (useSingle) "single" else "double")
 
 	if(!singular.ok && z$rank < p) {
 		stop("singular fit encountered")
@@ -285,7 +280,7 @@ gpuLm.fit <- function (x, y, w = NULL, offset = NULL, method = "qr",
 
 ## Taken almost verbatim from "stats" package lsfit() command.
 #
-gpuLsfit <- function(x, y, wt=NULL, intercept=TRUE, useSingle = TRUE,
+gpuLsfit <- function(x, y, wt=NULL, intercept=TRUE, useSingle = getOption("gputools.precision", "single") == "single",
 	tolerance=gpuLm.defaultTol(useSingle), yname=NULL)
 {
     ## find names of x variables (design matrix)
@@ -360,7 +355,8 @@ gpuLsfit <- function(x, y, wt=NULL, intercept=TRUE, useSingle = TRUE,
     yIn <- y
 
     z <- .Call(C_gpuLSFit, qr, as.integer(nrx), as.integer(ncx), yIn,
-		as.integer(ncy), as.double(tolerance), coef, resid, drop(yIn))
+		as.integer(ncy), as.double(tolerance), coef, resid, drop(yIn),
+		if (useSingle) "single" else "double")
 
     # Compensates for C's zero-based indexing.
     #
@@ -425,7 +421,7 @@ gpuLsfit <- function(x, y, wt=NULL, intercept=TRUE, useSingle = TRUE,
 gpuGlm <- function(formula, family = gaussian, data, weights,
 		subset, na.action, start = NULL,
 		etastart, mustart, offset,
-                useSingle = TRUE,
+                useSingle = getOption("gputools.precision", "single") == "single",
 		control = gpuGlm.control(useSingle, ...), model = TRUE,
                 method = "gpuGlm.fit", x = FALSE, y = TRUE,
                 contrasts = NULL, ...)
@@ -437,9 +433,6 @@ gpuGlm <- function(formula, family = gaussian, data, weights,
     if(is.function(family)) family <- family()
     if(is.null(family$family)) {
 	stop("'family' not recognized")
-    }
-    if(useSingle != TRUE) {
-	stop("Double precision gpuLm not yet implemented.\n\tSorry for any inconvenience!")
     }
 
 
@@ -550,7 +543,7 @@ gpuGlm.control <- function(useSingle, epsilon = gpuGlm.defaultEps(useSingle), ma
 gpuGlm.fit <-
     function (x, y, weights = rep(1, nobs), start = NULL,
 	      etastart = NULL, mustart = NULL, offset = rep(0, nobs),
-	      family = gaussian(), useSingle = TRUE, control = gpuGlm.control(useSingle), intercept = TRUE)
+	      family = gaussian(), useSingle = getOption("gputools.precision", "single") == "single", control = gpuGlm.control(useSingle), intercept = TRUE)
 {
     x <- as.matrix(x)
     xnames <- dimnames(x)[[2L]]
@@ -656,7 +649,7 @@ gpuGlm.fit <-
 	fit <- .Call(C_gpuLSFit, qr, as.integer(ngoodobs), as.integer(nvars),
 		yIn, 1L,
 		as.double(min(gpuLm.defaultTol(useSingle), control$epsilon/1000)),
-		coef, resid, effects)
+		coef, resid, effects, if (useSingle) "single" else "double")
 
 
         fit$pivot <- fit$pivot + 1

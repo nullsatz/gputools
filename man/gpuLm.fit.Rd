@@ -10,7 +10,8 @@
 \title{Fitter functions for gpu enabled linear models}
 \usage{
 gpuLm.fit(x, y, w = NULL, offset = NULL, method = "qr",
-	useSingle, tol = gpuLm.defaultTol(useSingle), singular.ok = TRUE, ...)
+	useSingle = getOption("gputools.precision", "single") == "single",
+	tol = gpuLm.defaultTol(useSingle), singular.ok = TRUE, ...)
 }
 \alias{gpuLm.fit}
 \description{
@@ -34,9 +35,10 @@ gpuLm.fit(x, y, w = NULL, offset = NULL, method = "qr",
 
   \item{method}{currently, only \code{method="qr"} is supported.}
 
-  \item{useSingle}{logical. If TRUE, the gpu will use single precision
-  	arithmetic. In the future, if FALSE the gpu may use double precision
-	arithmetic, but this is not implemented yet.}
+  \item{useSingle}{logical: \code{TRUE} computes in single precision on the GPU,
+		\code{FALSE} in double. The default follows
+		\code{options(gputools.precision)}: single unless that is \code{"double"}.
+		It also sets the default tolerance (see \code{\link{gpuLm.defaultTol}}).}
   
   % Avoid Matrix's grab of qr.
   \item{tol}{tolerance for the \code{\link[base]{qr}} decomposition.  Default
