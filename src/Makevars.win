@@ -1,0 +1,3 @@
+# Windows does not run configure, and gputools has no Windows CUDA build:
+# build only the fallback, whose GPU functions explain that.
+OBJECTS = nocuda.o
