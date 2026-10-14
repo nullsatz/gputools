@@ -20,12 +20,44 @@
 
 #include "rinterface.h"
 
-void R_init_mylib(DllInfo *info) {
-  R_CallMethodDef callMethods[]  = {
-    {"gpuMatMult", (DL_FUNC) &gpuMatMult, 2},
-    {NULL, NULL, 0}
-  };
-  R_registerRoutines(info, NULL, callMethods, NULL, NULL);
+extern "C" {
+  SEXP gputoolsSetKernelDir(SEXP dir);
+  SEXP gputoolsUnloadKernels();
+}
+
+#define CDEF(name, n) {#name, (DL_FUNC) &name, n, NULL}
+#define CALLDEF(name, n) {#name, (DL_FUNC) &name, n}
+
+static const R_CMethodDef cMethods[] = {
+  CDEF(rpmcc, 9),
+  CDEF(rsetDevice, 1),
+  CDEF(rgetDevice, 1),
+  CDEF(rtestT, 4),
+  CDEF(RgpuKendall, 6),
+  CDEF(rgpuGranger, 6),
+  CDEF(rgpuGrangerXY, 8),
+  CDEF(Rdistclust, 8),
+  CDEF(Rdistances, 6),
+  CDEF(Rhcluster, 6),
+  CDEF(rGetQRDecompRR, 7),
+  CDEF(rGetInverseFromQR, 5),
+  CDEF(rSolveFromQR, 6),
+  CDEF(rBSplineMutualInfo, 8),
+  CDEF(RgpuLSFit, 13),
+  {NULL, NULL, 0, NULL}
+};
+
+static const R_CallMethodDef callMethods[] = {
+  CALLDEF(gpuMatMult, 2),
+  CALLDEF(gputoolsSetKernelDir, 1),
+  CALLDEF(gputoolsUnloadKernels, 0),
+  {NULL, NULL, 0}
+};
+
+extern "C" void R_init_gputools(DllInfo * dll)
+{
+  R_registerRoutines(dll, cMethods, callMethods, NULL, NULL);
+  R_useDynamicSymbols(dll, FALSE);
 }
 
 // whichObs = 0 means everything
