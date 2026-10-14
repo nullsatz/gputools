@@ -50,11 +50,13 @@
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 numVectors <- 5
 dimension <- 10
 Vectors <- matrix(runif(numVectors*dimension), numVectors, dimension)
 myClust <- gpuDistClust(Vectors, "maximum", "mcquitty")
 plot(myClust)
+\dontshow{\}) # examplesIf}
 }
 
 \keyword{cluster}

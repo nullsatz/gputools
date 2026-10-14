@@ -31,6 +31,7 @@
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 numVectors <- 5
 dimension <- 10
 Vectors <- matrix(runif(numVectors*dimension), numVectors, dimension)
@@ -38,6 +39,7 @@ gpuDist(Vectors, "euclidean")
 gpuDist(Vectors, "maximum")
 gpuDist(Vectors, "manhattan")
 gpuDist(Vectors, "minkowski", 4)
+\dontshow{\}) # examplesIf}
 }
 
 \keyword{math}

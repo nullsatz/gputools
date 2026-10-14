@@ -51,6 +51,7 @@ gpuMi(x, y = NULL, bins = 2, splineOrder = 1)
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 	# get 3 random variables each with 20 samples
 	x <- matrix(runif(60), 20, 3)
 	y <- matrix(runif(60), 20, 3)
@@ -58,4 +59,5 @@ gpuMi(x, y = NULL, bins = 2, splineOrder = 1)
 	y[,2] <- 3.0 * (x[,1] + x[,3])
 	z <- gpuMi(x, y, bins = 10, splineOrder = 3)
 	print(z)
+\dontshow{\}) # examplesIf}
 }

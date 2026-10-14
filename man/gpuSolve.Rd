@@ -29,6 +29,7 @@ an estimate of a matrix multiplicative pseudo inverse of x.
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 	x <- matrix(runif(100), 10, 10)
 	y <- runif(10)
 	b <- gpuSolve(x, y)
@@ -37,4 +38,5 @@ an estimate of a matrix multiplicative pseudo inverse of x.
 	x.inverse <- gpuSolve(x)
 	cat("an estimate of a pseudo inverse for x:\n")
 	print(x.inverse)
+\dontshow{\}) # examplesIf}
 }

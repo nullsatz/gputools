@@ -29,7 +29,9 @@
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 goodPairs <- rpois(10, lambda=5)
 coeffs <- runif(10)
 gpuTtest(goodPairs, coeffs)
+\dontshow{\}) # examplesIf}
 }

@@ -3,8 +3,7 @@
 tol <- 1e-4
 
 skip_if_no_gpu <- function() {
-  ok <- tryCatch({ getGpuId(); TRUE }, error = function(e) FALSE)
-  if (!ok) skip("no usable CUDA device")
+  if (!gpuAvailable()) skip("no usable CUDA device")
 }
 
 # Granger causality F-test, "does cause[] Granger-cause effect[]", by lm().

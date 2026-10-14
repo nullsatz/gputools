@@ -24,9 +24,11 @@
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 matA <- matrix(runif(3*2), 3, 2)
 matB <- matrix(runif(3*4), 3, 4)
 gpuCrossprod(matA, matB)
+\dontshow{\}) # examplesIf}
 }
 
 \keyword{array}

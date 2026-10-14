@@ -60,10 +60,12 @@ Golub, Gene H. and Van Loan, C. F. (1996)
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 # get some random data of any shape at all
 x <- matrix(runif(25), 5, 5)
 qr <- gpuQr(x)
 print(qr)
+\dontshow{\}) # examplesIf}
 }
 
 

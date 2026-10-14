@@ -38,6 +38,7 @@ gpuGranger(x, y=NULL, lag)
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 # permutations of pairs of cols of just x
 numRandVars <- 5
 numSamples <- 20
@@ -56,4 +57,5 @@ y <- matrix(runif(numYRandVars*numYSamples), numYSamples, numYRandVars)
 
 result <- gpuGranger(x, y, lag = 5)
 print(result)
+\dontshow{\}) # examplesIf}
 }

@@ -82,9 +82,11 @@ by Mark Seligman at Rapid Biologics LLC.
 \code{\link{ls.print}}, \code{\link{ls.diag}}
 }
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 \dontshow{utils::example("lm", echo = FALSE)}
 ##-- Using the same data as the lm(.) example:
 lsD9 <- gpuLsfit(x = unclass(gl(2,10)), y = weight)
 ls.print(lsD9)
+\dontshow{\}) # examplesIf}
 }
 \keyword{regression}

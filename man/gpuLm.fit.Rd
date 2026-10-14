@@ -68,6 +68,7 @@ gpuLm.fit(x, y, w = NULL, offset = NULL, method = "qr",
   regression
 }
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 require(utils)
 set.seed(129)
 n <- 7 ; p <- 2
@@ -76,6 +77,7 @@ y <- rnorm(n)
 w <- rnorm(n)^2
 
 str(lmw <- gpuLm.fit(x=X, y=y, w=w))
+\dontshow{\}) # examplesIf}
 }
 \keyword{regression}
 \keyword{array}

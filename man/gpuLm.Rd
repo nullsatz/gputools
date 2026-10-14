@@ -249,6 +249,7 @@ gpuLm(formula, data, subset, weights, na.action,
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 # require(graphics)
 
 ## Annette Dobson (1990) "An Introduction to Generalized Linear Models".
@@ -270,6 +271,7 @@ stopifnot(identical(gpuLm(weight ~ group, method = "model.frame"),
 	model.frame(lm.D9)))
 
 ### less simple examples in "See Also" above
+\dontshow{\}) # examplesIf}
 }
 
 \keyword{regression}

@@ -47,12 +47,14 @@
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 numVectors <- 5
 dimension <- 10
 Vectors <- matrix(runif(numVectors*dimension), numVectors, dimension)
 distMat <- gpuDist(Vectors, "euclidean")
 myClust <- gpuHclust(distMat, "single")
 plot(myClust)
+\dontshow{\}) # examplesIf}
 }
 
 \keyword{cluster}

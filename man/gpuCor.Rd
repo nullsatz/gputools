@@ -51,6 +51,7 @@ gpuCor(x, y = NULL, use = "everything", method = "pearson")
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 numAvars <- 5
 numBvars <- 10
 numSamples <- 30
@@ -60,4 +61,5 @@ gpuCor(A, B, method="pearson")
 gpuCor(A, B, method="kendall")
 A[3,2] <- NA
 gpuCor(A, B, use="pairwise.complete.obs", method="pearson")
+\dontshow{\}) # examplesIf}
 }

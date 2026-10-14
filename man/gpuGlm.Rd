@@ -304,6 +304,7 @@ gpuGlm.fit(x, y, weights = rep(1, nobs), start = NULL, etastart = NULL,
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 ## Dobson (1990) Page 93: Randomized Controlled Trial :
 counts <- c(18,17,15,20,10,20,25,13,12)
 outcome <- gl(3,1,9)
@@ -320,6 +321,7 @@ clotting <- data.frame(
     lot2 = c(69,35,26,21,18,16,13,12,12))
 summary(gpuGlm(lot1 ~ log(u), data=clotting, family=Gamma))
 summary(gpuGlm(lot2 ~ log(u), data=clotting, family=Gamma))
+\dontshow{\}) # examplesIf}
 }
 
 \keyword{models}

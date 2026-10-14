@@ -19,5 +19,7 @@ getGpuId()
 }
 
 \examples{
+\dontshow{if (gpuAvailable()) withAutoprint(\{ # examplesIf}
 getGpuId()
+\dontshow{\}) # examplesIf}
 }
