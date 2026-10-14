@@ -253,6 +253,16 @@ SEXP grangerXYT(SEXP x, int rows, int nx, SEXP y, int ny, int lag)
 }
 
 template <typename T>
+SEXP mutualInfoT(int bins, int order, int nsamples, SEXP x, int na, SEXP y,
+                 int nb)
+{
+  std::vector<T> a = narrow<T>(x, "x"), b = narrow<T>(y, "y"), mi(na * nb);
+  bSplineMutualInfo(bins, order, nsamples, na, a.data(), nb, b.data(),
+                    mi.data());
+  return doubles(mi.data(), mi.size());
+}
+
+template <typename T>
 SEXP distT(SEXP points, int n, int k, SEXP method, SEXP p)
 {
   std::vector<T> pts = narrow<T>(points, "points"), d((size_t) n * n);
@@ -473,15 +483,13 @@ SEXP gpuSolveFromQR(SEXP q, SEXP r, SEXP y, SEXP rows, SEXP cols)
 }
 
 SEXP gpuMutualInfo(SEXP bins, SEXP splineOrder, SEXP nsamples,
-                   SEXP x, SEXP nx, SEXP y, SEXP ny)
+                   SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP precision)
 {
   requireDevice();
-  int na = asInteger(nx), nb = asInteger(ny);
-  std::vector<float> a = floats(x, "x"), b = floats(y, "y"), mi(na * nb);
-  bSplineMutualInfo(asInteger(bins), asInteger(splineOrder),
-                    asInteger(nsamples), na, a.data(), nb, b.data(),
-                    mi.data());
-  return doubles(mi.data(), mi.size());
+  int b = asInteger(bins), o = asInteger(splineOrder), n = asInteger(nsamples),
+    na = asInteger(nx), nb = asInteger(ny);
+  return isDouble(precision) ? mutualInfoT<double>(b, o, n, x, na, y, nb)
+                             : mutualInfoT<float>(b, o, n, x, na, y, nb);
 }
 
 // Least squares by blocked, pivoted Householder QR. coef, resid and
@@ -540,7 +548,7 @@ static const R_CallMethodDef callMethods[] = {
   CALLDEF(gpuQrDecomp, 2),
   CALLDEF(gpuInverseFromQR, 4),
   CALLDEF(gpuSolveFromQR, 5),
-  CALLDEF(gpuMutualInfo, 7),
+  CALLDEF(gpuMutualInfo, 8),
   CALLDEF(gpuLSFit, 9),
   CALLDEF(gputoolsSetKernelDir, 1),
   CALLDEF(gputoolsUnloadKernels, 0),

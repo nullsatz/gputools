@@ -10,7 +10,8 @@
 }
 
 \usage{
-gpuMi(x, y = NULL, bins = 2, splineOrder = 1)
+gpuMi(x, y = NULL, bins = 2, splineOrder = 1,
+		precision = getOption("gputools.precision", "single"))
 }
 
 \arguments{
@@ -34,6 +35,10 @@ gpuMi(x, y = NULL, bins = 2, splineOrder = 1)
 	\item{splineOrder}{a single integer value giving the degree of the spline
 		polynomials used to define both the number of bins a single value will
 		be placed in and the weight of membership given to the value.}
+	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
+		the GPU computes in. Single precision is the default, set with
+		\code{options(gputools.precision = "double")}; it runs many times
+		faster on most consumer GPUs. Results are returned as doubles either way.}
 }
 
 \value{

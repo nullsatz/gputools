@@ -56,3 +56,10 @@ test_that("gpuMi is symmetric, non-negative and sees dependence", {
   expect_true(all(m >= -tol))
   expect_gt(m["effect", "cause"], m["noise", "cause"])
 })
+
+test_that("gpuMi agrees in single and double precision", {
+  skip_if_no_gpu()
+  expect_equal(gpuMi(x, bins = 6, splineOrder = 3, precision = "single"),
+               gpuMi(x, bins = 6, splineOrder = 3, precision = "double"),
+               tolerance = tol)
+})

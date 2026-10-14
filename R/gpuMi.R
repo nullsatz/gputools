@@ -1,5 +1,7 @@
-gpuMi <- function(x, y = NULL, bins = 2, splineOrder = 1)
+gpuMi <- function(x, y = NULL, bins = 2, splineOrder = 1,
+	precision = getOption("gputools.precision", "single"))
 {
+	precision <- .precision(precision)
 	x <- as.matrix(x)
 	if(!is.null(y)) {
 		y <- as.matrix(y)
@@ -26,7 +28,8 @@ gpuMi <- function(x, y = NULL, bins = 2, splineOrder = 1)
 		row_labels <- colnames(y)
 	}
         
-	mi <- .Call(C_gpuMutualInfo, bins, splineOrder, nsamples, a, na, b, nb)
+	mi <- .Call(C_gpuMutualInfo, bins, splineOrder, nsamples, a, na, b, nb,
+		precision)
 	mi <- matrix(mi, nb, na)
 	rownames(mi) <- row_labels
 	colnames(mi) <- colnames(x)
