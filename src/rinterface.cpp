@@ -20,6 +20,7 @@
 #include "qrdecomp.h"
 
 #include "rinterface.h"
+#include "routines.h"
 #include "cudaUtils.h"
 #include "gpublas.h"
 
@@ -557,27 +558,24 @@ SEXP gpuLSFit(SEXP x, SEXP n, SEXP p, SEXP y, SEXP ny, SEXP tol,
     : lsFitT<float>(x, n, p, y, ny, tol, coef, resid, effects);
 }
 
-#define CALLDEF(name, n) {#name, (DL_FUNC) &name, n}
+SEXP gputoolsBuildInfo()
+{
+  const char * names[] = { "cuda", "message", "" };
+  SEXP out = PROTECT(mkNamed(VECSXP, names));
+  SET_VECTOR_ELT(out, 0, ScalarLogical(TRUE));
+  char version[64];
+  snprintf(version, sizeof version, "built with CUDA %d.%d",
+           CUDART_VERSION / 1000, (CUDART_VERSION % 1000) / 10);
+  SET_VECTOR_ELT(out, 1, mkString(version));
+  UNPROTECT(1);
+  return out;
+}
+
+#define CALLDEF(name, n) {#name, (DL_FUNC) &name, n},
 
 static const R_CallMethodDef callMethods[] = {
-  CALLDEF(gpuMatMult, 2),
-  CALLDEF(gpuPmcc, 7),
-  CALLDEF(gpuSetDevice, 1),
-  CALLDEF(gpuGetDevice, 0),
-  CALLDEF(gpuTtest, 3),
-  CALLDEF(gpuKendall, 6),
-  CALLDEF(gpuGranger, 5),
-  CALLDEF(gpuGrangerXY, 7),
-  CALLDEF(gpuDist, 6),
-  CALLDEF(gpuHclust, 4),
-  CALLDEF(gpuDistClust, 6),
-  CALLDEF(gpuQrDecomp, 3),
-  CALLDEF(gpuInverseFromQR, 5),
-  CALLDEF(gpuSolveFromQR, 6),
-  CALLDEF(gpuMutualInfo, 8),
-  CALLDEF(gpuLSFit, 10),
-  CALLDEF(gputoolsSetKernelDir, 1),
-  CALLDEF(gputoolsUnloadKernels, 0),
+  GPUTOOLS_GPU_ROUTINES(CALLDEF)
+  GPUTOOLS_OTHER_ROUTINES(CALLDEF)
   {NULL, NULL, 0}
 };
 

@@ -1,0 +1,2 @@
+/* Written by configure: why this build has no CUDA, empty if it has. */
+#define GPUTOOLS_NO_CUDA_REASON "@NO_CUDA_REASON@"

@@ -25,6 +25,10 @@ jobs:
           - cuda: "13.0"
             channels: conda-forge
             cuda-packages: cuda-version=13.0 cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev
+          # no toolkit: the fallback build every machine without CUDA gets
+          - cuda: "none"
+            channels: conda-forge
+            cuda-packages: ""
     defaults:
       run:
         shell: bash -el {0}
@@ -45,8 +49,8 @@ jobs:
             cxx-compiler c-compiler make \
             ${{ matrix.cuda-packages }}
           R --version | head -1
-          grep -m1 "define CUDART_VERSION" \
-            $(find $CONDA_PREFIX -name cuda_runtime_api.h | head -1)
+          h=$(find $CONDA_PREFIX -name cuda_runtime_api.h | head -1)
+          if [ -n "$h" ]; then grep -m1 "define CUDART_VERSION" "$h"; fi
 
       - name: R CMD check
         env:
@@ -56,6 +60,10 @@ jobs:
           R CMD build .
           R CMD check --no-manual gputools_*.tar.gz || true
           cat gputools.Rcheck/00check.log
+          if [ "${{ matrix.cuda }}" = none ] &&
+             ! grep -q "WITHOUT CUDA" gputools.Rcheck/00install.out; then
+            echo "expected the no-CUDA build"; exit 1
+          fi
           if grep -qE "^\* .*(ERROR|WARNING)" gputools.Rcheck/00check.log; then
             cat gputools.Rcheck/00install.out
             exit 1
