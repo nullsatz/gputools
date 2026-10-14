@@ -11,7 +11,7 @@ on:
 jobs:
   check:
     name: CUDA ${{ matrix.cuda }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -29,14 +29,15 @@ jobs:
       run:
         shell: bash -el {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: conda-incubator/setup-miniconda@v3
+      - uses: conda-incubator/setup-miniconda@v4
         with:
           miniforge-version: latest
           activate-environment: gputools
           channels: ${{ matrix.channels }}
           channel-priority: flexible
+          conda-remove-defaults: true
 
       - name: Install R and CUDA
         run: |
@@ -61,7 +62,7 @@ jobs:
 
       - name: Upload check results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: check-cuda-${{ matrix.cuda }}
           path: gputools.Rcheck
