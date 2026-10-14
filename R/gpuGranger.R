@@ -1,5 +1,7 @@
-gpuGranger <- function(x, y=NULL, lag)
+gpuGranger <- function(x, y=NULL, lag,
+    precision = getOption("gputools.precision", "single"))
 {
+    precision <- .precision(precision)
     x <- as.matrix(x)
     rows <- nrow(x)
     colsx <- ncol(x)
@@ -17,11 +19,12 @@ gpuGranger <- function(x, y=NULL, lag)
     if(is.null(y)) {
         colsy <- colsx
         cRetVal <- .Call(C_gpuGranger, x, as.integer(rows), as.integer(colsx),
-                         lag)
+                         lag, precision)
     } else {
         colsy <- ncol(y)
         cRetVal <- .Call(C_gpuGrangerXY, x, as.integer(rows),
-                         as.integer(colsx), y, as.integer(colsy), lag)
+                         as.integer(colsx), y, as.integer(colsy), lag,
+                         precision)
     }
     fStats <- matrix(cRetVal$fStats, colsx, colsy)
     pValues <- matrix(cRetVal$pValues, colsx, colsy)

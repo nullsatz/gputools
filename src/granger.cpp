@@ -17,23 +17,26 @@
 #define FALSE 0
 #define TRUE !FALSE
 
-void getPValues(int rows, int cols, const float * fStats, int p, int embedRows,
-                float * pValues)
+template <typename T>
+void getPValues(int rows, int cols, const T * fStats, int p, int embedRows,
+                T * pValues)
 {
-  float fscore = 0.f;
+  T fscore = T(0);
 
   for(int i = 0; i < rows; i++) {
     for(int j = 0; j < cols; j++) {
       fscore = fStats[i + j * rows];
-      pValues[i + j * rows] = 1.f - (float) pf((double) fscore,
-                                               (double) p, (double)embedRows - 2.0 * (double) p - 1.0,
-                                               1, 0);
+      // the upper tail directly: 1 - pf(lower tail) rounds small p to 0
+      pValues[i + j * rows] = (T) pf((double) fscore, (double) p,
+                                     (double) embedRows - 2.0 * p - 1.0,
+                                     0, 0);
     }
   }
 }
 
-void granger(int rows, int cols, const float * y, int p, 
-             float * fStats, float * pValues)
+template <typename T>
+void granger(int rows, int cols, const T * y, int p, 
+             T * fStats, T * pValues)
 {
   if(cols < 2) {
     fatal("The Granger test needs at least 2 variables.\n");
@@ -41,9 +44,9 @@ void granger(int rows, int cols, const float * y, int p,
   }
   int
     i, j, k, t = p+1,
-    fbytes = sizeof(float),
+    fbytes = sizeof(T),
     embedRows = rows-p, embedCols = t*2;
-  float 
+  T 
     * Y, * rQ, * rR,
     * unrQ, * unrR,
     * restricted, * unrestricted,
@@ -68,12 +71,12 @@ void granger(int rows, int cols, const float * y, int p,
     unrQdim = (embedCols-1) * embedRows, 
     unrRdim = (embedCols-1) * (embedCols-1),
     unrestrictedDim = embedCols-1, unrdataDim = (embedCols-1)*embedRows;
-  float 
+  T 
     * ypos, * rdataPos, * unrdataPos,
     * evenCols;
   int 
     skip = 2*embedRows, colBytes = embedRows*fbytes;
-  const float 
+  const T 
     * vectA, * vectB;
 
   for(i = 0; i < cols; i++) {
@@ -130,7 +133,7 @@ void granger(int rows, int cols, const float * y, int p,
     &restricted,
     &restrictedDim
   };
-  cudaLaunch("getRestricted", restArgs, dimRGrid, dimRBlock);
+  cudaLaunch("getRestricted", restArgs, dimRGrid, dimRBlock, precisionOf<T>());
   if( hasCudaError("granger: getRestricted kernel execution") ) return;
 
   cudaFree(rQ);
@@ -142,7 +145,7 @@ void granger(int rows, int cols, const float * y, int p,
   if( hasCudaError("granger: line 336: attemped gpu memory allocation") ) 
     return;
 
-  size_t unrestT = embedCols - 1;
+  int unrestT = embedCols - 1;  // the kernels take an int
   void * unrestArgs[] = {
     &cols, &cols,
     &embedRows,
@@ -158,7 +161,7 @@ void granger(int rows, int cols, const float * y, int p,
     &unrestricted,
     &unrestrictedDim
   };
-  cudaLaunch("getUnrestricted", unrestArgs, dimUnrGrid, dimUnrBlock);
+  cudaLaunch("getUnrestricted", unrestArgs, dimUnrGrid, dimUnrBlock, precisionOf<T>());
   if( hasCudaError("granger : getUnRestricted kernel execution") ) return;
 
   cudaFree(unrQ);
@@ -183,7 +186,7 @@ void granger(int rows, int cols, const float * y, int p,
     &unrdata, &unrdataDim,
     &dfStats
   };
-  cudaLaunch("ftest", ftestArgs, dimUnrGrid, dimUnrBlock); 
+  cudaLaunch("ftest", ftestArgs, dimUnrGrid, dimUnrBlock, precisionOf<T>()); 
   if( hasCudaError("granger : ftest kernel execution") ) return;
 
   cudaMemcpy(fStats, dfStats, resultSize, cudaMemcpyDeviceToHost);
@@ -201,8 +204,9 @@ void granger(int rows, int cols, const float * y, int p,
   // cudaFree(dpValues);
 }
 
-void grangerxy(int rows, int colsx, const float * x, int colsy, 
-               const float * y, int p, float * fStats, float * pValues)
+template <typename T>
+void grangerxy(int rows, int colsx, const T * x, int colsy, 
+               const T * y, int p, T * fStats, T * pValues)
 {
 
   if((p < 0) || (rows < 1) || (colsx < 1) || (colsy < 1)) {
@@ -211,9 +215,9 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
   }
   int
     i, j, k, t = p+1,
-    fbytes = sizeof(float),
+    fbytes = sizeof(T),
     embedRows = rows-p, embedCols = t*2;
-  float 
+  T 
     * Y, * rQ, * rR,
     * unrQ, * unrR,
     * restricted, * unrestricted,
@@ -242,13 +246,13 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
     unrQdim = (embedCols-1) * embedRows, 
     unrRdim = (embedCols-1) * (embedCols-1),
     unrestrictedDim = embedCols-1, unrdataDim = (embedCols-1)*embedRows;
-  float 
+  T 
     * ypos, * rdataPos, * unrdataPos;
 
   int 
     skip = 2*embedRows, colBytes = embedRows*fbytes;
-  const float * vectA, * vectB;
-  float * evenCols;
+  const T * vectA, * vectB;
+  T * evenCols;
 
   for(i = 0; i < colsy; i++) {
     rdataPos = rdata+i*rdataDim;
@@ -303,9 +307,9 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
     &restricted, &restrictedDim
   };
   cudaLaunch("getRestricted", restArgs,
-                    dimRGrid, dimRBlock);
+                    dimRGrid, dimRBlock, precisionOf<T>());
   
-  size_t unrestT = embedCols - 1;
+  int unrestT = embedCols - 1;  // the kernels take an int
   void * unrestArgs[] = {
     &colsx, &colsy,
     &embedRows,
@@ -317,7 +321,7 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
     &unrestricted, &unrestrictedDim
   };
   cudaLaunch("getUnrestricted", unrestArgs,
-                    dimUnrGrid, dimUnrBlock);
+                    dimUnrGrid, dimUnrBlock, precisionOf<T>());
 
   checkCudaError("grangerxy : kernel execution get(Un)Restricted");
 
@@ -345,7 +349,7 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
     &unrdata, &unrdataDim,
     &dfStats
   };
-  cudaLaunch("ftest", ftestArgs, dimUnrGrid, dimUnrBlock); 
+  cudaLaunch("ftest", ftestArgs, dimUnrGrid, dimUnrBlock, precisionOf<T>()); 
   checkCudaError("grangerxy : kernel execution ftest");
 
   cudaMemcpy(fStats, dfStats, resultSize, cudaMemcpyDeviceToHost);
@@ -362,3 +366,16 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
   cudaFree(dfStats);
   // cudaFree(dpValues);
 }
+
+template void getPValues<float>(int rows, int cols, const float * fStats, int p, int embedRows,
+                float * pValues);
+template void getPValues<double>(int rows, int cols, const double * fStats, int p, int embedRows,
+                double * pValues);
+template void granger<float>(int rows, int cols, const float * y, int p, 
+             float * fStats, float * pValues);
+template void granger<double>(int rows, int cols, const double * y, int p, 
+             double * fStats, double * pValues);
+template void grangerxy<float>(int rows, int colsx, const float * x, int colsy, 
+               const float * y, int p, float * fStats, float * pValues);
+template void grangerxy<double>(int rows, int colsx, const double * x, int colsy, 
+               const double * y, int p, double * fStats, double * pValues);

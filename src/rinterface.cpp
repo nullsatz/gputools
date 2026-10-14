@@ -224,6 +224,35 @@ SEXP kendallT(SEXP x, int na, SEXP y, int nb, int size)
 }
 
 template <typename T>
+SEXP fAndP(const std::vector<T> & f, const std::vector<T> & p)
+{
+  const char * names[] = { "fStats", "pValues", "" };
+  SEXP values[] = {
+    PROTECT(doubles(f.data(), f.size())), PROTECT(doubles(p.data(), p.size()))
+  };
+  SEXP out = namedList(names, values);
+  UNPROTECT(2);
+  return out;
+}
+
+template <typename T>
+SEXP grangerT(SEXP x, int rows, int n, int lag)
+{
+  std::vector<T> a = narrow<T>(x, "x"), f(n * n), p(n * n);
+  granger(rows, n, a.data(), lag, f.data(), p.data());
+  return fAndP(f, p);
+}
+
+template <typename T>
+SEXP grangerXYT(SEXP x, int rows, int nx, SEXP y, int ny, int lag)
+{
+  std::vector<T>
+    a = narrow<T>(x, "x"), b = narrow<T>(y, "y"), f(nx * ny), p(nx * ny);
+  grangerxy(rows, nx, a.data(), ny, b.data(), lag, f.data(), p.data());
+  return fAndP(f, p);
+}
+
+template <typename T>
 SEXP distT(SEXP points, int n, int k, SEXP method, SEXP p)
 {
   std::vector<T> pts = narrow<T>(points, "points"), d((size_t) n * n);
@@ -328,39 +357,22 @@ SEXP gpuKendall(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
                              : kendallT<float>(x, na, y, nb, n);
 }
 
-SEXP gpuGranger(SEXP x, SEXP rows, SEXP cols, SEXP lag)
+SEXP gpuGranger(SEXP x, SEXP rows, SEXP cols, SEXP lag, SEXP precision)
 {
   requireDevice();
-  int n = asInteger(cols);
-  std::vector<float> a = floats(x, "x"), f(n * n), p(n * n);
-  granger(asInteger(rows), n, a.data(), asInteger(lag), f.data(), p.data());
-
-  const char * names[] = { "fStats", "pValues", "" };
-  SEXP values[] = {
-    PROTECT(doubles(f.data(), n * n)), PROTECT(doubles(p.data(), n * n))
-  };
-  SEXP out = namedList(names, values);
-  UNPROTECT(2);
-  return out;
+  int r = asInteger(rows), n = asInteger(cols), p = asInteger(lag);
+  return isDouble(precision) ? grangerT<double>(x, r, n, p)
+                             : grangerT<float>(x, r, n, p);
 }
 
 SEXP gpuGrangerXY(SEXP x, SEXP rows, SEXP colsx, SEXP y, SEXP colsy,
-                  SEXP lag)
+                  SEXP lag, SEXP precision)
 {
   requireDevice();
-  int nx = asInteger(colsx), ny = asInteger(colsy);
-  std::vector<float>
-    a = floats(x, "x"), b = floats(y, "y"), f(nx * ny), p(nx * ny);
-  grangerxy(asInteger(rows), nx, a.data(), ny, b.data(), asInteger(lag),
-            f.data(), p.data());
-
-  const char * names[] = { "fStats", "pValues", "" };
-  SEXP values[] = {
-    PROTECT(doubles(f.data(), nx * ny)), PROTECT(doubles(p.data(), nx * ny))
-  };
-  SEXP out = namedList(names, values);
-  UNPROTECT(2);
-  return out;
+  int r = asInteger(rows), nx = asInteger(colsx), ny = asInteger(colsy),
+    p = asInteger(lag);
+  return isDouble(precision) ? grangerXYT<double>(x, r, nx, y, ny, p)
+                             : grangerXYT<float>(x, r, nx, y, ny, p);
 }
 
 SEXP gpuDist(SEXP points, SEXP numPoints, SEXP dim, SEXP method, SEXP p,
@@ -520,8 +532,8 @@ static const R_CallMethodDef callMethods[] = {
   CALLDEF(gpuGetDevice, 0),
   CALLDEF(gpuTtest, 3),
   CALLDEF(gpuKendall, 6),
-  CALLDEF(gpuGranger, 4),
-  CALLDEF(gpuGrangerXY, 6),
+  CALLDEF(gpuGranger, 5),
+  CALLDEF(gpuGrangerXY, 7),
   CALLDEF(gpuDist, 6),
   CALLDEF(gpuHclust, 4),
   CALLDEF(gpuDistClust, 6),

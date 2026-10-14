@@ -8,7 +8,8 @@
 }
 
 \usage{
-gpuGranger(x, y=NULL, lag)
+gpuGranger(x, y=NULL, lag,
+		precision = getOption("gputools.precision", "single"))
 }
 
 \arguments{
@@ -18,6 +19,10 @@ gpuGranger(x, y=NULL, lag)
 		represents a sequence of observations for a single random variable.}
 	\item{lag}{a positive integer by which to offset the sequence of 
 		observations to calculate the coefficient for Granger causality.}
+	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
+		the GPU computes in. Single precision is the default, set with
+		\code{options(gputools.precision = "double")}; it runs many times
+		faster on most consumer GPUs. Results are returned as doubles either way.}
 }
 
 \value{a list of two single precision floating point matrices both of the same
