@@ -28,12 +28,12 @@ gpuGranger(x, y=NULL, lag)
 
 	If y is NULL, the test is run on permutations of pairs of columns of x. To
 	find the Granger causality F-statistic estimating the answer to
-	"Does variable x[ ,j] Granger-cause variable x[ ,i]?", look at
+	"Does variable x[ ,i] Granger-cause variable x[ ,j]?", look at
 	fStatistics[i, j] and pValues[i, j].
 
 	If y is not NULL, the test is run on permutations of pairs (x[ ,i], y[ ,j]).
 	To find the Granger causality F-statistic estimating the answer to
-	"Does variable y[ ,j] Granger-cause variable x[ ,i]?", look at
+	"Does variable x[ ,i] Granger-cause variable y[ ,j]?", look at
 	fStatistics[i, j] and pValues[i, j].
 }
 

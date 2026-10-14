@@ -275,9 +275,7 @@ void grangerxy(int rows, int colsx, const float * x, int colsy,
       cudaMemcpy(evenCols+(k*embedRows)/2, unrdataPos+(1+k)*embedRows, 
                  colBytes, cudaMemcpyDeviceToDevice);
     }
-    char errline[16];
-    sprintf(errline, "gxy err : %d\n", i);
-    if( hasCudaError(errline) ) return;
+    if( hasCudaError("grangerxy : building lagged data") ) return;
   }
   checkCudaError("grangerxy : mem copy from host to device");
 

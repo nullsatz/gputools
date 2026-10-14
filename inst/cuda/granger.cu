@@ -21,7 +21,10 @@ __global__ void getRestricted(int countx, int county, int rows, int cols,
     * colQ, * colX;
 
   if(m >= county) return;
-  if(m == 1) n = 0;
+  // Any pair (m, n) holds column m's own lags; the single-matrix form
+  // leaves the diagonal pair (m, m) unfilled, so avoid n == m there, and the
+  // x/y form with one x column only has n == 0.
+  if(m == 1 || countx == 1) n = 0;
   else n = 1;
 
   X = mX + (m * mXdim);
