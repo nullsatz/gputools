@@ -177,3 +177,43 @@ are scale-invariant. The least-squares code cited Bischof & Van Loan
 - Tests, in both precisions: exactly collinear predictors (same `NA` and
   coefficients as `lm`/`glm`/`lsfit`, including `lsfit`'s collinearity
   warning), a zero column, and data in units of 1e-9 and 1e9.
+
+Speed: the `dqrdc2` port costs nothing measurable against the blocked QR it
+replaced (RTX 2080 Ti: `gpuLm` on 100,000 x 50, 0.23 s against 0.25 s;
+`gpuLsfit` on 4,000 x 500, 0.11 s both).
+
+## Distances (`gpuDist`) and Pearson correlation (`gpuCor`)
+
+**Definitions.** The metrics `dist()` documents (euclidean, maximum,
+manhattan, canberra, binary, minkowski) and the Pearson product-moment
+correlation, with `use = "pairwise.complete.obs"` meaning each pair of
+columns uses the rows complete in both (means and deviations recomputed per
+pair), as `cor()` does. Base R is the definition here.
+
+**Code.** Canberra used |a - b| / |a + b| (fixed in 2.0.0: R's
+|a - b| / (|a| + |b|), 0/0 terms left out). Otherwise correct: every metric
+and both `use` modes match `dist()`/`cor()` to 1e-10 in double precision.
+
+## Kernel arguments
+
+Kernels take their arguments as an array of pointers, so nothing checks
+that the host passes the type a kernel parameter declares. Every launch was
+checked: each kernel's parameter types against the types of the host
+variables passed. The only mismatches were the two fixed in 2.0.0 (Granger
+passed a `size_t` and MI its pitches as `size_t` for `int` parameters,
+which read correctly only because the low half comes first on
+little-endian machines); all launches now match.
+
+## Open decisions
+
+1. **`gpuSolve` computes on the CPU.** It calls base R's `qr()`,
+   `qr.Q()` and `qr.R()` and uses the GPU only for the final triangular
+   solve and product, so it is slower than `solve()` (38 times on the
+   benchmark machine). It is correct, but pointless as it stands. Options:
+   solve on the GPU with cuSOLVER's LU (`getrf`/`getrs`), which adds a
+   dependency on NVIDIA's cuSOLVER library (part of the CUDA toolkit, as
+   cuBLAS is); or factor with `gpuQr` and solve with the triangular
+   factors on the GPU, no new dependency; or deprecate `gpuSolve`.
+2. **The flexible clustering methods' fixed parameters** (see above):
+   expose `beta`, and whether to keep 0.5 or move to Lance & Williams'
+   -0.25 as the default.
