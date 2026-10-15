@@ -8,7 +8,7 @@ declared with `globalVariables()`, and a test checks that the declared
 list matches the registered routines. `R CMD check --as-cran
 --install=fake` is now clean.
 
-## Resubmission of an archived package
+## Return of an archived package
 
 gputools was archived on 2017-12-19 because check problems were not
 corrected. Version 2.1.0 is a rewrite of the build and much of the code:
