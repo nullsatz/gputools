@@ -49,6 +49,7 @@ const std::vector<KernelFile> & kernelFiles()
         "find_min1_kernel", "find_min2_kernel" } },
     { "kendall", { "gpuKendall", "gpuSpearmanPairwise" } },
     { "rank", { "gpuRankColumns" } },
+    { "pairs", { "gpuThresholdPairs", "gpuTopPerColumn" } },
     { "mi", { "scale", "get_bin_scores", "get_entropy", "get_mi" } },
     { "qrdecomp",
       { "getColNorms" } },

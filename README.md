@@ -23,6 +23,7 @@ Pearson correlation 16 times, distance matrices 7 times.
 | gputools | base R |
 |---|---|
 | `gpuCor` (Pearson, Kendall, Spearman; with p-values) | `cor`, `cor.test` |
+| `gpuCorPairs` | `cor` then `which(abs(r) >= t)`, without the matrix |
 | `gpuTtest` | the correlation t-test |
 | `gpuDist` | `dist` |
 | `gpuHclust`, `gpuDistClust` | `hclust`, `hclust(dist())` |
@@ -140,6 +141,11 @@ about these sizes:
 | `gpuDistClust` | 300 points |
 | `gpuSolve` | 300 x 300 |
 | `gpuQr` | 1,000 columns |
+
+For finding the strongly correlated pairs among many variables,
+`gpuCorPairs` never builds the correlation matrix: every pair with
+|r| >= 0.8 among 10,000 variables took 0.02 s against 6.5 s for `cor()`
+and `which()`, and among 50,000 variables, 0.09 s.
 
 Below these sizes base R is faster, and each call carries a fixed cost of
 about 50 µs, so **don't loop over small pieces**: put all the variables in

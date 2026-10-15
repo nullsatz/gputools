@@ -1,6 +1,6 @@
 useDynLib(gputools, .registration = TRUE, .fixes = "C_")
 
-export(gpuCor, 
+export(gpuCor, gpuCorPairs,
 	gpuTtest,
 	gpuQr, gpuSolve,
 	gpuGranger, 
