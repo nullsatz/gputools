@@ -2953,7 +2953,7 @@ then :
 printf "%s\n" "#define STDC_HEADERS 1" >>confdefs.h
 
 fi
-       for ac_header in cuda.h cuda_runtime.h nvrtc.h cublas_v2.h
+       for ac_header in cuda.h cuda_runtime.h nvrtc.h cublas_v2.h cusolverDn.h
 do :
   as_ac_Header=`printf "%s\n" "ac_cv_header_$ac_header" | sed "$as_sed_sh"`
 ac_fn_cxx_check_header_compile "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
@@ -3193,6 +3193,71 @@ then :
 
 else case e in #(
   e) no_cuda="no cuBLAS library (libcublas) in ${cuda_lib}" ;;
+esac
+fi
+
+fi
+if test -z "${no_cuda}"; then
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing cusolverDnCreate" >&5
+printf %s "checking for library containing cusolverDnCreate... " >&6; }
+if test ${ac_cv_search_cusolverDnCreate+y}
+then :
+  printf %s "(cached) " >&6
+else case e in #(
+  e) ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+namespace conftest {
+  extern "C" int cusolverDnCreate ();
+}
+int
+main (void)
+{
+return conftest::cusolverDnCreate ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' cusolver
+do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_cxx_try_link "$LINENO"
+then :
+  ac_cv_search_cusolverDnCreate=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext
+  if test ${ac_cv_search_cusolverDnCreate+y}
+then :
+  break
+fi
+done
+if test ${ac_cv_search_cusolverDnCreate+y}
+then :
+
+else case e in #(
+  e) ac_cv_search_cusolverDnCreate=no ;;
+esac
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS ;;
+esac
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_cusolverDnCreate" >&5
+printf "%s\n" "$ac_cv_search_cusolverDnCreate" >&6; }
+ac_res=$ac_cv_search_cusolverDnCreate
+if test "$ac_res" != no
+then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+else case e in #(
+  e) no_cuda="no cuSOLVER library (libcusolver) in ${cuda_lib}" ;;
 esac
 fi
 

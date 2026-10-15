@@ -18,13 +18,13 @@ jobs:
         include:
           - cuda: "11.8"
             channels: nvidia/label/cuda-11.8.0,conda-forge
-            cuda-packages: cuda-nvcc cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev
+            cuda-packages: cuda-nvcc cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev libcusolver-dev
           - cuda: "12.6"
             channels: conda-forge
-            cuda-packages: cuda-version=12.6 cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev
+            cuda-packages: cuda-version=12.6 cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev libcusolver-dev
           - cuda: "13.0"
             channels: conda-forge
-            cuda-packages: cuda-version=13.0 cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev
+            cuda-packages: cuda-version=13.0 cuda-nvrtc-dev cuda-cudart-dev cuda-driver-dev libcublas-dev libcusolver-dev
           # no toolkit: the fallback build every machine without CUDA gets
           - cuda: "none"
             channels: conda-forge

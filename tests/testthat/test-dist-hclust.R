@@ -60,3 +60,27 @@ test_that("non-finite input is an error, not garbage", {
 test_that("precision must be single or double", {
   expect_error(gpuDist(pts, precision = "half"), "single.*double")
 })
+
+for (pr in precisions) {
+  for (m in c("flexible", "flexible group")) {
+    test_that(paste("gpuHclust", m, "takes beta in", pr), {
+      skip_if_no_gpu()
+      d <- dist(pts)
+      for (b in c(-0.25, 0, 0.5)) {
+        expect_equal(sort(gpuHclust(d, m, beta = b, precision = pr)$height),
+                     sort(lanceWilliams(d, m, lambda = b, beta = b)),
+                     tolerance = tolFor(pr), label = paste("beta", b))
+        expect_equal(gpuDistClust(pts, clustmethod = m, beta = b,
+                                  precision = pr)$height,
+                     gpuHclust(gpuDist(pts, precision = pr), m, beta = b,
+                               precision = pr)$height,
+                     tolerance = tolFor(pr))
+      }
+    })
+  }
+}
+
+test_that("beta must be below 1", {
+  expect_error(gpuHclust(dist(pts), "flexible", beta = 1), "below 1")
+  expect_error(gpuHclust(dist(pts), "flexible", beta = NA), "below 1")
+})

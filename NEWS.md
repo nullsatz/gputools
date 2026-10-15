@@ -20,6 +20,18 @@ Every method was checked against its published or standard definition;
   diagonal is `NA` (a series against itself is no test) rather than F = 0,
   p = 1.
 
+New:
+
+- `gpuSolve` computes on the GPU with NVIDIA's cuSOLVER: LU decomposition
+  for a square `x`, as `solve()` does, and QR least squares for an
+  overdetermined one. It used to factor `x` with base R on the CPU, which
+  made it slower than `solve()`. `y` may now be a matrix, and results are
+  named as `solve()` names them. Building gputools now also needs
+  cuSOLVER, which comes with the CUDA toolkit.
+- `gpuHclust` and `gpuDistClust` take `beta`, the parameter of the
+  `"flexible"` and `"flexible group"` methods, which was fixed at 0.5. The
+  default stays 0.5; Lance and Williams (1967) recommend -0.25.
+
 # gputools 2.0.0
 
 ## Wrong results fixed

@@ -14,83 +14,6 @@
 
 #define NTHREADS 512
 
-// finds inverse for X where X has QR decomp X = QR
-// dQ has order rows x cols
-// dR has order cols x cols
-// please allocate space for dInverse before calling getInverseFromQR
-// dQ, dR, and dInverse all live on the gpu device
-template <typename T>
-void getInverseFromQR(int rows, int cols, const T * dQ, const T * dR,
-                      T * dInverse)
-{
-  T
-    * rInverse, * hostIdent;
-
-  if((dQ == NULL) || (dR == NULL) || (dInverse == NULL))
-    error("getInverseFromQR: a pointer to a matrix is null");
-  if((rows <= 0) || (cols <= 0))
-    error("getInverseFromQR: invalid rows or cols argument");
-
-  hostIdent = (T *) R_Calloc(cols * cols, T);
-  for(int i = 0; i < cols; i++)
-    hostIdent[i + i * cols] = T(1);
-
-  rInverse = gpuAlloc<T>(cols * cols);
-  blas::setMatrix(cols, cols, sizeof(T), hostIdent, cols, rInverse, cols);
-  R_Free(hostIdent);
-
-  blas::trsmLeftUpper(cols, cols, T(1), dR, cols, rInverse, cols);
-  blas::gemm('N', 'T', cols, rows, cols, T(1), rInverse, cols, dQ, rows,
-              T(0), dInverse, cols);
-  cudaFree(rInverse);
-}
-
-// solves XB=Y for B where X has QR decomp X = QR
-// matQ has order rows x cols
-// matR has order cols x cols
-// vectY has length rows
-// vectB has length cols
-// please allocate space for vectB before calling solveFromQR
-template <typename T>
-void solveFromQR(int rows, int cols, const T * matQ, const T * matR,
-                 const T * vectY,  T * vectB)
-{
-  T
-    * dQ, * dR,
-    * dY, * dB,
-    * xInverse;
-
-  if((matQ == NULL) || (matR == NULL) || (vectY == NULL) || (vectB == NULL))
-    error("solveFromQR: null array argument");
-  if((rows <= 0) || (cols <= 0))
-    error("solveFromQR: invalid rows or cols argument");
-
-  dQ = gpuAlloc<T>(rows * cols);
-  blas::setMatrix(rows, cols, sizeof(T), matQ, rows, dQ, rows);
-
-  dR = gpuAlloc<T>(cols * cols);
-  blas::setMatrix(cols, cols, sizeof(T), matR, cols, dR, cols);
-
-  xInverse = gpuAlloc<T>(rows * cols);
-
-  getInverseFromQR(rows, cols, dQ, dR, xInverse);
-  cudaFree(dQ);
-  cudaFree(dR);
-
-  dY = gpuAlloc<T>(rows);
-  blas::setVector(rows, sizeof(T), vectY, 1, dY, 1);
-
-  dB = gpuAlloc<T>(cols);
-
-  blas::gemv('N', cols, rows, T(1), xInverse, cols, dY, 1, T(0), dB, 1);
-
-  cudaFree(xInverse);
-  cudaFree(dY);
-
-  blas::getVector(cols, sizeof(T), dB, 1, vectB, 1);
-  cudaFree(dB);
-}
-
 // implements the Modified Gram-Schmidt QR decomp
 // of the matrix A as found in Numerical methods for least squares
 // problems by Ake Bjorck
@@ -376,14 +299,6 @@ void getQRDecompLinpack(int rows, int cols, double tol, T * dQR,
   cudaFree(dTmp);
 }
 
-template void getInverseFromQR<float>(int rows, int cols, const float * dQ, const float * dR,
-                      float * dInverse);
-template void getInverseFromQR<double>(int rows, int cols, const double * dQ, const double * dR,
-                      double * dInverse);
-template void solveFromQR<float>(int rows, int cols, const float * matQ, const float * matR,
-                 const float * vectY,  float * vectB);
-template void solveFromQR<double>(int rows, int cols, const double * matQ, const double * matR,
-                 const double * vectY,  double * vectB);
 template void getQRDecompRR<float>(int rows, int cols, double tol, float * dQR,
                    int * pivot, double * qrAux, int * rank);
 template void getQRDecompRR<double>(int rows, int cols, double tol, double * dQR,
