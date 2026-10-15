@@ -108,7 +108,7 @@ test_that("p-values match cor.test()", {
   skip_if_no_gpu()
   for (m in c("pearson", "kendall", "spearman")) {
     g <- gpuCor(xm, ym, use = "pairwise.complete.obs", method = m,
-                precision = "double")
+                test = TRUE, precision = "double")
     for (i in 1:4) for (j in 1:3) {
       ok <- !(is.na(xm[, i]) | is.na(ym[, j]))
       ref <- suppressWarnings(cor.test(xm[ok, i], ym[ok, j], method = m,
@@ -122,7 +122,14 @@ test_that("p-values match cor.test()", {
 
 test_that("gpuCor names its results as cor() does", {
   skip_if_no_gpu()
-  g <- gpuCor(xm, ym, method = "spearman")
+  g <- gpuCor(xm, ym, method = "spearman", test = TRUE)
   for (part in c("coefficients", "ts", "p.value", "pairs"))
     expect_identical(dimnames(g[[part]]), list(colnames(xm), colnames(ym)))
+})
+
+test_that("p-values only when asked for", {
+  skip_if_no_gpu()
+  expect_null(gpuCor(x)$p.value)
+  expect_null(gpuCor(x, method = "kendall")$z)
+  expect_false(is.null(gpuCor(x, method = "kendall", test = TRUE)$z))
 })

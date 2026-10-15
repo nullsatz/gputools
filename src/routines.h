@@ -7,6 +7,7 @@
 #define GPUTOOLS_GPU_ROUTINES(X) \
   X(gpuMatMult, 2)               \
   X(gpuPmcc, 7)                  \
+  X(gpuCorProduct, 3)            \
   X(gpuSetDevice, 1)             \
   X(gpuGetDevice, 0)             \
   X(gpuTtest, 3)                 \
