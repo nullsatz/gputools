@@ -20,6 +20,7 @@
 #include "mi.h"
 #include "qrdecomp.h"
 #include "solve.h"
+#include "rank.h"
 
 #include "rinterface.h"
 #include "routines.h"
@@ -252,6 +253,23 @@ SEXP corProductT(SEXP x, SEXP y)
   }
   SEXP out = namedList(names, values);
   UNPROTECT(2);
+  return out;
+}
+
+// rank(ties.method = "average", na.last = "keep") of each column of x,
+// on the GPU
+template <typename T>
+SEXP rankT(SEXP x)
+{
+  SEXP dx = getAttrib(x, R_DimSymbol);
+  int n = INTEGER(dx)[0], p = INTEGER(dx)[1];
+  std::vector<T> a = narrow<T>(x, "x", true), r((size_t) n * p);
+  rankColumns(a.data(), n, p, r.data());
+  SEXP out = PROTECT(allocMatrix(REALSXP, n, p));
+  double * po = REAL(out);
+  for (size_t i = 0; i < r.size(); ++i)
+    po[i] = std::isnan(r[i]) ? NA_REAL : r[i];
+  UNPROTECT(1);
   return out;
 }
 
@@ -539,6 +557,12 @@ SEXP gpuCorProduct(SEXP x, SEXP y, SEXP precision)
   requireDevice();
   return isDouble(precision) ? corProductT<double>(x, y)
                              : corProductT<float>(x, y);
+}
+
+SEXP gpuRank(SEXP x, SEXP precision)
+{
+  requireDevice();
+  return isDouble(precision) ? rankT<double>(x) : rankT<float>(x);
 }
 
 SEXP gpuSetDevice(SEXP device)

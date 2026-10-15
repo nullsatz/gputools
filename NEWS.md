@@ -35,8 +35,9 @@ New:
   `cor.test(exact = FALSE)` for the rank coefficients -- and Kendall's its
   z statistics (`$z`). Results carry `cor()`'s dimnames.
 - Pearson's and Spearman's coefficients on data without missing values (or
-  with `use = "everything"`) are one matrix product on the GPU: 25 million
-  correlations (500 x 5,000) in 0.12 s, where `cor()` takes 7.5 s.
+  with `use = "everything"`) are one matrix product on the GPU, and
+  Spearman's columns are ranked on the GPU too: 25 million correlations
+  (500 x 5,000) in about 0.5 s, where `cor()` takes 7 s.
 - `gpuPrcomp` and `gpuSvd`: principal components and the singular value
   decomposition as `prcomp()` and `svd()` compute them, on cuSOLVER;
   `gpuPrcomp` returns a `"prcomp"` object.

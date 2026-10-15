@@ -48,15 +48,10 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson",
        (method == "spearman" && allRows)) {
         if(method == "spearman") {
             # cor()'s Spearman is Pearson's on the ranks (ties averaged)
-            rank2 <- function(m) {
-                r <- apply(m, 2L, rank, na.last = "keep",
-                           ties.method = "average")
-                dim(r) <- dim(m)
-                storage.mode(r) <- "double"
-                r
-            }
-            x <- rank2(x)
-            if(!selfCor) y <- rank2(y) else y <- x
+            # (rank(ties.method = "average", na.last = "keep") per column,
+            # on the GPU)
+            x <- .Call(C_gpuRank, x, precision)
+            if(!selfCor) y <- .Call(C_gpuRank, y, precision) else y <- x
         }
         if(allRows) {
             answer <- .Call(C_gpuCorProduct, x, if(selfCor) NULL else y,
