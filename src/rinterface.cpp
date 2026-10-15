@@ -188,9 +188,11 @@ namespace {
 // of two columns is the dot product of their standardised versions:
 // z = (x - mean) / (sd sqrt(n - 1)), mean and sd taken in double. A column
 // with a missing value, or a constant one, becomes NaN, so its
-// correlations come out NA, as with cor().
+// correlations come out NA, as with cor(). norms, if given, gets each
+// centred column's length.
 template <typename T>
-std::vector<T> standardised(SEXP x, int n, int p)
+std::vector<T> standardised(SEXP x, int n, int p,
+                            std::vector<double> * norms = NULL)
 {
   x = PROTECT(coerceVector(x, REALSXP));
   const double * px = REAL(x);
@@ -202,6 +204,7 @@ std::vector<T> standardised(SEXP x, int n, int p)
     mean /= n;
     for (int i = 0; i < n; ++i) ss += (col[i] - mean) * (col[i] - mean);
     double scale = 1 / std::sqrt(ss);   // = 1 / (sd sqrt(n - 1))
+    if (norms) norms->push_back(std::sqrt(ss));
     for (int i = 0; i < n; ++i)
       z[i + (size_t) j * n] = (T) ((col[i] - mean) * scale);
   }
@@ -257,6 +260,35 @@ SEXP corProductT(SEXP x, SEXP y)
   return out;
 }
 
+// list(i, j, r) from pairs, i and j 1-based, and if given the columns'
+// residual lengths as xlen, ylen
+SEXP pairListValue(const PairList & pairs, const std::vector<double> * xLen,
+                   const std::vector<double> * yLen)
+{
+  R_xlen_t m = pairs.r.size();
+  const char * names[] = { "i", "j", "r", "xlen", "ylen", "" };
+  if (!xLen) names[3] = "";
+  SEXP values[] = {
+    PROTECT(allocVector(INTSXP, m)), PROTECT(allocVector(INTSXP, m)),
+    PROTECT(allocVector(REALSXP, m)),
+    PROTECT(allocVector(REALSXP, xLen ? xLen->size() : 0)),
+    PROTECT(allocVector(REALSXP, yLen ? yLen->size() : 0))
+  };
+  int * pi = INTEGER(values[0]), * pj = INTEGER(values[1]);
+  double * pr = REAL(values[2]);
+  for (R_xlen_t e = 0; e < m; ++e) {
+    pi[e] = pairs.i[e] + 1;
+    pj[e] = pairs.j[e] + 1;
+    double v = pairs.r[e];
+    pr[e] = v > 1 ? 1 : (v < -1 ? -1 : v);
+  }
+  if (xLen) std::copy(xLen->begin(), xLen->end(), REAL(values[3]));
+  if (yLen) std::copy(yLen->begin(), yLen->end(), REAL(values[4]));
+  SEXP out = namedList(names, values);
+  UNPROTECT(5);
+  return out;
+}
+
 // Selected Pearson correlations of the columns of x with those of y (x
 // itself when y is NULL): every pair with |r| >= threshold (mode 0), or
 // each y column's top k partners (mode 1). list(i, j, r), i and j 1-based.
@@ -270,32 +302,60 @@ SEXP corPairsT(SEXP x, SEXP y, int mode, double threshold, int k,
     q = same ? p : INTEGER(getAttrib(y, R_DimSymbol))[1];
   std::vector<T> zx = standardised<T>(x, n, p), zy;
   if (!same) zy = standardised<T>(y, n, q);
-  const T * pzy = same ? NULL : zy.data();
+  T * dZx = gpuAlloc<T>((size_t) n * p), * dZy = dZx;
+  CUDART_CALL(cudaMemcpy(dZx, zx.data(), zx.size() * sizeof(T),
+                         cudaMemcpyHostToDevice));
+  if (!same) {
+    dZy = gpuAlloc<T>((size_t) n * q);
+    CUDART_CALL(cudaMemcpy(dZy, zy.data(), zy.size() * sizeof(T),
+                           cudaMemcpyHostToDevice));
+  }
 
   PairList pairs;
-  if (mode == 0)
-    thresholdPairs<T>(n, p, zx.data(), q, pzy, absolute, threshold, tile,
-                      limit, pairs);
-  else
-    topPairs<T>(n, p, zx.data(), q, pzy, absolute, k, tile, pairs);
+  selectPairs<T>(n, p, dZx, q, dZy, mode, threshold, k, absolute, tile,
+                 limit, pairs);
+  return pairListValue(pairs, NULL, NULL);
+}
 
-  R_xlen_t m = pairs.r.size();
-  const char * names[] = { "i", "j", "r", "" };
-  SEXP values[] = {
-    PROTECT(allocVector(INTSXP, m)), PROTECT(allocVector(INTSXP, m)),
-    PROTECT(allocVector(REALSXP, m))
-  };
-  int * pi = INTEGER(values[0]), * pj = INTEGER(values[1]);
-  double * pr = REAL(values[2]);
-  for (R_xlen_t e = 0; e < m; ++e) {
-    pi[e] = pairs.i[e] + 1;
-    pj[e] = pairs.j[e] + 1;
-    double v = pairs.r[e];
-    pr[e] = v > 1 ? 1 : (v < -1 ? -1 : v);
-  }
-  SEXP out = namedList(names, values);
-  UNPROTECT(3);
-  return out;
+// Association of each column of x with each column of y, adjusted for the
+// covariates: their correlation after both are residualised on the m
+// orthonormal columns of q (an intercept and the covariates). The pairs
+// selected as by corPairsT, with each column's residual length (NaN where
+// nothing is left) for the regression slopes.
+template <typename T>
+SEXP assocT(SEXP x, SEXP y, SEXP q, int mode, double threshold, int k,
+            int tile, double limit)
+{
+  SEXP dx = getAttrib(x, R_DimSymbol), dq = getAttrib(q, R_DimSymbol);
+  int n = INTEGER(dx)[0], p = INTEGER(dx)[1],
+    nq = INTEGER(getAttrib(y, R_DimSymbol))[1], m = INTEGER(dq)[1];
+  if (INTEGER(dq)[0] != n || INTEGER(getAttrib(y, R_DimSymbol))[0] != n)
+    error("gputools: x, y and the covariate basis must have the same rows");
+  std::vector<double> xLen, yLen, xRel, yRel;
+  std::vector<T> zx = standardised<T>(x, n, p, &xLen),
+    zy = standardised<T>(y, n, nq, &yLen);
+  std::vector<T> hq((size_t) n * m);
+  const double * pq = REAL(q);
+  for (size_t e = 0; e < hq.size(); ++e) hq[e] = (T) pq[e];
+
+  T * dZx = gpuAlloc<T>(zx.size()), * dZy = gpuAlloc<T>(zy.size()),
+    * dQ = gpuAlloc<T>(hq.size() > 0 ? hq.size() : 1);
+  CUDART_CALL(cudaMemcpy(dZx, zx.data(), zx.size() * sizeof(T),
+                         cudaMemcpyHostToDevice));
+  CUDART_CALL(cudaMemcpy(dZy, zy.data(), zy.size() * sizeof(T),
+                         cudaMemcpyHostToDevice));
+  CUDART_CALL(cudaMemcpy(dQ, hq.data(), hq.size() * sizeof(T),
+                         cudaMemcpyHostToDevice));
+  residualise<T>(n, p, dZx, m, dQ, xRel);
+  residualise<T>(n, nq, dZy, m, dQ, yRel);
+  cudaFree(dQ);
+  for (int j = 0; j < p; ++j) xLen[j] *= xRel[j];
+  for (int j = 0; j < nq; ++j) yLen[j] *= yRel[j];
+
+  PairList pairs;
+  selectPairs<T>(n, p, dZx, nq, dZy, mode, threshold, k, true, tile, limit,
+                 pairs);
+  return pairListValue(pairs, &xLen, &yLen);
 }
 
 // rank(ties.method = "average", na.last = "keep") of each column of x,
@@ -611,6 +671,17 @@ SEXP gpuCorPairs(SEXP x, SEXP y, SEXP mode, SEXP threshold, SEXP k,
   return isDouble(precision)
     ? corPairsT<double>(x, y, md, thr, kk, abs, tl, lim)
     : corPairsT<float>(x, y, md, thr, kk, abs, tl, lim);
+}
+
+SEXP gpuAssoc(SEXP x, SEXP y, SEXP q, SEXP mode, SEXP threshold, SEXP k,
+              SEXP tile, SEXP limit, SEXP precision)
+{
+  requireDevice();
+  int md = asInteger(mode), kk = asInteger(k), tl = asInteger(tile);
+  double thr = asReal(threshold), lim = asReal(limit);
+  return isDouble(precision)
+    ? assocT<double>(x, y, q, md, thr, kk, tl, lim)
+    : assocT<float>(x, y, q, md, thr, kk, tl, lim);
 }
 
 SEXP gpuRank(SEXP x, SEXP precision)

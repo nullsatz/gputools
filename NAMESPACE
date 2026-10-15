@@ -1,6 +1,6 @@
 useDynLib(gputools, .registration = TRUE, .fixes = "C_")
 
-export(gpuCor, gpuCorPairs,
+export(gpuCor, gpuCorPairs, gpuAssoc,
 	gpuTtest,
 	gpuQr, gpuSolve,
 	gpuGranger, 
@@ -14,6 +14,7 @@ export(gpuCor, gpuCorPairs,
 importFrom("stats",
   "pnorm",
   "pt",
+  "qt",
   ".getXlevels",
   "as.dist",
   "complete.cases",

@@ -1,5 +1,12 @@
 # gputools (development version)
 
+- New `gpuAssoc()`: an association scan of every column of `x` against
+  every column of `y` (SNPs against genes, in an eQTL study), linear
+  regression with covariates, reporting the associations below a p-value or
+  each outcome's most significant ones, with slopes, t statistics and
+  false discovery rates. It computes what Matrix eQTL's linear model does,
+  on the GPU, and agrees with `lm()`.
+
 - New `gpuCorPairs()`: the strongly correlated pairs among many variables
   (every pair over a threshold, or each variable's strongest partners),
   Pearson or Spearman, without forming the correlation matrix, which it

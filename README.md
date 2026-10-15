@@ -24,6 +24,7 @@ Pearson correlation 16 times, distance matrices 7 times.
 |---|---|
 | `gpuCor` (Pearson, Kendall, Spearman; with p-values) | `cor`, `cor.test` |
 | `gpuCorPairs` | `cor` then `which(abs(r) >= t)`, without the matrix |
+| `gpuAssoc` | `lm(y[, j] ~ x[, i] + covariates)` for every pair: an eQTL scan, as Matrix eQTL |
 | `gpuTtest` | the correlation t-test |
 | `gpuDist` | `dist` |
 | `gpuHclust`, `gpuDistClust` | `hclust`, `hclust(dist())` |
@@ -145,7 +146,9 @@ about these sizes:
 For finding the strongly correlated pairs among many variables,
 `gpuCorPairs` never builds the correlation matrix: every pair with
 |r| >= 0.8 among 10,000 variables took 0.02 s against 6.5 s for `cor()`
-and `which()`, and among 50,000 variables, 0.09 s.
+and `which()`, and among 50,000 variables, 0.09 s. An eQTL scan with
+`gpuAssoc` (20,000 genes, 50,000 SNPs, 500 samples, 5 covariates) took
+0.47 s against 11.2 s for Matrix eQTL, reporting the same associations.
 
 Below these sizes base R is faster, and each call carries a fixed cost of
 about 50 µs, so **don't loop over small pieces**: put all the variables in

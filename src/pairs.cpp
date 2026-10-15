@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <vector>
 
 #include "cuda_runtime.h"
@@ -13,36 +14,23 @@
 
 namespace {
 
-// zx and zy on the GPU, and the tile of their product being worked on
+// zx and zy, already on the GPU (dZy == dZx for x with itself), and the
+// tile of their product being worked on
 template <typename T>
 struct Tiles {
   int n, p, q, tile;
   bool same;
-  T * dZx, * dZy, * dR;
+  const T * dZx, * dZy;
+  T * dR;
 
-  Tiles(int n, int p, const T * zx, int q, const T * zy, int tile)
-    : n(n), p(p), q(q), tile(tile), same(zy == NULL),
-      dZx(NULL), dZy(NULL), dR(NULL)
-  {
-    dZx = gpuAlloc<T>((size_t) n * p);
-    CUDART_CALL(cudaMemcpy(dZx, zx, (size_t) n * p * sizeof(T),
-                           cudaMemcpyHostToDevice));
-    if (same) {
-      dZy = dZx;
-    } else {
-      dZy = gpuAlloc<T>((size_t) n * q);
-      CUDART_CALL(cudaMemcpy(dZy, zy, (size_t) n * q * sizeof(T),
-                             cudaMemcpyHostToDevice));
-    }
-    dR = gpuAlloc<T>((size_t) tile * tile);
-  }
+  Tiles(int n, int p, const T * dZx, int q, const T * dZy, int tile)
+    : n(n), p(p), q(q), tile(tile), same(dZy == dZx), dZx(dZx), dZy(dZy),
+      dR(gpuAlloc<T>((size_t) tile * tile)) {}
 
   void release()
   {
-    cudaFree(dZx);
-    if (!same) cudaFree(dZy);
     cudaFree(dR);
-    dZx = dZy = dR = NULL;
+    dR = NULL;
   }
 
   // the correlations of x columns i0 .. i0 + ta - 1 with y columns
@@ -57,11 +45,11 @@ struct Tiles {
 } // namespace
 
 template <typename T>
-void thresholdPairs(int n, int p, const T * zx, int q, const T * zy,
+bool thresholdPairs(int n, int p, const T * dZx, int q, const T * dZy,
                     bool absolute, double threshold, int tile, double limit,
                     PairList & out)
 {
-  Tiles<T> t(n, p, zx, q, zy, tile);
+  Tiles<T> t(n, p, dZx, q, dZy, tile);
   size_t cap = (size_t) tile * tile;
   int * dCount = gpuAlloc<int>(1), * dI = gpuAlloc<int>(cap),
     * dJ = gpuAlloc<int>(cap);
@@ -108,16 +96,14 @@ void thresholdPairs(int n, int p, const T * zx, int q, const T * zy,
 
   cudaFree(dCount); cudaFree(dI); cudaFree(dJ); cudaFree(dV);
   t.release();
-  if (tooMany)
-    error("gputools: more than %.0f pairs pass the threshold; raise the "
-          "threshold, or raise limit if you want them all", limit);
+  return !tooMany;
 }
 
 template <typename T>
-void topPairs(int n, int p, const T * zx, int q, const T * zy,
+void topPairs(int n, int p, const T * dZx, int q, const T * dZy,
               bool absolute, int k, int tile, PairList & out)
 {
-  Tiles<T> t(n, p, zx, q, zy, tile);
+  Tiles<T> t(n, p, dZx, q, dZy, tile);
   int n2 = 1;
   while (n2 < std::min(tile, p)) n2 <<= 1;
   int kt = std::min(k, std::min(tile, p));   // per tile: at most ta useful
@@ -179,9 +165,75 @@ void topPairs(int n, int p, const T * zx, int q, const T * zy,
   t.release();
 }
 
-template void thresholdPairs<float>(int, int, const float *, int,
+template <typename T>
+void selectPairs(int n, int p, T * dZx, int q, T * dZy, int mode,
+                 double threshold, int k, bool absolute, int tile,
+                 double limit, PairList & out)
+{
+  bool ok = true;
+  if (mode == 0)
+    ok = thresholdPairs<T>(n, p, dZx, q, dZy, absolute, threshold, tile,
+                           limit, out);
+  else
+    topPairs<T>(n, p, dZx, q, dZy, absolute, k, tile, out);
+  cudaFree(dZx);
+  if (dZy != dZx) cudaFree(dZy);
+  if (!ok)
+    error("gputools: more than %.0f pairs pass the threshold; raise the "
+          "threshold, or raise limit if you want them all", limit);
+}
+
+template <typename T>
+void residualise(int n, int p, T * dZ, int m, const T * dQ,
+                 std::vector<double> & lengths)
+{
+  if (m > 0) {
+    // Z -= Q (Q' Z)
+    T * dW = gpuAlloc<T>((size_t) m * p);
+    blas::gemm('T', 'N', m, p, n, T(1), dQ, n, dZ, n, T(0), dW, m);
+    blas::gemm('N', 'N', n, p, m, T(-1), dQ, n, dW, m, T(1), dZ, n);
+    cudaFree(dW);
+  }
+
+  double * dNorms = gpuAlloc<double>(p);
+  dim3 grid(p), block(256);
+  void * normArgs[] = { &dZ, &n, &dNorms };
+  cudaLaunch("gpuColumnNorms", normArgs, grid, block, precisionOf<T>());
+  lengths.resize(p);
+  CUDART_CALL(cudaMemcpy(lengths.data(), dNorms, p * sizeof(double),
+                         cudaMemcpyDeviceToHost));
+  cudaFree(dNorms);
+
+  // what the covariates leave of a column is rounding error if it is this
+  // small a fraction of the unit-length column
+  double tol = sizeof(T) == sizeof(float) ? 1e-5 : 1e-10;
+  std::vector<T> scale(p);
+  for (int j = 0; j < p; ++j) {
+    bool usable = lengths[j] > tol;   // false for NaN too
+    scale[j] = usable ? (T) (1 / lengths[j]) : std::numeric_limits<T>::quiet_NaN();
+    if (!usable) lengths[j] = NAN;
+  }
+  T * dScale = gpuAlloc<T>(p);
+  CUDART_CALL(cudaMemcpy(dScale, scale.data(), p * sizeof(T),
+                         cudaMemcpyHostToDevice));
+  size_t entries = (size_t) n * p;
+  dim3 sgrid((unsigned) ((entries + 255) / 256)), sblock(256);
+  void * scaleArgs[] = { &dZ, &n, &p, &dScale };
+  cudaLaunch("gpuScaleColumns", scaleArgs, sgrid, sblock, precisionOf<T>());
+  cudaFree(dScale);
+}
+
+template void residualise<float>(int, int, float *, int, const float *,
+  std::vector<double> &);
+template void residualise<double>(int, int, double *, int, const double *,
+  std::vector<double> &);
+template void selectPairs<float>(int, int, float *, int, float *, int,
+  double, int, bool, int, double, PairList &);
+template void selectPairs<double>(int, int, double *, int, double *, int,
+  double, int, bool, int, double, PairList &);
+template bool thresholdPairs<float>(int, int, const float *, int,
   const float *, bool, double, int, double, PairList &);
-template void thresholdPairs<double>(int, int, const double *, int,
+template bool thresholdPairs<double>(int, int, const double *, int,
   const double *, bool, double, int, double, PairList &);
 template void topPairs<float>(int, int, const float *, int, const float *,
   bool, int, int, PairList &);
