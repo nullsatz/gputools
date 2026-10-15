@@ -1,0 +1,6 @@
+"what","seconds"
+"one gpuCor call, 50 x 2",4.97512437810493e-05
+"one cor call, 50 x 2",1.00000000000477e-05
+"1,000 pairs: a loop of gpuCor calls",0.0647500000000036
+"1,000 pairs: one gpuCor call for all 1,000 x 1,000 (the 1,000 wanted are its diagonal)",0.0145624999999967
+"1,000 pairs: a loop of cor calls",0.0152000000000006

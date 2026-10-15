@@ -38,8 +38,8 @@ Pearson correlation 16 times, distance matrices 7 times.
 | `gpuQr`, `gpuSolve` | `qr`, `solve` |
 | `gpuMatMult`, `gpuCrossprod`, `gpuTcrossprod` | `%*%`, `crossprod`, `tcrossprod` |
 
-A multi-threaded BLAS is about as fast as the GPU at matrix products and
-small regressions; for general GPU array work in R,
+These are there for convenience: R's own `lm`, `glm` and `%*%` were as fast
+or faster at every size we measured; for general GPU array work in R,
 [torch](https://torch.mlverse.org/) is the better tool. The
 [benchmarks vignette](vignettes/benchmarks.Rmd) has the measurements.
 
@@ -126,8 +126,25 @@ Kernels are compiled for the GPU in use the first time each is needed, so
 the first call of a function takes a fraction of a second longer.
 
 Whether the GPU is faster depends on the function, the data size and the
-hardware: `vignette("benchmarks", package = "gputools")` has measured
-timings against base R.
+hardware. On an RTX A5500, single precision, the GPU started to win at
+about these sizes:
+
+| function | faster than base R from |
+|---|---|
+| `gpuCor`, Kendall | 5 variables |
+| `gpuCor`, Spearman | 10 variables |
+| `gpuCor`, Pearson | 30 variables |
+| `gpuGranger` | 5 series |
+| `gpuDist` | 100 points |
+| `gpuPrcomp` | 100 variables |
+| `gpuDistClust` | 300 points |
+| `gpuSolve` | 300 x 300 |
+| `gpuQr` | 1,000 columns |
+
+Below these sizes base R is faster, and each call carries a fixed cost of
+about 50 µs, so **don't loop over small pieces**: put all the variables in
+one matrix and make one call. `vignette("benchmarks", package = "gputools")`
+has the full measurements and the script to repeat them on your hardware.
 
 ## Testing on a GPU
 
