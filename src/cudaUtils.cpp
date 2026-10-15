@@ -52,6 +52,7 @@ const std::vector<KernelFile> & kernelFiles()
     { "pairs",
       { "gpuThresholdPairs", "gpuTopPerColumn", "gpuColumnNorms",
         "gpuScaleColumns" } },
+    { "rowtest", { "gpuRowT", "gpuRowTCount" } },
     { "perm", { "gpuPermuteRows", "gpuCountExceed" } },
     { "kmeans", { "gpuAssignNearest", "gpuOneHot" } },
     { "mi", { "scale", "get_bin_scores", "get_entropy", "get_mi" } },

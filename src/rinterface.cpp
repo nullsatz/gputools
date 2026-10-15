@@ -24,6 +24,7 @@
 #include "pairs.h"
 #include "kmeans.h"
 #include "perm.h"
+#include "rowtest.h"
 
 #include "rinterface.h"
 #include "routines.h"
@@ -412,6 +413,43 @@ SEXP corPermT(SEXP x, SEXP y, SEXP perms, double eps)
   return out;
 }
 
+// Two-group t tests of each row of x (genes x n) under the labellings in
+// labels (n x nb, column 0 observed): list(t, counts, maxima). Each row
+// is centred and scaled in double first; a constant row's t is NaN.
+template <typename T>
+SEXP rowTtestT(SEXP x, SEXP labels, int n1, bool pooled, double eps)
+{
+  SEXP dx = getAttrib(x, R_DimSymbol);
+  int genes = INTEGER(dx)[0], n = INTEGER(dx)[1],
+    nb = INTEGER(getAttrib(labels, R_DimSymbol))[1];
+  const double * px = REAL(x);
+  std::vector<T> z((size_t) genes * n);
+  for (int r = 0; r < genes; ++r) {
+    double mean = 0, ss = 0;
+    for (int c = 0; c < n; ++c) mean += px[r + (size_t) c * genes];
+    mean /= n;
+    for (int c = 0; c < n; ++c) {
+      double d = px[r + (size_t) c * genes] - mean;
+      ss += d * d;
+    }
+    double scale = 1 / std::sqrt(ss / (n - 1));
+    for (int c = 0; c < n; ++c)
+      z[r + (size_t) c * genes] =
+        (T) ((px[r + (size_t) c * genes] - mean) * scale);
+  }
+
+  const char * names[] = { "t", "counts", "maxima", "" };
+  SEXP values[] = {
+    PROTECT(allocVector(REALSXP, genes)), PROTECT(allocVector(INTSXP, genes)),
+    PROTECT(allocVector(REALSXP, nb - 1))
+  };
+  rowTtests<T>(genes, n, z.data(), nb, INTEGER(labels), n1, pooled, eps,
+               REAL(values[0]), INTEGER(values[1]), REAL(values[2]));
+  SEXP out = namedList(names, values);
+  UNPROTECT(3);
+  return out;
+}
+
 // rank(ties.method = "average", na.last = "keep") of each column of x,
 // on the GPU
 template <typename T>
@@ -752,6 +790,17 @@ SEXP gpuCorPerm(SEXP x, SEXP y, SEXP perms, SEXP eps, SEXP precision)
   double e = asReal(eps);
   return isDouble(precision) ? corPermT<double>(x, y, perms, e)
                              : corPermT<float>(x, y, perms, e);
+}
+
+SEXP gpuRowTtest(SEXP x, SEXP labels, SEXP n1, SEXP pooled, SEXP eps,
+                 SEXP precision)
+{
+  requireDevice();
+  int m = asInteger(n1);
+  bool pool = asLogical(pooled);
+  double e = asReal(eps);
+  return isDouble(precision) ? rowTtestT<double>(x, labels, m, pool, e)
+                             : rowTtestT<float>(x, labels, m, pool, e);
 }
 
 SEXP gpuRank(SEXP x, SEXP precision)
