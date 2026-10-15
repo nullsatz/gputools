@@ -14,12 +14,11 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson",
     ny <- if(is.null(y)) nx else ncol(y)
 
     methods <- c("pearson", "kendall", "spearman")
+    # pmatch() gives -1 (nomatch) for an unknown name and for an ambiguous
+    # abbreviation alike
     method <- pmatch(method, methods, -1)
-    if(is.na(method)) {
-        stop("invalid correlation method")
-    }
     if(method == -1) {
-        stop("ambiguous correlation method")
+        stop("invalid or ambiguous correlation method")
     }
     method <- methods[method]
 

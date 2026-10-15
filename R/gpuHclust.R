@@ -10,10 +10,7 @@ gpuDist <- function(points, method = "euclidean", p = 2.0,
                  "minkowski")
     method <- pmatch(method, methods) # hey presto method becomes an int
     if(is.na(method)) {
-        stop("invalid distance method")
-    }
-    if(method == -1) {
-        stop("ambiguous distance method")
+        stop("invalid or ambiguous distance method")
     }
     method <- methods[method] # return method to a meaningful string
 
@@ -44,10 +41,7 @@ gpuHclust <- function(distances, method = "complete", beta = 0.5,
                  "median", "centroid", "flexible", "flexible group", "wpgma")
     method <-  pmatch(method, methods) # method is now an integer
     if(is.na(method)) {
-        stop("invalid clustering method")
-    }
-    if(method == -1) {
-        stop("ambiguous clustering method")
+        stop("invalid or ambiguous clustering method")
     }
     method <- methods[method] # return method to a meaningful string
 
@@ -98,10 +92,7 @@ gpuDistClust <- function(points, distmethod = "euclidean",
                  "minkowski")
     distmethod <- pmatch(distmethod, methods) # hey presto method becomes an int
     if(is.na(distmethod)) {
-        stop("invalid distance method")
-    }
-    if(distmethod == -1) {
-        stop("ambiguous distance method")
+        stop("invalid or ambiguous distance method")
     }
     distmethod <- methods[distmethod] # return method to a meaningful string
 
@@ -109,10 +100,7 @@ gpuDistClust <- function(points, distmethod = "euclidean",
                  "median", "centroid", "flexible", "flexible group", "wpgma")
     clustmethod <-  pmatch(clustmethod, methods) # method is now an integer
     if(is.na(clustmethod)) {
-        stop("invalid clustering method")
-    }
-    if(clustmethod == -1) {
-        stop("ambiguous clustering method")
+        stop("invalid or ambiguous clustering method")
     }
     clustmethod <- methods[clustmethod] # return method to a meaningful string
 
