@@ -45,9 +45,16 @@ jobs:
 
       - name: Install R and CUDA
         run: |
-          conda install -y r-base r-testthat r-knitr r-rmarkdown pandoc \
-            cxx-compiler c-compiler make \
-            ${{ matrix.cuda-packages }}
+          # anaconda.org returns the odd HTTP 502; packages already
+          # downloaded stay in the cache, so a retry only fetches the rest
+          for attempt in 1 2 3; do
+            conda install -y r-base r-testthat r-knitr r-rmarkdown pandoc \
+              cxx-compiler c-compiler make \
+              ${{ matrix.cuda-packages }} && break
+            if [ $attempt = 3 ]; then exit 1; fi
+            echo "conda install failed (attempt $attempt); retrying"
+            sleep 30
+          done
           R --version | head -1
           h=$(find $CONDA_PREFIX -name cuda_runtime_api.h | head -1)
           if [ -n "$h" ]; then grep -m1 "define CUDART_VERSION" "$h"; fi
