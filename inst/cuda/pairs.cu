@@ -89,3 +89,32 @@ __global__ void gpuTopPerColumn(const real * r, int ta, int n2, int i0,
 		outR[b * k + t] = p < 0 ? REAL_NAN : rc[p];
 	}
 }
+
+// The length of each column of z (n rows, column-major), in double: one
+// block of 256 threads per column.
+__global__ void gpuColumnNorms(const real * z, int n, double * norms)
+{
+	__shared__ double sums[256];
+	const real * zc = z + (size_t) blockIdx.x * n;
+	double s = 0;
+	for(int i = threadIdx.x; i < n; i += blockDim.x) {
+		double v = zc[i];
+		s += v * v;
+	}
+	sums[threadIdx.x] = s;
+	__syncthreads();
+	for(int stride = blockDim.x >> 1; stride > 0; stride >>= 1) {
+		if(threadIdx.x < stride)
+			sums[threadIdx.x] += sums[threadIdx.x + stride];
+		__syncthreads();
+	}
+	if(threadIdx.x == 0) norms[blockIdx.x] = sqrt(sums[0]);
+}
+
+// z[, j] *= scale[j] for each of the p columns of z (n rows)
+__global__ void gpuScaleColumns(real * z, int n, int p, const real * scale)
+{
+	size_t k = blockIdx.x * (size_t) blockDim.x + threadIdx.x;
+	if(k >= (size_t) n * p) return;
+	z[k] *= scale[k / n];
+}

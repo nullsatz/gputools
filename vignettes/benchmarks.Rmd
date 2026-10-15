@@ -202,6 +202,44 @@ Most of the time `cor()` and `gpuCor()` take here goes on the matrix
 itself, building it and searching it in R, which `gpuCorPairs()` never
 does. Use it whenever you want pairs, not the matrix.
 
+## Association scans
+
+```{r assoc-data, include = FALSE}
+sc <- read.csv("assoc.csv")
+secs <- function(v) ifelse(is.na(v), "--", sprintf("%.2f", v))
+big <- sc[!is.na(sc$MatrixEQTL), ]
+big <- big[which.max(big$snps * big$genes), ]
+```
+
+`gpuAssoc()` tests every column of one matrix against every column of
+another by linear regression with covariates: the scan of an eQTL study,
+SNPs against genes. It computes what Matrix eQTL's linear model does
+(Shabalin 2012), so the comparison is with Matrix eQTL itself, version
+`r if (requireNamespace("MatrixEQTL", quietly = TRUE)) as.character(packageVersion("MatrixEQTL")) else "2.4"`,
+running on the multi-threaded OpenBLAS of the machine above. Each scan
+has `r sc$samples[1]` samples and `r sc$covariates[1]` covariates and
+reports p <= 1e-5; both programs reported the same associations wherever
+both ran.
+
+```{r assoc-table, echo = FALSE}
+knitr::kable(data.frame(
+  SNPs = format(sc$snps, big.mark = ","),
+  Genes = format(sc$genes, big.mark = ","),
+  Tests = format(sc$snps * as.double(sc$genes), big.mark = ",",
+                 scientific = FALSE),
+  Found = format(sc$found, big.mark = ","),
+  `Matrix eQTL` = secs(sc$MatrixEQTL),
+  `gpuAssoc single` = secs(sc$single), `gpuAssoc double` = secs(sc$double),
+  check.names = FALSE), align = "rrrrrrr")
+```
+
+Times are in seconds; "--" was not run (at four billion tests Matrix eQTL
+ran out of a 48 GB job's memory). At
+`r format(big$snps * as.double(big$genes), big.mark = ",", scientific = FALSE)`
+tests the GPU was `r round(big$MatrixEQTL / big$single)` times as fast.
+A genome-wide scan, millions of SNPs, is a loop over chromosomes or
+blocks of SNPs, each call large enough to keep the GPU busy.
+
 ## Your own hardware
 
 To measure your own machine, run from a checkout of the source repository
