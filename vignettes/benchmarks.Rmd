@@ -166,6 +166,42 @@ Filled points are single precision, open points double.
   s per group of functions and precision, once; time the second call when
   comparing.
 
+## Wide data: the strongest pairs
+
+```{r pairs-data, include = FALSE}
+pp <- read.csv("pairs.csv")
+fmt <- function(v) ifelse(is.na(v), "--", sprintf("%.2f", v))
+```
+
+For thousands of variables or more, the whole correlation matrix is the
+problem: `r format(max(pp$variables), big.mark = ",")` variables have
+`r format(max(pp$variables)^2 / 2, big.mark = ",", scientific = FALSE)`
+pairs, and their matrix takes
+`r round(8 * max(pp$variables)^2 / 1e9)` GB. Usually only the strong
+pairs are wanted. `gpuCorPairs()` returns those, every pair at or above a
+threshold or each variable's strongest partners, computing the matrix on
+the GPU a block at a time and never holding it whole.
+
+The table times finding every pair with |r| >= 0.8 among variables of
+`r pp$rows[1]` observations (random data with a few hundred planted
+correlated groups): base R's `cor()` and then `which()`, `gpuCor()` and
+then `which()`, and `gpuCorPairs()`; and, last, `gpuCorPairs()` finding
+each variable's 10 strongest partners. Times are in seconds; "--" was not
+run, the matrix being too big to wait for.
+
+```{r pairs-table, echo = FALSE}
+knitr::kable(data.frame(
+  Variables = format(pp$variables, big.mark = ","),
+  `Pairs found` = format(pp$pairs, big.mark = ","),
+  `cor + which` = fmt(pp$cor), `gpuCor + which` = fmt(pp$gpuCor),
+  gpuCorPairs = fmt(pp$gpuCorPairs), `top 10 each` = fmt(pp$top10),
+  check.names = FALSE), align = "rrrrrr")
+```
+
+Most of the time `cor()` and `gpuCor()` take here goes on the matrix
+itself, building it and searching it in R, which `gpuCorPairs()` never
+does. Use it whenever you want pairs, not the matrix.
+
 ## Your own hardware
 
 To measure your own machine, run from a checkout of the source repository

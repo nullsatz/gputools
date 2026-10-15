@@ -21,6 +21,7 @@
 #include "qrdecomp.h"
 #include "solve.h"
 #include "rank.h"
+#include "pairs.h"
 
 #include "rinterface.h"
 #include "routines.h"
@@ -253,6 +254,47 @@ SEXP corProductT(SEXP x, SEXP y)
   }
   SEXP out = namedList(names, values);
   UNPROTECT(2);
+  return out;
+}
+
+// Selected Pearson correlations of the columns of x with those of y (x
+// itself when y is NULL): every pair with |r| >= threshold (mode 0), or
+// each y column's top k partners (mode 1). list(i, j, r), i and j 1-based.
+template <typename T>
+SEXP corPairsT(SEXP x, SEXP y, int mode, double threshold, int k,
+               bool absolute, int tile, double limit)
+{
+  bool same = isNull(y);
+  SEXP dx = getAttrib(x, R_DimSymbol);
+  int n = INTEGER(dx)[0], p = INTEGER(dx)[1],
+    q = same ? p : INTEGER(getAttrib(y, R_DimSymbol))[1];
+  std::vector<T> zx = standardised<T>(x, n, p), zy;
+  if (!same) zy = standardised<T>(y, n, q);
+  const T * pzy = same ? NULL : zy.data();
+
+  PairList pairs;
+  if (mode == 0)
+    thresholdPairs<T>(n, p, zx.data(), q, pzy, absolute, threshold, tile,
+                      limit, pairs);
+  else
+    topPairs<T>(n, p, zx.data(), q, pzy, absolute, k, tile, pairs);
+
+  R_xlen_t m = pairs.r.size();
+  const char * names[] = { "i", "j", "r", "" };
+  SEXP values[] = {
+    PROTECT(allocVector(INTSXP, m)), PROTECT(allocVector(INTSXP, m)),
+    PROTECT(allocVector(REALSXP, m))
+  };
+  int * pi = INTEGER(values[0]), * pj = INTEGER(values[1]);
+  double * pr = REAL(values[2]);
+  for (R_xlen_t e = 0; e < m; ++e) {
+    pi[e] = pairs.i[e] + 1;
+    pj[e] = pairs.j[e] + 1;
+    double v = pairs.r[e];
+    pr[e] = v > 1 ? 1 : (v < -1 ? -1 : v);
+  }
+  SEXP out = namedList(names, values);
+  UNPROTECT(3);
   return out;
 }
 
@@ -557,6 +599,18 @@ SEXP gpuCorProduct(SEXP x, SEXP y, SEXP precision)
   requireDevice();
   return isDouble(precision) ? corProductT<double>(x, y)
                              : corProductT<float>(x, y);
+}
+
+SEXP gpuCorPairs(SEXP x, SEXP y, SEXP mode, SEXP threshold, SEXP k,
+                 SEXP absolute, SEXP tile, SEXP limit, SEXP precision)
+{
+  requireDevice();
+  int md = asInteger(mode), kk = asInteger(k), tl = asInteger(tile);
+  double thr = asReal(threshold), lim = asReal(limit);
+  bool abs = asLogical(absolute);
+  return isDouble(precision)
+    ? corPairsT<double>(x, y, md, thr, kk, abs, tl, lim)
+    : corPairsT<float>(x, y, md, thr, kk, abs, tl, lim);
 }
 
 SEXP gpuRank(SEXP x, SEXP precision)

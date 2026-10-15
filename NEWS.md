@@ -1,5 +1,11 @@
 # gputools (development version)
 
+- New `gpuCorPairs()`: the strongly correlated pairs among many variables
+  (every pair over a threshold, or each variable's strongest partners),
+  Pearson or Spearman, without forming the correlation matrix, which it
+  computes on the GPU a block at a time. For tens of thousands of variables,
+  such as a gene co-expression network.
+
 The benchmarks vignette now says at what data size each function starts to
 beat base R, and what a loop of small calls costs; `bench/crossover.R`
 repeats the measurement.
