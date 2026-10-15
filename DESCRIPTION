@@ -1,6 +1,6 @@
 Package: gputools
-Version: 2.0.0.9000
-Title: A Few GPU Enabled Functions
+Version: 2.1.0
+Title: GPU Drop-Ins for Statistics on Wide Data
 Authors@R: c(person("Josh", "Buckner", email = "nullsatz@gmail.com",
                     role = c("aut", "cre")),
   person("Mark", "Seligman", email = "mseligman@suiji.org", role = "aut"),
@@ -12,9 +12,19 @@ Config/testthat/edition: 3
 VignetteBuilder: knitr
 SystemRequirements: NVIDIA CUDA toolkit (>= 11.7); an NVIDIA GPU to run
         the GPU functions
-Description: Provides R interfaces to a handful of common
-        functions implemented using the NVIDIA CUDA toolkit.
-        Thanks to Craig Stark at UC Irvine for donating time on his lab's Mac.
+Description: GPU versions of base R statistics for data with many
+    variables, using the NVIDIA 'CUDA' toolkit: correlation matrices
+    (Pearson, Spearman and Kendall) and their tests, the strongest
+    correlated pairs among tens of thousands of variables without forming
+    the matrix, association scans with covariates as in expression
+    quantitative trait loci studies (Shabalin 2012
+    <doi:10.1093/bioinformatics/bts163>), permutation tests with
+    Westfall-Young maxT adjustment, distance matrices, hierarchical and
+    k-means clustering, Granger causality tests, B-spline mutual
+    information, principal components, and least-squares fits. Results
+    agree with the base R functions they replace. Without 'CUDA' the
+    package installs, and its functions explain how to get a 'CUDA' build.
+    Described in Buckner et al. (2010) <doi:10.1093/bioinformatics/btp608>.
 License: GPL-3
 URL: https://github.com/nullsatz/gputools
 BugReports: https://github.com/nullsatz/gputools/issues

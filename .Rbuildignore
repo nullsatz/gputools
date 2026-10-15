@@ -7,3 +7,4 @@
 ^bench$
 ^\.gitattributes$
 ^review$
+^cran-comments\.md$

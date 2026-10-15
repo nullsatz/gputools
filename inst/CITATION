@@ -1,0 +1,13 @@
+bibentry(
+  bibtype = "Article",
+  title = "The gputools package enables GPU computing in R",
+  author = c(person("Joshua", "Buckner"), person("Justin", "Wilson"),
+             person("Mark", "Seligman"), person("Brian", "Athey"),
+             person("Stanley", "Watson"), person("Fan", "Meng")),
+  journal = "Bioinformatics",
+  year = "2010",
+  volume = "26",
+  number = "1",
+  pages = "134--135",
+  doi = "10.1093/bioinformatics/btp608"
+)

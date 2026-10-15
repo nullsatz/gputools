@@ -1,4 +1,4 @@
-# gputools (development version)
+# gputools 2.1.0
 
 - New `gpuCorPerm()`: permutation p-values for every correlation between
   the columns of `x` and `y`, and p-values adjusted for testing them all by
