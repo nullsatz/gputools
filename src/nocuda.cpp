@@ -17,8 +17,9 @@
 
 #ifdef _WIN32
 #define GPUTOOLS_GUIDANCE \
-  "To use them, install gputools on Linux with an NVIDIA GPU and the CUDA " \
-  "toolkit (11.7 or later)."
+  "On Windows, run R under WSL2 (the Windows Subsystem for Linux), which " \
+  "supports CUDA, and install gputools there with the CUDA toolkit (11.7 " \
+  "or later); see the package README."
 #else
 #define GPUTOOLS_GUIDANCE \
   "To use them, install the NVIDIA CUDA toolkit (11.7 or later), make it " \
