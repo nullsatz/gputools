@@ -1,5 +1,12 @@
 # gputools (development version)
 
+- New `gpuCorPerm()`: permutation p-values for every correlation between
+  the columns of `x` and `y`, and p-values adjusted for testing them all by
+  Westfall and Young's maxT. Pearson or Spearman.
+- New `gpuRowTtest()`: Welch's or Student's t test of every row of a
+  matrix between two groups of columns, as `t.test` gives them, with
+  permutation and maxT p-values computed on the GPU.
+
 - New `gpuKmeans()`: Lloyd's k-means on the GPU, step for step as
   `kmeans(algorithm = "Lloyd")`, from the same random starts, returning a
   `"kmeans"` object. A million points into a thousand clusters takes

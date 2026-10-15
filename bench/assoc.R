@@ -24,7 +24,8 @@ for (sz in list(c(2000, 5000), c(10000, 5000), c(10000, 20000),
   for (g in seq_len(ngene / 100))                      # planted eQTLs
     genes[, g] <- genes[, g] + 0.4 * snps[, sample(nsnp, 1)]
 
-  invisible(gpuAssoc(snps[, 1:100], genes[, 1:100], cv))   # warm up
+  for (pr in c("single", "double"))                       # warm up
+    invisible(gpuAssoc(snps[, 1:100], genes[, 1:100], cv, precision = pr))
   found <- NA
   gpu <- once(function() found <<- nrow(gpuAssoc(snps, genes, cv,
                                                   pvalue = 1e-5)))

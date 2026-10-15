@@ -29,7 +29,8 @@ for (p in c(50, 200, 1000, 3000)) {
   set.seed(1)
   x <- matrix(rexp(n * p), n, p); y <- matrix(rexp(n * p), n, p)
   perms <- vapply(seq_len(B), function(b) sample.int(n), integer(n))
-  invisible(gpuCorPerm(x[, 1:10], y[, 1:10], B = 10))   # warm up
+  for (pr in c("single", "double"))                      # warm up
+    invisible(gpuCorPerm(x[, 1:10], y[, 1:10], B = 10, precision = pr))
   gpu <- once(function() gpuCorPerm(x, y, B = B))
   gpuD <- once(function() gpuCorPerm(x, y, B = B, precision = "double"))
   loopCor <- if (p <= 1000) once(function() cpuPerm(x, y, perms, FALSE)) else NA

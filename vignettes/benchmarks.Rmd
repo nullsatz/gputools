@@ -271,6 +271,50 @@ and most with many clusters. Where Lloyd's algorithm ends at a worse
 sum of squares, a few random starts (`nstart`) cost little on the GPU and
 usually close the gap.
 
+## Permutation tests
+
+```{r perm-data, include = FALSE}
+pm <- read.csv("perm.csv")
+rt <- read.csv("rowtest.csv")
+s3 <- function(v) ifelse(is.na(v), "--", formatC(v, format = "f", digits = 3))
+s2 <- function(v) ifelse(is.na(v), "--", formatC(v, format = "f", digits = 2))
+```
+
+A permutation test repeats the whole computation for every shuffle of
+the samples, so a thousand permutations cost a thousand times the test:
+the case the GPU is best at. Both functions here also give Westfall and
+Young's maxT adjustment for testing everything at once, which needs every
+permutation's results together.
+
+`gpuCorPerm()`, `r pm$permutations[1]` permutations of
+`r pm$rows[1]` samples, every column of x against every column of y,
+against the same test in R: a loop of `cor()` calls, and the faster loop of
+BLAS products of standardised columns. Times in seconds; "--" was not run.
+
+```{r perm-table, echo = FALSE}
+knitr::kable(data.frame(
+  `x and y variables` = format(pm$variables, big.mark = ","),
+  Pairs = format(pm$variables^2, big.mark = ",", scientific = FALSE),
+  `cor loop` = s2(pm$corLoop), `BLAS loop` = s2(pm$blasLoop),
+  `gpuCorPerm single` = s3(pm$single), `gpuCorPerm double` = s3(pm$double),
+  check.names = FALSE), align = "rrrrrr")
+```
+
+`gpuRowTtest()`, Welch's t test of every gene between two groups of
+samples with `r rt$permutations[1]` permutations, against the same test in
+vectorised R (each permutation's t for every gene from `rowMeans` and
+`rowSums`). The t tests themselves, without permutations, run on the CPU
+and take the time in the last column.
+
+```{r rowtest-table, echo = FALSE}
+knitr::kable(data.frame(
+  Genes = format(rt$genes, big.mark = ","), Samples = rt$samples,
+  `R loop` = s2(rt$cpu), `gpuRowTtest single` = s3(rt$single),
+  `gpuRowTtest double` = s3(rt$double),
+  `no permutations` = s3(rt$noPermutations),
+  check.names = FALSE), align = "rrrrrr")
+```
+
 ## Your own hardware
 
 To measure your own machine, run from a checkout of the source repository

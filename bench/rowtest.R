@@ -34,7 +34,8 @@ for (sz in list(c(1000, 20), c(20000, 20), c(20000, 100), c(50000, 100))) {
   set.seed(1)
   x <- matrix(rnorm(genes * n), genes, n)
   group <- rep(1:2, length.out = n)
-  invisible(gpuRowTtest(x[1:10, ], group, B = 10))      # warm up
+  for (pr in c("single", "double"))                     # warm up
+    invisible(gpuRowTtest(x[1:10, ], group, B = 10, precision = pr))
   noPerm <- once(function() gpuRowTtest(x, group))
   gpu <- once(function() gpuRowTtest(x, group, B = B))
   gpuD <- once(function() gpuRowTtest(x, group, B = B, precision = "double"))
