@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#include <vector>
 
 #include "gpublas.h"
 #include "R.h"
@@ -201,12 +202,15 @@ void getQRDecompRR(int rows, int cols, double tol, T * dQR,
       T
         normV = blas::nrm2(rowsk, pdVdiag, 1);
 
+      // Bjorck's rank test, |r_kk| < tol |r_11|: relative, so the rank
+      // does not depend on the units of the data (it used
+      // tol (1 + |r_11|), which declared data in small units rank 0)
       if (k == 0) {
-        if (normV < tol) {
+        if (normV == T(0)) {
           *rank = 0;
           break;
         } else
-          minElt = tol * (1.0 + normV);
+          minElt = tol * normV;
       } else if (normV < minElt)
         break;
 
@@ -287,228 +291,89 @@ void getQRDecompRR(int rows, int cols, double tol, T * dQR,
         
 }
 
-// use householder xfrms and column pivoting to get the R factor of the
-// QR decomp of matrix da:  Q*A*P=R, equiv A*P = Q^t * R
+// QR decomposition as LINPACK's dqrdc2, which lm() and lsfit() use, so
+// that gpuLm/gpuLsfit/gpuGlm detect rank deficiency the way they do:
+// columns are taken in order, and one whose norm below the rows already
+// reduced has fallen under tol times its original norm is moved to the
+// end (the rest keep their order). Every column is still reduced, so the
+// result is LINPACK's compact form: R on and above the diagonal, the
+// Householder vectors below it with their leading elements in qrAux.
+// rank is the number of columns not moved.
 //
+// dQR (rows x cols, leading dimension rows) is on the device; pivot
+// (0-based column indices) and qrAux are on the host.
 template <typename T>
-void getQRDecompBlocked(int rows, int cols, double tol,
-                        T * dQR,
-                        int blockSize, int stride, int * pivot,
-                        double * qrAux, int * rank)
+void getQRDecompLinpack(int rows, int cols, double tol, T * dQR,
+                        int * pivot, double * qrAux, int * rank)
 {
-  // Copyright 2009, Mark Seligman at Rapid Biologics, LLC.  All rights
-  // reserved.
-  //
-
-  int
-    nblocks, nthreads = NTHREADS,
-    fbytes = sizeof(T),
-    rowsk = stride, // # unprocessed rows = stride - k
-    colsk = cols,   // # unprocessed columns = cols - k
-    maxCol = cols - 1,  // Highest candidate column:  not fixed.
-    k = 0; // Number of columns processed.
-  const int maxRow = rows - 1;
-  T
-    * dV, * dW, *du, *dWtR, *dT, *dColNorms;
-
-
-  nblocks = cols / nthreads;
-  if(nblocks * nthreads < cols)
-    nblocks++;
-
-  // Presets the matrix of Householder vectors, dV, to zero.
-  // Padding with zeroes appears to offer better performance than
-  // direct operations on submatrices:  aligned access helps
-  // ensure coalescing.
-  //
-  dV = gpuAlloc<T>(stride * blockSize);
-  dW = gpuAlloc<T>(stride * blockSize);
-  dT = gpuAlloc<T>(blockSize * blockSize);
-  du = gpuAlloc<T>(stride);
-  // only the update to the right of a block uses it, so not if cols fit
-  // in one block
-  dWtR = cols > blockSize ? gpuAlloc<T>(blockSize * (cols - blockSize))
-                          : NULL;
-  dColNorms = gpuAlloc<T>(cols);
-
-
-  // Obtains the highest valued norm in order to approximate a condition-
-  // based lower bound, "minElt".
-  //
-  dim3 grid(nblocks), block(nthreads);
-  void * argsCN[] = {
-    &rows, &cols, &dQR, &stride, &dColNorms
-  };
-  cudaLaunch("getColNorms", argsCN, grid, block, precisionOf<T>());
-
-  int maxIdx = blas::iamax(cols, dColNorms, 1)-1;
-  T maxNorm = blas::nrm2(rows, dQR + stride * maxIdx, 1);
-  int rk = 0; // Local value of rank;
-  int maxRank;
-  double minElt; // Lowest acceptable norm under given tolerance.
-
-  if (maxNorm < tol)
-    maxRank = 0; // Short-circuits the main loop
-  else {
-    minElt = (1.0 + maxNorm) * tol;
-    maxRank = rows > cols ? cols : rows;
+  const int fbytes = sizeof(T), lup = std::min(rows, cols);
+  std::vector<double> origNorm(cols);
+  for (int j = 0; j < cols; ++j) {
+    origNorm[j] = blas::nrm2(rows, dQR + (size_t) j * rows, 1);
+    if (origNorm[j] == 0.0) origNorm[j] = 1.0;  // as dqrdc2's work(j,2)
   }
 
-  T * pdQRBlock = dQR;
+  T * dw = gpuAlloc<T>(cols), * dTmp = gpuAlloc<T>(rows);
+  int kept = cols;  // columns [kept, cols) have been moved to the end
 
-  int blockCount = (cols + blockSize - 1) / blockSize;
-  for (int bc = 0; bc < blockCount; bc++) {
-    // Determines "blockEnd", which counts the number of columns remaining
-    // in the upcoming block.  Swaps trivial columns with the rightmost
-    // unvisited column until either a nontrivial column is found or all
-    // columns have been visited.  Note that 'blockEnd <= blockSize', with
-    // inequality possible only in the rightmost processed block.
-    //
-    // This pivoting scheme does not attempt to order columns by norm, nor
-    // does it recompute norms altered by the rank-one update within the
-    // upcoming block.  A higher-fidelity scheme is implemented in the non-
-    // blocked form of this function.  Sapienti sat.
-    //
-    int blockEnd = 0;
-    for (int i = k; i < k + blockSize && i < maxRank && i <= maxCol; i++) {
-      T colNorm = blas::nrm2(rows, dQR + i * stride, 1);
-      while ( (colNorm < minElt) && (maxCol > i)) {
-        blas::swap(rows, dQR + i * stride, 1, dQR + maxCol*stride, 1);
-        int tempIdx = pivot[maxCol];
-        pivot[maxCol] = pivot[i];
-        pivot[i] = tempIdx;
-        maxCol--;
-        colNorm = blas::nrm2(rows, dQR + i * stride, 1);
-      }
-      if (colNorm >= minElt)
-        blockEnd++;
-    }
-    rk += blockEnd;
-    T scales[blockSize];
-    double Beta[blockSize];
+  for (int l = 0; l < lup; ++l) {
+    T * col = dQR + (size_t) l * rows + l;
+    int m = rows - l;
+    double remaining = blas::nrm2(m, col, 1);
 
-    cudaMemset2D(dV, blockSize * fbytes, T(0), blockSize * fbytes, rowsk);
-
-    T *pdVcol = dV;
-    T *pdVdiag = dV;
-    T *pdQRdiag = pdQRBlock;
-
-    for (int colIdx = 0; colIdx < blockEnd; colIdx++, pdVcol += rowsk, pdVdiag += (rowsk + 1),
-           pdQRdiag += (stride + 1), k++) {
-
-      blas::copy(rowsk - colIdx, pdQRdiag, 1, pdVdiag, 1);
-
-      // Builds Householder vector from maximal column just copied.
-      // For now, uses slow memory transfers to modify leading element:
-      //      V_1 += sign(V_1) * normV.
-      //
-      T v1;         
-      blas::getVector(1, fbytes, pdVdiag, rowsk + 1, &v1, 1);
-      double v1Abs = fabs(v1);
-      if (k == maxRow) // The bottom row is not scaled.
-        qrAux[k] = v1Abs;
-      else { // zero-valued "normV" should already have been ruled out.
-        T normV = blas::nrm2(rowsk - colIdx, pdQRdiag, 1);
-        double recipNormV = 1.0 / normV;
-        qrAux[k] = 1.0 + v1Abs * recipNormV;
-        scales[colIdx] = (v1 >= T(0) ? T(1) : -T(1)) * recipNormV;
-
-        // Scales leading nonzero element of vector.
-        //
-        double fac = 1.0 + normV / v1Abs;
-        blas::scal(1, (T) fac, pdVdiag, 1);
-                  
-        // Beta = -2 v^t v :  updates squared norm on host side.
-        //
-        Beta[colIdx] = -2.0 / (normV*normV + v1Abs * v1Abs * (-1.0 + fac * fac));
-
-        // Rank-one update of the remainder of the block, "B":
-        // u = Beta B^t v
-        //
-        blas::gemv('T', rowsk, std::min(blockSize,colsk), (T) Beta[colIdx], pdQRBlock, stride, pdVcol, 1, T(0), du, 1);
-                                       
-        // B = B + v u^t
-        //
-        blas::ger(rowsk, std::min(blockSize,colsk), T(1.0), pdVcol, 1, du, 1, pdQRBlock, stride);
-      }
+    // move negligible columns to the end, keeping the others' order
+    while (l < kept && remaining < origNorm[l] * tol) {
+      T * colTop = dQR + (size_t) l * rows;
+      CUDART_CALL(cudaMemcpy(dTmp, colTop, rows * fbytes,
+                             cudaMemcpyDeviceToDevice));
+      for (int j = l + 1; j < cols; ++j)
+        CUDART_CALL(cudaMemcpy(dQR + (size_t) (j - 1) * rows,
+                               dQR + (size_t) j * rows, rows * fbytes,
+                               cudaMemcpyDeviceToDevice));
+      CUDART_CALL(cudaMemcpy(dQR + (size_t) (cols - 1) * rows, dTmp,
+                             rows * fbytes, cudaMemcpyDeviceToDevice));
+      std::rotate(pivot + l, pivot + l + 1, pivot + cols);
+      std::rotate(origNorm.begin() + l, origNorm.begin() + l + 1,
+                  origNorm.end());
+      --kept;
+      remaining = blas::nrm2(m, col, 1);
     }
 
-    // If more unseen columns remain, updates the remainder of QR lying to
-    // the right of the block just updated.  This must be done unless we
-    // happen to have exited the inner loop without having applied any
-    // Householder transformations (i.e., blockEnd == 0).
-    //
-    if (bc < blockCount - 1 && blockEnd > 0) {
-      // w_m = Beta (I + W V^t) v_m, where the unsubscripted matrices
-      // refer to those built at step 'i-1', having 'i' columns.
-      //
-      // w_i = Beta v_i
-      //
-      //  T = V^t V
-      //
-      blas::syrk('U', 'T', blockSize, rowsk, T(1), dV, rowsk, T(0), dT, blockSize);
-
-      T *pdTcol = dT;
-      T *pdWcol = dW;
-      pdVcol = dV;
-      for (int m = 0; m < blockSize; m++, pdWcol += rowsk, pdVcol += rowsk, pdTcol += blockSize) {
-        blas::copy(rowsk, pdVcol, 1, pdWcol, 1);
-        blas::scal(rowsk, Beta[m], pdWcol, 1);
-        // w_m = w_m + Beta W T(.,m)
-        //
-        if (m > 0) {
-          blas::gemv('N', rowsk, m, Beta[m], dW, rowsk, pdTcol, 1, T(1), pdWcol, 1);
-        }
-      }
-
-      // Updates R, beginning at current diagonal by:
-      //   R = (I_m + V W^t) R = R + V (W^t R)
-      //
-
-      // WtR = W^t R
-      //
-      blas::gemm('T','N', blockSize, colsk - blockSize, rowsk, T(1), dW, rowsk, 
-                  pdQRBlock + blockSize * stride, stride, T(0), dWtR, blockSize);
-
-      // R = V WtR + R
-      //
-      blas::gemm('N', 'N', rowsk, colsk - blockSize, blockSize, T(1), dV,
-                  rowsk, dWtR, blockSize, T(1), pdQRBlock+ blockSize * stride, stride);
+    if (l == rows - 1) {          // the last row: nothing to reflect
+      qrAux[l] = remaining;
+      continue;
+    }
+    if (remaining == 0.0) {
+      qrAux[l] = 0.0;
+      continue;
     }
 
-    // Flushes scaled Householder vectors to the subdiagonals of dQR,
-    // 'blockSize'-many at a time.  The only time a smaller number are
-    // sent occurs when a partial block remains at the right end.
-    //
-    pdVdiag = dV;
-    pdQRdiag = pdQRBlock;
-    for (int l = 0; l < blockEnd; l++, pdVdiag += (rowsk + 1), pdQRdiag += (stride + 1)) {
-      blas::scal(rowsk - (l + 1), scales[l], pdVdiag + 1, 1);
-      blas::copy(rowsk - (l + 1), pdVdiag + 1, 1, pdQRdiag + 1, 1);
-    }
+    // Householder reflection of column l, LINPACK's formulation
+    T xll;
+    blas::getVector(1, fbytes, col, 1, &xll, 1);
+    T nrmxl = (T) remaining;
+    if (xll != T(0) && xll < T(0)) nrmxl = -nrmxl;
+    blas::scal(m, T(1) / nrmxl, col, 1);
+    blas::getVector(1, fbytes, col, 1, &xll, 1);
+    xll += T(1);
+    blas::setVector(1, fbytes, &xll, 1, col, 1);
 
-    pdQRBlock += blockSize * (stride + 1);
-    colsk -= blockSize;
-    rowsk -= blockSize;
+    int right = cols - l - 1;
+    if (right > 0) {
+      // x_j -= (u . x_j / u_l) u for every column j to the right
+      T * rest = dQR + (size_t) (l + 1) * rows + l;
+      blas::gemv('T', m, right, T(1), rest, rows, col, 1, T(0), dw, 1);
+      blas::scal(right, T(-1) / xll, dw, 1);
+      blas::ger(m, right, T(1), col, 1, dw, 1, rest, rows);
+    }
+    qrAux[l] = xll;
+    T rll = -nrmxl;
+    blas::setVector(1, fbytes, &rll, 1, col, 1);
   }
 
-  *rank = rk; 
-  checkCudaError("getQRDecompBlocked:");
-     
-  // dQR now contains the upper-triangular portion of the factorization,
-  // R.
-  // dV is lower-triangular, and contains the Householder vectors, from
-  // which the Q portion can be derived.  An adjusted form of the
-  // diagonal is saved in qrAux, while the sub-diagonal portion is
-  // written onto QR.
-
-  cudaFree(dT);
-  cudaFree(dV);
-  cudaFree(dW);
-  cudaFree(du);
-  cudaFree(dWtR);
-  cudaFree(dColNorms);
-
+  *rank = std::min(kept, rows);
+  cudaFree(dw);
+  cudaFree(dTmp);
 }
 
 template void getInverseFromQR<float>(int rows, int cols, const float * dQ, const float * dR,
@@ -523,11 +388,7 @@ template void getQRDecompRR<float>(int rows, int cols, double tol, float * dQR,
                    int * pivot, double * qrAux, int * rank);
 template void getQRDecompRR<double>(int rows, int cols, double tol, double * dQR,
                    int * pivot, double * qrAux, int * rank);
-template void getQRDecompBlocked<float>(int rows, int cols, double tol,
-                        float * dQR,
-                        int blockSize, int stride, int * pivot,
-                        double * qrAux, int * rank);
-template void getQRDecompBlocked<double>(int rows, int cols, double tol,
-                        double * dQR,
-                        int blockSize, int stride, int * pivot,
-                        double * qrAux, int * rank);
+template void getQRDecompLinpack<float>(int rows, int cols, double tol,
+  float * dQR, int * pivot, double * qrAux, int * rank);
+template void getQRDecompLinpack<double>(int rows, int cols, double tol,
+  double * dQR, int * pivot, double * qrAux, int * rank);

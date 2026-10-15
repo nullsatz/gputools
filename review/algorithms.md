@@ -137,3 +137,43 @@ documentation to it. Kept. The result matrices now carry dimnames
 `cause` x `effect` (from the variables' names), so a printed result shows
 which way it reads, and the diagonal -- a series against itself, which is no
 test -- is `NA` rather than F = 0, p = 1.
+
+## QR decomposition and least squares (`gpuQr`, `gpuLm`, `gpuLsfit`, `gpuGlm`)
+
+**Definitions.** `gpuQr` cites Bjorck (1996): Householder QR with column
+pivoting (Businger-Golub), whose rank test is relative,
+|r_kk| <= tol |r_11|. `gpuLm`/`gpuLsfit`/`gpuGlm` stand in for `lm`,
+`lsfit` and `glm`, which use LINPACK's `dqrdc2`: limited pivoting, where a
+column whose norm below the rows already reduced falls under tol times its
+own original norm is moved to the end (the rest keep their order); every
+column is still reduced, and the rank is the number not moved. Both tests
+are scale-invariant. The least-squares code cited Bischof & Van Loan
+(1987) for its blocked (WY) Householder QR.
+
+**Code before.**
+- *Rank test (both).* Stopped when the remaining norm fell below
+  tol (1 + |r_11|): relative for data of order one, but an absolute
+  threshold for data in small units. Data in units of 1e-8 got rank 0 from
+  `gpuQr` and all-`NA` coefficients from `gpuLm`, where `lm` fits normally;
+  with `tol = 1e-4`, already at 1e-5.
+- *Collinearity (`gpuLm`, `gpuLsfit`, `gpuGlm`).* The blocked QR measured
+  each column's norm over the whole column, which orthogonal reflections
+  never change, so a column that is a combination of earlier ones was never
+  detected. Exactly collinear predictors gave no `NA` and huge
+  coefficients: about 1e3 in single precision, 1.6e13 in double (`lm`:
+  0.98, -1.01, `NA`).
+- *`gpuGlm` in single precision* passed `glm.fit`'s QR tolerance,
+  min(1e-7, epsilon / 1000) = 1e-8 there, below what floats resolve, so it
+  could not detect collinearity even with a correct QR.
+
+**Now.**
+- `gpuLm`/`gpuLsfit`/`gpuGlm` use a port of `dqrdc2` (unblocked, remaining
+  norms recomputed exactly each step, LINPACK's compact output), so they
+  alias the same columns as `lm`/`lsfit`/`glm`. This replaces the blocked
+  WY QR.
+- `gpuQr` keeps full column pivoting, with Bjorck's relative rank test.
+- `gpuGlm` uses the float-sized tolerance (1e-4) in single precision and
+  `glm.fit`'s own in double.
+- Tests, in both precisions: exactly collinear predictors (same `NA` and
+  coefficients as `lm`/`glm`/`lsfit`, including `lsfit`'s collinearity
+  warning), a zero column, and data in units of 1e-9 and 1e9.
