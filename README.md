@@ -43,6 +43,23 @@ CUDA toolkit. The prebuilt packages r-universe offers (Windows, macOS, and
 its opt-in Linux binaries) are built without CUDA: they install and load,
 but their GPU functions cannot run.
 
+### Windows
+
+gputools runs on Windows under **WSL2** (the Windows Subsystem for
+Linux), which supports CUDA:
+
+1. Install the ordinary NVIDIA driver for Windows; it also serves WSL2.
+   Do not install a separate Linux driver inside WSL.
+2. In a WSL2 Linux distribution (Ubuntu, say), install R and the CUDA
+   toolkit for WSL, following NVIDIA's
+   [CUDA on WSL guide](https://docs.nvidia.com/cuda/wsl-user-guide/).
+3. Install gputools inside WSL as above.
+
+The native Windows package installs and loads, but its GPU functions
+cannot run.
+
+### Finding CUDA
+
 `configure` finds CUDA through `CUDA_HOME`, `CUDA_PATH`, `nvcc` on the
 `PATH`, or `/usr/local/cuda`; in a conda environment set
 `CUDA_HOME=$CONDA_PREFIX`. See [INSTALL](INSTALL) for the details and the
