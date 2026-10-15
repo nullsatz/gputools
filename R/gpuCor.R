@@ -67,9 +67,13 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson",
         }
     } else {
         ts <- NULL
-        kernel <- if(method == "kendall") C_gpuKendall else C_gpuSpearman
-        answer <- .Call(kernel, x, as.integer(nx), y, as.integer(ny),
-                        as.integer(size), precision)
+        answer <- if(method == "kendall") {
+            .Call(C_gpuKendall, x, as.integer(nx), y, as.integer(ny),
+                  as.integer(size), precision)
+        } else {
+            .Call(C_gpuSpearman, x, as.integer(nx), y, as.integer(ny),
+                  as.integer(size), precision)
+        }
         corr <- matrix(answer$r, nx, ny)
         pairs <- matrix(answer$n, nx, ny)
         if(use == "everything") {

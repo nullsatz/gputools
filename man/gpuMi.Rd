@@ -52,7 +52,7 @@ gpuMi(x, y = NULL, bins = 2, splineOrder = 1,
 	2004.  Estimating mutual information using B-spline functions -- an
 	improved similarity measure for analysing gene expression data.
 	\emph{BMC Bioinformatics}. 5:118.  Available from
-	\url{http://www.biomedcentral.com/1471-2105/5/118}
+	\doi{10.1186/1471-2105-5-118}
 }
 
 \examples{

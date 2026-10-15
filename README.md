@@ -188,6 +188,11 @@ Buckner J, Wilson J, Seligman M, Athey B, Watson S, Meng F (2010). The
 gputools package enables GPU computing in R. *Bioinformatics* 26(1),
 134-135. [doi:10.1093/bioinformatics/btp608](https://doi.org/10.1093/bioinformatics/btp608)
 
+## Acknowledgements
+
+Thanks to Craig Stark at UC Irvine for donating time on his lab's Mac to
+the original package.
+
 ## License
 
 GPL-3
