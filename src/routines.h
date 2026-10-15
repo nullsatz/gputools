@@ -10,6 +10,7 @@
   X(gpuCorProduct, 3)            \
   X(gpuCorPairs, 9)              \
   X(gpuAssoc, 9)                 \
+  X(gpuKmeans, 4)                \
   X(gpuRank, 2)                  \
   X(gpuSetDevice, 1)             \
   X(gpuGetDevice, 0)             \

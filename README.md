@@ -28,6 +28,7 @@ Pearson correlation 16 times, distance matrices 7 times.
 | `gpuTtest` | the correlation t-test |
 | `gpuDist` | `dist` |
 | `gpuHclust`, `gpuDistClust` | `hclust`, `hclust(dist())` |
+| `gpuKmeans` | `kmeans(algorithm = "Lloyd")` |
 | `gpuGranger` | Granger causality F-tests for every pair of series |
 | `gpuMi` | B-spline mutual information (Daub et al. 2004) |
 | `gpuPrcomp`, `gpuSvd` | `prcomp`, `svd` |
@@ -148,7 +149,8 @@ For finding the strongly correlated pairs among many variables,
 |r| >= 0.8 among 10,000 variables took 0.02 s against 6.5 s for `cor()`
 and `which()`, and among 50,000 variables, 0.09 s. An eQTL scan with
 `gpuAssoc` (20,000 genes, 50,000 SNPs, 500 samples, 5 covariates) took
-0.47 s against 11.2 s for Matrix eQTL, reporting the same associations.
+0.47 s against 11.2 s for Matrix eQTL, reporting the same associations. `gpuKmeans` put 100,000 points into
+1,000 clusters in 0.24 s, against 15 s for `kmeans()`.
 
 Below these sizes base R is faster, and each call carries a fixed cost of
 about 50 µs, so **don't loop over small pieces**: put all the variables in

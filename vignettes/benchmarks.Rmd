@@ -240,6 +240,37 @@ tests the GPU was `r round(big$MatrixEQTL / big$single)` times as fast.
 A genome-wide scan, millions of SNPs, is a loop over chromosomes or
 blocks of SNPs, each call large enough to keep the GPU busy.
 
+## K-means
+
+```{r kmeans-data, include = FALSE}
+km <- read.csv("kmeans.csv")
+```
+
+`gpuKmeans()` runs Lloyd's algorithm, step for step as
+`kmeans(algorithm = "Lloyd")` does. Base R's default, Hartigan-Wong, is
+also timed, since it is what most people run: it does more work per pass
+but needs fewer passes, and usually ends at a lower total within-cluster
+sum of squares from the same start. All runs start from the same centres
+(`r km$dimensions[1]` dimensions, at most 20 iterations); the last column
+is the GPU's sum of squares relative to Hartigan-Wong's. Times are in
+seconds; "--" was not run, base R taking many minutes.
+
+```{r kmeans-table, echo = FALSE}
+f <- function(v, d = 2) ifelse(is.na(v), "--", formatC(v, format = "f", digits = d))
+knitr::kable(data.frame(
+  Points = format(km$points, big.mark = ",", scientific = FALSE),
+  Clusters = format(km$clusters, big.mark = ","),
+  `kmeans Lloyd` = f(km$lloyd), `kmeans Hartigan-Wong` = f(km$hartiganWong),
+  `gpuKmeans single` = f(km$single, 3), `gpuKmeans double` = f(km$double, 3),
+  `sum of squares vs H-W` = f(km$wssGpu / km$wssHW, 3),
+  check.names = FALSE), align = "rrrrrrr")
+```
+
+The GPU pays off from about ten thousand points and a hundred clusters,
+and most with many clusters. Where Lloyd's algorithm ends at a worse
+sum of squares, a few random starts (`nstart`) cost little on the GPU and
+usually close the gap.
+
 ## Your own hardware
 
 To measure your own machine, run from a checkout of the source repository

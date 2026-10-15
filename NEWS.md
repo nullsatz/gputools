@@ -1,5 +1,10 @@
 # gputools (development version)
 
+- New `gpuKmeans()`: Lloyd's k-means on the GPU, step for step as
+  `kmeans(algorithm = "Lloyd")`, from the same random starts, returning a
+  `"kmeans"` object. A million points into a thousand clusters takes
+  seconds.
+
 - New `gpuAssoc()`: an association scan of every column of `x` against
   every column of `y` (SNPs against genes, in an eQTL study), linear
   regression with covariates, reporting the associations below a p-value or
