@@ -11,6 +11,7 @@
   X(gpuGetDevice, 0)             \
   X(gpuTtest, 3)                 \
   X(gpuKendall, 6)               \
+  X(gpuSpearman, 6)              \
   X(gpuGranger, 5)               \
   X(gpuGrangerXY, 7)             \
   X(gpuDist, 6)                  \
@@ -18,6 +19,7 @@
   X(gpuDistClust, 7)             \
   X(gpuQrDecomp, 3)              \
   X(gpuSolve, 3)                 \
+  X(gpuSvd, 4)                   \
   X(gpuMutualInfo, 8)            \
   X(gpuLSFit, 10)
 

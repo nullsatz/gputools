@@ -22,11 +22,13 @@ Pearson correlation 16 times, distance matrices 7 times.
 
 | gputools | base R |
 |---|---|
-| `gpuCor` (Pearson, Kendall), `gpuTtest` | `cor`, the correlation t-test |
+| `gpuCor` (Pearson, Kendall, Spearman; with p-values) | `cor`, `cor.test` |
+| `gpuTtest` | the correlation t-test |
 | `gpuDist` | `dist` |
 | `gpuHclust`, `gpuDistClust` | `hclust`, `hclust(dist())` |
 | `gpuGranger` | Granger causality F-tests for every pair of series |
 | `gpuMi` | B-spline mutual information (Daub et al. 2004) |
+| `gpuPrcomp`, `gpuSvd` | `prcomp`, `svd` |
 
 **Models and linear algebra**, with the same interface as base R:
 

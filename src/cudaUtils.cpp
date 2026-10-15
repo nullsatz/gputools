@@ -47,7 +47,7 @@ const std::vector<KernelFile> & kernelFiles()
         "centroid_kernel", "flexible_group_kernel", "flexible_kernel",
         "ward_kernel", "mcquitty_kernel", "single_kernel", "convert_kernel",
         "find_min1_kernel", "find_min2_kernel" } },
-    { "kendall", { "gpuKendall" } },
+    { "kendall", { "gpuKendall", "gpuSpearmanPairwise" } },
     { "mi", { "scale", "get_bin_scores", "get_entropy", "get_mi" } },
     { "qrdecomp",
       { "getColNorms" } },

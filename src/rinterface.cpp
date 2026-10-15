@@ -214,13 +214,22 @@ SEXP ttestT(SEXP goodPairs, SEXP coeffs)
   return doubles(ts.data(), ts.size());
 }
 
+// Kendall (kernel gpuKendall) or pairwise Spearman (gpuSpearmanPairwise)
+// over pairwise complete rows: list(r, n), the correlations and the
+// number of complete rows each used
 template <typename T>
-SEXP kendallT(SEXP x, int na, SEXP y, int nb, int size)
+SEXP rankCorT(const char * kernel, SEXP x, int na, SEXP y, int nb, int size)
 {
-  std::vector<T> a = narrow<T>(x, "x"), b = narrow<T>(y, "y");
-  SEXP out = PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb));
-  masterKendall(a.data(), na, b.data(), nb, size, REAL(out));
-  UNPROTECT(1);
+  std::vector<T> a = narrow<T>(x, "x", true), b = narrow<T>(y, "y", true);
+  const char * names[] = { "r", "n", "" };
+  SEXP values[] = {
+    PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb)),
+    PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb))
+  };
+  rankCorrelation(kernel, a.data(), na, b.data(), nb, size, REAL(values[0]),
+                  REAL(values[1]));
+  SEXP out = namedList(names, values);
+  UNPROTECT(2);
   return out;
 }
 
@@ -311,6 +320,30 @@ SEXP solveT(SEXP x, SEXP y)
   INTEGER(dim)[1] = k;
   setAttrib(out, R_DimSymbol, dim);
   UNPROTECT(2);
+  return out;
+}
+
+// svd() of an m x n matrix with m >= n (the R side transposes a wide
+// one): list(d, u, v), u and v NULL unless asked for
+template <typename T>
+SEXP svdT(SEXP x, bool wantU, bool wantV)
+{
+  SEXP dx = getAttrib(x, R_DimSymbol);
+  int m = INTEGER(dx)[0], n = INTEGER(dx)[1];
+  std::vector<T> a = narrow<T>(x, "x"), s(n), u(wantU ? (size_t) m * n : 0),
+    v(wantV ? (size_t) n * n : 0);
+  singularValues(m, n, a.data(), s.data(), wantU, u.data(), wantV, v.data());
+
+  const char * names[] = { "d", "u", "v", "" };
+  SEXP values[] = {
+    PROTECT(doubles(s.data(), n)),
+    wantU ? PROTECT(allocMatrix(REALSXP, m, n)) : R_NilValue,
+    wantV ? PROTECT(allocMatrix(REALSXP, n, n)) : R_NilValue
+  };
+  for (size_t i = 0; i < u.size(); ++i) REAL(values[1])[i] = u[i];
+  for (size_t i = 0; i < v.size(); ++i) REAL(values[2])[i] = v[i];
+  SEXP out = namedList(names, values);
+  UNPROTECT(1 + wantU + wantV);
   return out;
 }
 
@@ -454,8 +487,19 @@ SEXP gpuKendall(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
 {
   requireDevice();
   int na = asInteger(nx), nb = asInteger(ny), n = asInteger(size);
-  return isDouble(precision) ? kendallT<double>(x, na, y, nb, n)
-                             : kendallT<float>(x, na, y, nb, n);
+  return isDouble(precision)
+    ? rankCorT<double>("gpuKendall", x, na, y, nb, n)
+    : rankCorT<float>("gpuKendall", x, na, y, nb, n);
+}
+
+SEXP gpuSpearman(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
+                 SEXP precision)
+{
+  requireDevice();
+  int na = asInteger(nx), nb = asInteger(ny), n = asInteger(size);
+  return isDouble(precision)
+    ? rankCorT<double>("gpuSpearmanPairwise", x, na, y, nb, n)
+    : rankCorT<float>("gpuSpearmanPairwise", x, na, y, nb, n);
 }
 
 SEXP gpuGranger(SEXP x, SEXP rows, SEXP cols, SEXP lag, SEXP precision)
@@ -519,6 +563,13 @@ SEXP gpuSolve(SEXP x, SEXP y, SEXP precision)
 {
   requireDevice();
   return isDouble(precision) ? solveT<double>(x, y) : solveT<float>(x, y);
+}
+
+SEXP gpuSvd(SEXP x, SEXP wantU, SEXP wantV, SEXP precision)
+{
+  requireDevice();
+  bool u = asLogical(wantU), v = asLogical(wantV);
+  return isDouble(precision) ? svdT<double>(x, u, v) : svdT<float>(x, u, v);
 }
 
 SEXP gpuMutualInfo(SEXP bins, SEXP splineOrder, SEXP nsamples,

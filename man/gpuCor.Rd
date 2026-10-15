@@ -3,12 +3,10 @@
 \title{Calculate Various Correlation Coefficients With a GPU}
 
 \description{
-	The correlation coefficient will be calculated
-	for each pair $x_i$, $y_j$ where $x_i$ is a column of $x$ and $y_j$ is a
-	column of $y$.  Currently, Pearson's and Kendall's correlation
-	coefficient are implemented.  Pearson's may be calculated for
-	data sets containing NAs in which case, the implementation behaves
-	as R-native cor function with use="pairwise.complete".
+	Correlates each column of \code{x} with each column of \code{y}, as
+	\code{\link{cor}} does, with Pearson's, Kendall's (tau-b) or
+	Spearman's coefficient, and tests each correlation for zero, as
+	\code{\link{cor.test}} does.
 }
 
 \usage{
@@ -17,42 +15,45 @@ gpuCor(x, y = NULL, use = "everything", method = "pearson",
 }
 
 \arguments{
-	\item{x}{a matrix of floating point values in which each column is a 
-		random variable.}  
-	\item{y}{a matrix of floating point values in which each column is a 
-		random variable.}
-	\item{use}{a string.  A character string giving a method for computing
-		in the presence of missing values. Options are
-		"everything" or "pairwise.complete.obs". This currently only 
-		affects the "pearson" method.}
-	\item{method}{a string.  Either "pearson" or "kendall".}
+	\item{x}{a numeric matrix whose columns are the variables.}
+	\item{y}{a numeric matrix with the same number of rows, or \code{NULL}
+		for \code{x} with itself.}
+	\item{use}{\code{"everything"} (a variable with a missing value gives
+		\code{NA}) or \code{"pairwise.complete.obs"} (each pair of variables
+		uses the rows where both are present), as with \code{cor}.}
+	\item{method}{\code{"pearson"}, \code{"kendall"} or \code{"spearman"}.}
 	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
 		the GPU computes in. Single precision is the default, set with
 		\code{options(gputools.precision = "double")}; it runs many times
 		faster on most consumer GPUs. Results are returned as doubles either way.}
 }
 
-\value{
-	For method "pearson", a list with matrices 'pairs',
-	'coefficients', and 'ts'. The matrix entry $i$, $j$ for pairs represents
-	the number of pairs of entries $x_i^k$, $y_j^k$ (the $k$-th entry from
-	$x_i$ and $y_j$ respectively). These are the
-	number of entries actually used to calculate the coefficients.
-	Entry $i$, $j$ of the coefficients matrix is the correlation coefficient
-	for $x_i$, $y_j$. Entry $i$, $j$ of the ts matrix is the t-score of the
-	$i$, $j$ entry of the coefficient matrix. If use="pairwise.complete.obs"
-	then only the pairs where both entries are not NA are used in the
-	computations.
+\details{
+	Kendall's coefficient is tau-b and Spearman's is Pearson's on the ranks,
+	ties averaged; with \code{use = "pairwise.complete.obs"}, each pair is
+	ranked over its complete rows only. All three match \code{cor}.
 
-	For method "kendall", a list of matrices 'pairs' as above and
-	'coefficients' as follows. The matrix 'coefficients' is a matrix of
-	floating point numbers where entry $i$, $j$ is the correlation coefficient
-	for $x_i$, $y_j$. Calculation of t-scores for the kendall coefficients is
-	not yet implemented.
+	The p-values are two-sided and match \code{cor.test}: exactly for
+	Pearson's (a t test on \code{pairs - 2} degrees of freedom), and as
+	\code{cor.test(exact = FALSE)} gives them for Spearman's (the same t
+	approximation) and Kendall's (a normal approximation with the tie
+	correction). \code{cor.test}'s exact small-sample tests for the rank
+	coefficients are not computed.
+}
+
+\value{
+	A list of matrices, each with a row per column of \code{x} and a column
+	per column of \code{y}, named as \code{cor} names them:
+	\item{coefficients}{the correlations.}
+	\item{ts}{for Pearson's and Spearman's, the t statistics,
+		\eqn{r \sqrt{(n - 2) / (1 - r^2)}}{r sqrt((n - 2) / (1 - r^2))}.}
+	\item{z}{for Kendall's, the normal statistics.}
+	\item{p.value}{the two-sided p-values.}
+	\item{pairs}{the number of rows each correlation used.}
 }
 
 \seealso{
-	cor
+	\code{\link{cor}}, \code{\link{cor.test}}
 }
 
 \examples{
@@ -64,6 +65,7 @@ A <- matrix(runif(numAvars*numSamples), numSamples, numAvars)
 B <- matrix(runif(numBvars*numSamples), numSamples, numBvars)
 gpuCor(A, B, method="pearson")
 gpuCor(A, B, method="kendall")
+gpuCor(A, B, method="spearman")$p.value
 A[3,2] <- NA
 gpuCor(A, B, use="pairwise.complete.obs", method="pearson")
 \dontshow{\}) # examplesIf}

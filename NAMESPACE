@@ -8,9 +8,12 @@ export(gpuCor,
 	gpuMatMult, cpuMatMult, gpuCrossprod, gpuTcrossprod,
 	gpuMi,
 	gpuLm, gpuLm.fit, gpuLsfit, gpuGlm, gpuGlm.fit,
-	chooseGpu, getGpuId, gpuAvailable)
+	chooseGpu, getGpuId, gpuAvailable,
+	gpuSvd, gpuPrcomp)
 
 importFrom("stats",
+  "pnorm",
+  "pt",
   ".getXlevels",
   "as.dist",
   "complete.cases",

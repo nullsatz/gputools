@@ -75,3 +75,54 @@ test_that("kendall counts stay exact past 2^24 pairs", {
                         method = "kendall", precision = pr)$coefficients[1, 1],
                  ref, tolerance = 1e-12)
 })
+
+# x and y with ties and with missing values in a few columns
+set.seed(13)
+xm <- matrix(sample(1:6, 40 * 4, replace = TRUE), 40, 4,
+             dimnames = list(NULL, paste0("x", 1:4)))
+ym <- matrix(rnorm(40 * 3), 40, 3, dimnames = list(NULL, paste0("y", 1:3)))
+xm[c(2, 9, 31), 2] <- NA
+ym[c(5, 9), 3] <- NA
+
+for (pr in precisions) {
+  for (m in c("pearson", "kendall", "spearman")) {
+    for (u in c("everything", "pairwise.complete.obs")) {
+      test_that(paste(m, u, "matches cor() with ties and NA in", pr), {
+        skip_if_no_gpu()
+        g <- gpuCor(xm, ym, use = u, method = m, precision = pr)
+        expect_equal(g$coefficients, cor(xm, ym, use = u, method = m),
+                     tolerance = tolFor(pr))
+      })
+    }
+  }
+
+  test_that(paste("spearman without missing values matches cor() in", pr), {
+    skip_if_no_gpu()
+    expect_equal(gpuCor(x, y, method = "spearman", precision = pr)$coefficients,
+                 cor(x, y, method = "spearman"), tolerance = tolFor(pr),
+                 ignore_attr = TRUE)
+  })
+}
+
+test_that("p-values match cor.test()", {
+  skip_if_no_gpu()
+  for (m in c("pearson", "kendall", "spearman")) {
+    g <- gpuCor(xm, ym, use = "pairwise.complete.obs", method = m,
+                precision = "double")
+    for (i in 1:4) for (j in 1:3) {
+      ok <- !(is.na(xm[, i]) | is.na(ym[, j]))
+      ref <- suppressWarnings(cor.test(xm[ok, i], ym[ok, j], method = m,
+                                       exact = FALSE))
+      expect_equal(g$p.value[i, j], ref$p.value, tolerance = 1e-8,
+                   label = sprintf("%s p-value [%d, %d]", m, i, j))
+      expect_equal(g$pairs[i, j], sum(ok))
+    }
+  }
+})
+
+test_that("gpuCor names its results as cor() does", {
+  skip_if_no_gpu()
+  g <- gpuCor(xm, ym, method = "spearman")
+  for (part in c("coefficients", "ts", "p.value", "pairs"))
+    expect_identical(dimnames(g[[part]]), list(colnames(xm), colnames(ym)))
+})

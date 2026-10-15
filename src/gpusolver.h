@@ -93,6 +93,34 @@ GPUTOOLS_ORMQR(float, S)
 GPUTOOLS_ORMQR(double, D)
 #undef GPUTOOLS_ORMQR
 
+// Thin SVD of the m x n matrix a (m >= n, as cuSOLVER's gesvd requires),
+// destroying a: s gets the n singular values, u (m x n) the left singular
+// vectors if wantU, vt (n x n) the right ones transposed if wantV. Returns
+// info: 0, or the number of superdiagonals that did not converge.
+#define GPUTOOLS_GESVD(T, P)                                                \
+inline int gesvd(int m, int n, T * a, int lda, T * s, bool wantU, T * u,    \
+                 int ldu, bool wantV, T * vt, int ldvt)                     \
+{                                                                           \
+  int lwork = 0;                                                            \
+  CUSOLVER_CALL(cusolverDn##P##gesvd_bufferSize(gpuSolverHandle(), m, n,    \
+                                                &lwork));                   \
+  T * work = gpuAlloc<T>(lwork > 0 ? lwork : 1);                            \
+  T * rwork = gpuAlloc<T>(n > 1 ? n - 1 : 1);                               \
+  int * dInfo = gpuAlloc<int>(1), info = 0;                                 \
+  CUSOLVER_CALL(cusolverDn##P##gesvd(gpuSolverHandle(), wantU ? 'S' : 'N',  \
+    wantV ? 'S' : 'N', m, n, a, lda, s, u, ldu, vt, ldvt, work, lwork,      \
+    rwork, dInfo));                                                         \
+  CUDART_CALL(cudaMemcpy(&info, dInfo, sizeof(int),                         \
+                         cudaMemcpyDeviceToHost));                          \
+  cudaFree(work);                                                           \
+  cudaFree(rwork);                                                          \
+  cudaFree(dInfo);                                                          \
+  return info;                                                              \
+}
+GPUTOOLS_GESVD(float, S)
+GPUTOOLS_GESVD(double, D)
+#undef GPUTOOLS_GESVD
+
 } // namespace solver
 
 #endif /* _GPUSOLVER_H_ */
