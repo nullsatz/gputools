@@ -23,6 +23,7 @@
 #include "rank.h"
 #include "pairs.h"
 #include "kmeans.h"
+#include "perm.h"
 
 #include "rinterface.h"
 #include "routines.h"
@@ -384,6 +385,33 @@ SEXP kmeansT(SEXP x, SEXP centers, int maxiter)
   return out;
 }
 
+// Permutation test of the Pearson correlations of the columns of x with
+// those of y (x itself when y is NULL), y's rows permuted by each column
+// of perms (0-based): list(r, counts, maxima)
+template <typename T>
+SEXP corPermT(SEXP x, SEXP y, SEXP perms, double eps)
+{
+  bool same = isNull(y);
+  SEXP dx = getAttrib(x, R_DimSymbol);
+  int n = INTEGER(dx)[0], p = INTEGER(dx)[1],
+    q = same ? p : INTEGER(getAttrib(y, R_DimSymbol))[1],
+    B = INTEGER(getAttrib(perms, R_DimSymbol))[1];
+  std::vector<T> zx = standardised<T>(x, n, p), zy;
+  if (!same) zy = standardised<T>(y, n, q);
+
+  const char * names[] = { "r", "counts", "maxima", "" };
+  SEXP values[] = {
+    PROTECT(allocMatrix(REALSXP, p, q)), PROTECT(allocMatrix(INTSXP, p, q)),
+    PROTECT(allocVector(REALSXP, B))
+  };
+  permuteCorrelations<T>(n, p, zx.data(), q, same ? NULL : zy.data(), B,
+                         INTEGER(perms), eps, REAL(values[0]),
+                         INTEGER(values[1]), REAL(values[2]));
+  SEXP out = namedList(names, values);
+  UNPROTECT(3);
+  return out;
+}
+
 // rank(ties.method = "average", na.last = "keep") of each column of x,
 // on the GPU
 template <typename T>
@@ -716,6 +744,14 @@ SEXP gpuKmeans(SEXP x, SEXP centers, SEXP iterMax, SEXP precision)
   int maxiter = asInteger(iterMax);
   return isDouble(precision) ? kmeansT<double>(x, centers, maxiter)
                              : kmeansT<float>(x, centers, maxiter);
+}
+
+SEXP gpuCorPerm(SEXP x, SEXP y, SEXP perms, SEXP eps, SEXP precision)
+{
+  requireDevice();
+  double e = asReal(eps);
+  return isDouble(precision) ? corPermT<double>(x, y, perms, e)
+                             : corPermT<float>(x, y, perms, e);
 }
 
 SEXP gpuRank(SEXP x, SEXP precision)
