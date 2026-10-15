@@ -1,7 +1,7 @@
 ## Resubmission of an archived package
 
 gputools was archived on 2017-12-19 because check problems were not
-corrected. Version 2.0.0 is a rewrite of the build and much of the code:
+corrected. Version 2.1.0 is a rewrite of the build and much of the code:
 
 * The package now builds and installs on every platform, with or without
   CUDA. `configure` looks for a CUDA toolkit (11.7 or later); when there is
