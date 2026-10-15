@@ -1,5 +1,9 @@
 # gputools (development version)
 
+The benchmarks vignette now says at what data size each function starts to
+beat base R, and what a loop of small calls costs; `bench/crossover.R`
+repeats the measurement.
+
 Every method was checked against its published or standard definition;
 `review/algorithms.md` in the source repository has the details. Fixed:
 

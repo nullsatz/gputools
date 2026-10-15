@@ -34,9 +34,9 @@ bench <- function(task, size, cpu, gpu) {
       timeIt(function() gpu("single")), timeIt(function() gpu("double")))
 }
 
-set.seed(1)
-
-# one-off kernel compilation, in a fresh process per precision
+# one-off kernel compilation, in a fresh process per precision -- measured
+# before this process uses the GPU, since a GPU in exclusive-process mode
+# refuses a second process
 compileCost <- function(precision) {
   cmd <- sprintf(paste0("library(gputools); x <- matrix(runif(200), 20);",
                         "cat(system.time(gpuDist(x, precision = '%s'))",
@@ -44,6 +44,10 @@ compileCost <- function(precision) {
   as.numeric(system2(file.path(R.home("bin"), "Rscript"),
                      c("-e", shQuote(cmd)), stdout = TRUE))
 }
+compiled <- c(single = compileCost("single"), double = compileCost("double"))
+
+set.seed(1)
+
 
 for (n in c(2000, 4000)) {
   a <- matrix(rnorm(n * n), n); b <- matrix(rnorm(n * n), n)
@@ -112,7 +116,7 @@ bench("gpuSolve vs solve", "2000 x 2000",
       function() solve(s), function(p) gpuSolve(s, precision = p))
 
 add("kernel compile, first use of a file", "gpuDist kernels",
-    NA, compileCost("single"), compileCost("double"))
+    NA, compiled[["single"]], compiled[["double"]])
 
 res <- do.call(rbind, results)
 dir.create(out, showWarnings = FALSE)
