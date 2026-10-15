@@ -25,6 +25,8 @@ Pearson correlation 16 times, distance matrices 7 times.
 | `gpuCor` (Pearson, Kendall, Spearman; with p-values) | `cor`, `cor.test` |
 | `gpuCorPairs` | `cor` then `which(abs(r) >= t)`, without the matrix |
 | `gpuAssoc` | `lm(y[, j] ~ x[, i] + covariates)` for every pair: an eQTL scan, as Matrix eQTL |
+| `gpuCorPerm` | permutation and maxT p-values for every correlation |
+| `gpuRowTtest` | `t.test` of every row, with permutation and maxT p-values |
 | `gpuTtest` | the correlation t-test |
 | `gpuDist` | `dist` |
 | `gpuHclust`, `gpuDistClust` | `hclust`, `hclust(dist())` |
@@ -149,8 +151,12 @@ For finding the strongly correlated pairs among many variables,
 |r| >= 0.8 among 10,000 variables took 0.02 s against 6.5 s for `cor()`
 and `which()`, and among 50,000 variables, 0.09 s. An eQTL scan with
 `gpuAssoc` (20,000 genes, 50,000 SNPs, 500 samples, 5 covariates) took
-0.47 s against 11.2 s for Matrix eQTL, reporting the same associations. `gpuKmeans` put 100,000 points into
-1,000 clusters in 0.24 s, against 15 s for `kmeans()`.
+0.37 s against 11 s for Matrix eQTL, reporting the same associations.
+`gpuKmeans` put 100,000 points into 1,000 clusters in 0.25 s, against
+14.5 s for `kmeans()`. Permutation tests
+gain most: a thousand permutations of every correlation among 1,000 x
+1,000 variables, maxT included, took 0.13 s against 20 s in R, and of
+t tests of 20,000 genes, 0.06 s against 23 s.
 
 Below these sizes base R is faster, and each call carries a fixed cost of
 about 50 µs, so **don't loop over small pieces**: put all the variables in

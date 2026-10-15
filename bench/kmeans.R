@@ -21,7 +21,8 @@ for (sz in list(c(1e3, 10), c(1e4, 10), c(1e4, 100), c(1e5, 10),
   mids <- matrix(rnorm(k * d, sd = 3), k, d)
   x <- mids[sample(k, n, replace = TRUE), ] + matrix(rnorm(n * d), n, d)
   starts <- x[sample(n, k), ]
-  invisible(gpuKmeans(x[1:200, ], 5))                  # warm up
+  for (pr in c("single", "double"))                    # warm up
+    invisible(gpuKmeans(x[1:200, ], 5, precision = pr))
   run <- function(f) {
     res <- NULL
     t <- once(function() res <<- suppressWarnings(f()))

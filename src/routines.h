@@ -11,6 +11,8 @@
   X(gpuCorPairs, 9)              \
   X(gpuAssoc, 9)                 \
   X(gpuKmeans, 4)                \
+  X(gpuCorPerm, 5)               \
+  X(gpuRowTtest, 6)              \
   X(gpuRank, 2)                  \
   X(gpuSetDevice, 1)             \
   X(gpuGetDevice, 0)             \
