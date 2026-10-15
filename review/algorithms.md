@@ -88,3 +88,25 @@ recommend b around -0.25 (slightly space-dilating); b = +0.5 is strongly
 space-contracting. Options: expose `beta` (with ai, aj following from it)
 and keep 0.5 as the default for compatibility, or change the default to the
 literature's -0.25.
+
+## B-spline mutual information (`gpuMi`)
+
+**Definition.** Daub, Steuer, Selbig & Kloska (2004), BMC Bioinformatics
+5:118. Each variable is scaled linearly onto the spline domain
+[0, M - k + 1]; each value is spread over the M bins with weights
+B_{i,k}(z), Cox-de Boor B-splines of order k on the knot vector
+0..0, 1, 2, ..., M-k+1..M-k+1; bin probabilities are the mean weights and
+joint probabilities the mean products of weights; entropies are in bits and
+MI(x, y) = H(x) + H(y) - H(x, y). (The paper's equations are images; the
+knot vector and scaling follow from its text and are confirmed by its worked
+example.)
+
+**Reference.** `daubMI()` in `tests/testthat/helper-gpu.R`, written from
+the paper. It reproduces the paper's worked example exactly (M = 3, k = 2:
+the Table 1 weights, p(a) = (1.8, 2.4, 1.8)/6, H(x) =
+log2(10) - 0.6 log2(3) - 0.4 log2(4) = 1.571, MI = 0.4489, printed as 0.45).
+
+**Code.** Correct: `gpuMi` matches the reference to 5e-15 in double
+precision for bins 5 and 10 and spline orders 1-4, and gives the paper's
+0.4489 on its example. Tests: the worked example and the random-data
+comparison, in both precisions.

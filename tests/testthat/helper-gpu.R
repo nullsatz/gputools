@@ -68,3 +68,38 @@ lanceWilliams <- function(d, method, lambda = 0.5, beta = 0.5) {
   }
   heights
 }
+
+# Mutual information by Daub et al. (2004), "Estimating mutual information
+# using B-spline functions", BMC Bioinformatics 5:118, from the paper:
+# each variable is scaled linearly onto the spline domain [0, M - k + 1],
+# each value is spread over the M bins with weights B_{i,k}(z) (Cox-de Boor
+# on the knot vector 0..0, 1, 2, ..., M-k+1..M-k+1), probabilities are the
+# mean weights, entropies are in bits, and MI = H(x) + H(y) - H(x, y).
+bsplineWeights <- function(x, bins, order) {
+  knots <- c(rep(0, order), seq_len(bins - order),
+             rep(bins - order + 1, order))
+  z <- (x - min(x)) / (max(x) - min(x)) * (bins - order + 1)
+  basis <- function(i, k, z) {        # B_{i,k}, i = 1..bins, Cox-de Boor
+    if (k == 1) {
+      inside <- knots[i] <= z & z < knots[i + 1]
+      # the right end of the domain belongs to the last non-empty interval
+      last <- z == knots[length(knots)] & knots[i + 1] == knots[length(knots)] &
+        knots[i] < knots[i + 1]
+      return(as.numeric(inside | last))
+    }
+    left <- if (knots[i + k - 1] > knots[i])
+      (z - knots[i]) / (knots[i + k - 1] - knots[i]) * basis(i, k - 1, z) else 0
+    right <- if (knots[i + k] > knots[i + 1])
+      (knots[i + k] - z) / (knots[i + k] - knots[i + 1]) *
+        basis(i + 1, k - 1, z) else 0
+    left + right
+  }
+  sapply(seq_len(bins), function(i) basis(i, order, z))
+}
+entropyBits <- function(p) -sum(p[p > 0] * log2(p[p > 0]))
+daubMI <- function(x, y, bins, order) {
+  wx <- bsplineWeights(x, bins, order)
+  wy <- bsplineWeights(y, bins, order)
+  entropyBits(colMeans(wx)) + entropyBits(colMeans(wy)) -
+    entropyBits(crossprod(wx, wy) / length(x))
+}
