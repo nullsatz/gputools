@@ -6,3 +6,4 @@
 ^ci$
 ^bench$
 ^\.gitattributes$
+^review$
