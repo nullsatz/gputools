@@ -5,9 +5,8 @@ template <typename T>
 void getQRDecompRR(int rows, int cols, double tol, T * dQR,
                    int * pivot, double * qrAux, int * rank);
 template <typename T>
-void getQRDecompBlocked(int rows, int cols, double tol, T * dQR,
-                        int blockSize, int rowsUnblocked, int * pivot,
-                        double * qrAux, int * rank);
+void getQRDecompLinpack(int rows, int cols, double tol, T * dQR,
+                        int * pivot, double * qrAux, int * rank);
 
 template <typename T>
 void getInverseFromQR(int rows, int cols, const T * dQ, const T * dR, 

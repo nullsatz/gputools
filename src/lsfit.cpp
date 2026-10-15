@@ -15,42 +15,19 @@
 // reserved.
 //
 
-// Rounds "length" up to the next multiple of the block length.
-//
-int alignBlock(int length, unsigned blockExp) {
-  int blockSize = 1 << blockExp;
-  return (length + blockSize - 1) & (((unsigned) -1)  << blockExp);
-}
-
 template <typename T>
 void leastSquaresFit(T * X, int rows, int cols, T * Y, int yCols,
                double tol, T * coeffs, T * resids, T * effects,
                int * rank, int * pivot, double * qrAux)
 {
 	const int
-		fbytes = sizeof(T);
+		fbytes = sizeof(T), stride = rows;
 
-	// Should be >= 4, to satisfy alignment criterea for memory
-	// coalescence.  For larger arrays (> 1000 rows), best performance
-	// has been observed at 7.
-	//
-	const unsigned blockExp = 7; // Gives blockSize = 2^7 = 128.
-
-	T *dQR;
-
-	int stride = alignBlock(rows, blockExp);
-	
-	dQR = gpuAlloc<T>(stride * cols);
-
-	// This is overkill:  just need to zero the padding.
-	//
-	cudaMemset2D(dQR, cols * fbytes, T(0), cols * fbytes, stride); 
+	T * dQR = gpuAlloc<T>((size_t) rows * cols);
 	blas::setMatrix(rows, cols, fbytes, X, rows, dQR, stride);
 
-  // On return we have dQR in pivoted, packed QR form.
-  
-  getQRDecompBlocked(rows, cols, tol, dQR, 1 << blockExp,
-                     stride, pivot, qrAux, rank);
+	// dQR in pivoted, packed QR form, as lm()'s dqrdc2 leaves it
+	getQRDecompLinpack(rows, cols, tol, dQR, pivot, qrAux, rank);
 	blas::getMatrix(rows, cols, fbytes, dQR, stride, X, rows);
 
 	if(*rank > 0)

@@ -1,5 +1,5 @@
 Package: gputools
-Version: 2.0.0
+Version: 2.0.0.9000
 Title: A Few GPU Enabled Functions
 Authors@R: c(person("Josh", "Buckner", email = "nullsatz@gmail.com",
                     role = c("aut", "cre")),

@@ -648,7 +648,10 @@ gpuGlm.fit <-
 
 	fit <- .Call(C_gpuLSFit, qr, as.integer(ngoodobs), as.integer(nvars),
 		yIn, 1L,
-		as.double(min(gpuLm.defaultTol(useSingle), control$epsilon/1000)),
+		# glm.fit's QR tolerance in double; in single precision that is
+		# below what floats resolve, so collinear columns were never caught
+		as.double(if (useSingle) gpuLm.defaultTol(TRUE)
+		          else min(1e-7, control$epsilon / 1000)),
 		coef, resid, effects, if (useSingle) "single" else "double")
 
 

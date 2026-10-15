@@ -1,47 +1,58 @@
 #define NUMTHREADS 16
-#define THREADWORK 32
 
-__global__ void gpuKendall(const real * a, size_t na, 
-	const real * b, size_t nb, size_t sampleSize, double * results) 
+// Kendall's tau-b of column bx of a with column by of b, as cor() computes
+// it:
+//
+//   (C - D) / sqrt((n0 - Tx) (n0 - Ty))
+//
+// over the n0 = n (n - 1) / 2 pairs of observations, where C and D count
+// the concordant and discordant pairs and Tx, Ty the pairs tied in x and
+// in y (a pair tied in both counts in both, and is neither concordant nor
+// discordant). The counts are integers so they stay exact however many
+// pairs there are.
+__global__ void gpuKendall(const real * a, size_t na,
+	const real * b, size_t nb, size_t sampleSize, double * results)
 {
-	size_t 
-		i, j, tests, 
-		tx = threadIdx.x, ty = threadIdx.y, 
+	typedef unsigned long long count;
+	const int nthreads = NUMTHREADS * NUMTHREADS;
+	size_t
+		tx = threadIdx.x, ty = threadIdx.y,
 		bx = blockIdx.x, by = blockIdx.y,
-		rowa = bx * sampleSize, rowb = by * sampleSize;
-	real 
-		discordant, concordant = real(0), 
-		numer, denom;
+		rowa = bx * sampleSize, rowb = by * sampleSize,
+		t = tx * NUMTHREADS + ty;
+	count c = 0, d = 0, tiesA = 0, tiesB = 0;
 
-	__shared__ real threadSums[NUMTHREADS*NUMTHREADS];
+	__shared__ count sums[4 * nthreads];
 
-	for(i = tx; i < sampleSize; i += NUMTHREADS) {
-		for(j = i+1+ty; j < sampleSize; j += NUMTHREADS) {
-			tests = ((a[rowa+j] >  a[rowa+i]) && (b[rowb+j] >  b[rowb+i]))
-				+ ((a[rowa+j] <  a[rowa+i]) && (b[rowb+j] <  b[rowb+i])) 
-				+ ((a[rowa+j] == a[rowa+i]) && (b[rowb+j] == b[rowb+i])); 
-			concordant = concordant + (real)tests;
+	for(size_t i = tx; i < sampleSize; i += NUMTHREADS) {
+		real ai = a[rowa+i], bi = b[rowb+i];
+		for(size_t j = i+1+ty; j < sampleSize; j += NUMTHREADS) {
+			real da = a[rowa+j] - ai, db = b[rowb+j] - bi;
+			tiesA += (da == real(0));
+			tiesB += (db == real(0));
+			c += (da > real(0) && db > real(0)) || (da < real(0) && db < real(0));
+			d += (da > real(0) && db < real(0)) || (da < real(0) && db > real(0));
 		}
 	}
-	threadSums[tx*NUMTHREADS+ty] = concordant;
-
+	sums[t] = c;
+	sums[t + nthreads] = d;
+	sums[t + 2 * nthreads] = tiesA;
+	sums[t + 3 * nthreads] = tiesB;
 	__syncthreads();
-	for(i = NUMTHREADS >> 1; i > 0; i >>= 1) {
-		if(ty < i) 
-			threadSums[tx*NUMTHREADS+ty] += threadSums[tx*NUMTHREADS+ty+i];
+
+	for(int stride = nthreads >> 1; stride > 0; stride >>= 1) {
+		if(t < stride)
+			for(int k = 0; k < 4; ++k)
+				sums[t + k * nthreads] += sums[t + stride + k * nthreads];
 		__syncthreads();
 	}
-  for(i = NUMTHREADS >> 1; i > 0; i >>= 1) {
-    if((tx < i) && (ty == 0))
-      threadSums[tx*NUMTHREADS] += threadSums[(tx+i)*NUMTHREADS];
-    __syncthreads();
-  }
 
-	if((tx == 0) && (ty == 0)) {
-		concordant = threadSums[0];
-		denom = (real)sampleSize;
-		denom = (denom * (denom - real(1))) / real(2); discordant = denom - concordant;
-		numer = concordant - discordant;
-		results[by*na+bx] = ((double)numer)/((double)denom);
+	if(t == 0) {
+		double
+			n0 = 0.5 * (double) sampleSize * ((double) sampleSize - 1.0),
+			numer = (double) sums[0] - (double) sums[nthreads],
+			denom = sqrt((n0 - (double) sums[2 * nthreads]) *
+			             (n0 - (double) sums[3 * nthreads]));
+		results[by*na+bx] = numer / denom;
 	}
 }

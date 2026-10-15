@@ -1,6 +1,9 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<math.h>
+#include <cmath>
+#include <limits>
+#include <algorithm>
 #include "cuda_runtime.h"
 #include<cuseful.h>
 #include<R.h>
@@ -13,6 +16,22 @@
 
 #define NUMTHREADS 16
 #define THREADWORK 32
+
+// The t statistic of a correlation r from npairs pairs,
+// r sqrt((npairs - 2) / (1 - r^2)): +-Inf at |r| = 1, NaN with fewer than
+// three pairs. r is clamped to [-1, 1] against rounding.
+template <typename T>
+static T tScore(T npairs, T r)
+{
+  if(!(npairs > T(2)))
+    return std::numeric_limits<T>::quiet_NaN();
+  r = std::min(T(1), std::max(T(-1), r));
+  T denom = T(1) - r * r;
+  if(denom <= T(0))
+    return r > 0 ? std::numeric_limits<T>::infinity()
+                 : -std::numeric_limits<T>::infinity();
+  return r * std::sqrt((npairs - T(2)) / denom);
+}
 
 template <typename T>
 void testSignif(const T * goodPairs, const T * coeffs, 
@@ -53,16 +72,8 @@ template <typename T>
 void hostSignif(const T * goodPairs, const T * coeffs, size_t n, 
                 T * tscores)
 {
-  T cor, radicand;
-  for(size_t i = 0; i < n; i++) {
-    cor = coeffs[i];
-    if(cor >= T(0.999)) 
-      tscores[i] = T(10000.0);
-    else {
-      radicand = (goodPairs[i] - T(2)) / (T(1) - cor * cor);
-      tscores[i] = cor * sqrtf(radicand);
-    }
-  }
+  for(size_t i = 0; i < n; i++)
+    tscores[i] = tScore(goodPairs[i], coeffs[i]);
 }
 
 template <typename T>

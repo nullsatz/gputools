@@ -26,7 +26,19 @@ gpuGranger <- function(x, y=NULL, lag,
                          as.integer(colsx), y, as.integer(colsy), lag,
                          precision)
     }
-    fStats <- matrix(cRetVal$fStats, colsx, colsy)
-    pValues <- matrix(cRetVal$pValues, colsx, colsy)
+    # [i, j] tests whether x[, i] Granger-causes x[, j] (or y[, j]); the
+    # dimnames say so when printed
+    names <- function(m, prefix)
+        if (is.null(colnames(m))) paste0(prefix, seq_len(ncol(m))) else colnames(m)
+    causes <- names(x, "x")
+    effects <- if (is.null(y)) causes else names(y, "y")
+    dn <- list(cause = causes, effect = effects)
+    fStats <- matrix(cRetVal$fStats, colsx, colsy, dimnames = dn)
+    pValues <- matrix(cRetVal$pValues, colsx, colsy, dimnames = dn)
+    if (is.null(y)) {
+        # a series does not Granger-cause itself: no test, so no value
+        diag(fStats) <- NA
+        diag(pValues) <- NA
+    }
     return(list(fStatistics = fStats, pValues = pValues))
 }

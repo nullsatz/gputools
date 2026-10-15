@@ -323,7 +323,10 @@ __global__ void flexible_group_kernel(real * dist, const size_t pitch_dist,
     real nr = count[row_winner];
     real np = -1.0 * count[col_winner];
     real nq = nr - np;
-    bot_val = (bot_val * (1.0 - lambda) * np + top_val * (1.0 - lambda) *  nq) / nr + beta * val[iter];
+    // Belbin et al.'s flexible UPGMA: each cluster weighted by its own
+    // size -- bot_val is the row_winner cluster (nq members), top_val the
+    // col_winner one (np)
+    bot_val = (bot_val * (1.0 - lambda) * nq + top_val * (1.0 - lambda) *  np) / nr + beta * val[iter];
     if(col == col_winner || col == row_winner) {
       bot_val = REAL_INF;
     }

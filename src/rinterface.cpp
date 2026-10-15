@@ -97,29 +97,32 @@ bool isDouble(SEXP precision)
 
 } // namespace
 
+// The names the R functions pass. An unknown name is an error: falling
+// back to a default once ran "flexible group" as single linkage.
 dist_method getDistEnum(const char * methodStr)
 {
+  if(0 == strcmp(methodStr,"euclidean"))  return EUCLIDEAN;
   if(0 == strcmp(methodStr,"maximum"))    return MAXIMUM;
   if(0 == strcmp(methodStr,"manhattan"))  return MANHATTAN;
   if(0 == strcmp(methodStr,"canberra"))   return CANBERRA;
   if(0 == strcmp(methodStr,"binary"))     return BINARY;
   if(0 == strcmp(methodStr,"minkowski"))  return MINKOWSKI;
-  //      if(0 == strcmp(methodStr,"dot"))                return DOT;
-  return EUCLIDEAN;
+  error("gputools: unknown distance method \"%s\"", methodStr);
 }
 
 hc_method getClusterEnum(const char * methodStr)
 {
-  if(0 == strcmp(methodStr,"complete"))           return COMPLETE;
-  if(0 == strcmp(methodStr,"wpgma"))                      return WPGMA;
-  if(0 == strcmp(methodStr,"average"))            return AVERAGE;
-  if(0 == strcmp(methodStr,"median"))                     return MEDIAN;
-  if(0 == strcmp(methodStr,"centroid"))           return CENTROID;
-  if(0 == strcmp(methodStr,"flexible_group"))     return FLEXIBLE_GROUP;
-  if(0 == strcmp(methodStr,"flexible"))           return FLEXIBLE;
-  if(0 == strcmp(methodStr,"ward"))                       return WARD;
-  if(0 == strcmp(methodStr,"mcquitty"))           return MCQUITTY;
-  return SINGLE;
+  if(0 == strcmp(methodStr,"single"))         return SINGLE;
+  if(0 == strcmp(methodStr,"complete"))       return COMPLETE;
+  if(0 == strcmp(methodStr,"wpgma"))          return WPGMA;
+  if(0 == strcmp(methodStr,"average"))        return AVERAGE;
+  if(0 == strcmp(methodStr,"median"))         return MEDIAN;
+  if(0 == strcmp(methodStr,"centroid"))       return CENTROID;
+  if(0 == strcmp(methodStr,"flexible group")) return FLEXIBLE_GROUP;
+  if(0 == strcmp(methodStr,"flexible"))       return FLEXIBLE;
+  if(0 == strcmp(methodStr,"ward"))           return WARD;
+  if(0 == strcmp(methodStr,"mcquitty"))       return MCQUITTY;
+  error("gputools: unknown clustering method \"%s\"", methodStr);
 }
 
 void formatClustering(const int len, const int * sub,  const int * sup, 

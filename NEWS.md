@@ -1,3 +1,25 @@
+# gputools (development version)
+
+Every method was checked against its published or standard definition;
+`review/algorithms.md` in the source repository has the details. Fixed:
+
+- `gpuLm`, `gpuLsfit` and `gpuGlm` did not detect collinear predictors:
+  where `lm()` reports a coefficient as `NA`, they returned huge values.
+  They now use the QR decomposition `lm()` uses (LINPACK's `dqrdc2`) and
+  alias the same columns.
+- `gpuLm`, `gpuLsfit`, `gpuGlm` and `gpuQr` treated data in small units
+  (around 1e-8) as rank 0, returning `NA` coefficients; their rank tests are
+  now relative.
+- `gpuCor(method = "kendall")` was wrong whenever the data had ties; it now
+  computes tau-b, as `cor()` does, with exact pair counts.
+- `gpuHclust(method = "flexible group")` computed single linkage; it now
+  computes flexible UPGMA.
+- `gpuCor()$ts` was 10000 for every correlation of 0.999 or more, and the
+  t-scores lost precision in double; `gpuTtest` gave `NaN` at |r| = 1.
+- `gpuGranger`'s result matrices are labelled `cause` x `effect`, and their
+  diagonal is `NA` (a series against itself is no test) rather than F = 0,
+  p = 1.
+
 # gputools 2.0.0
 
 ## Wrong results fixed

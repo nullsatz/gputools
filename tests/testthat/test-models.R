@@ -62,3 +62,47 @@ test_that("the gputools.precision option sets the default", {
                tolerance = 1e-8)
   expect_equal(gpuQr(cbind(d$a, d$b))$rank, 2L)
 })
+
+for (pr in precisions) {
+  single <- pr == "single"
+  tolLm <- if (single) 1e-3 else 1e-8
+
+  test_that(paste("collinear predictors are aliased as lm() does in", pr), {
+    skip_if_no_gpu()
+    set.seed(11)
+    dc <- data.frame(a = rnorm(50), b = rnorm(50))
+    dc$c <- dc$a + 2 * dc$b                      # exactly collinear
+    dc$y <- 1 + dc$a - dc$b + rnorm(50, sd = 0.1)
+    expect_equal(coef(gpuLm(y ~ a + b + c, dc, useSingle = single)),
+                 coef(lm(y ~ a + b + c, dc)), tolerance = tolLm)
+    expect_equal(coef(gpuGlm(y ~ a + b + c, data = dc, useSingle = single)),
+                 coef(glm(y ~ a + b + c, data = dc)), tolerance = tolLm)
+    X <- as.matrix(dc[, c("a", "b", "c")])
+    expect_warning(fit <- gpuLsfit(X, dc$y, useSingle = single),
+                   "collinear")
+    ref <- suppressWarnings(lsfit(X, dc$y))
+    expect_equal(fit$qr$rank, ref$qr$rank)
+    expect_equal(fit$coefficients, ref$coefficients, tolerance = tolLm,
+                 ignore_attr = TRUE)
+  })
+
+  test_that(paste("the fit does not depend on the units of the data in",
+                  pr), {
+    skip_if_no_gpu()
+    for (s in c(1e-9, 1e9)) {
+      ds <- data.frame(y = d$y * s, a = d$a * s, b = d$b * s)
+      expect_equal(coef(gpuLm(y ~ a + b, ds, useSingle = single)),
+                   coef(lm(y ~ a + b, ds)), tolerance = tolLm,
+                   label = paste("scale", s))
+      q <- gpuQr(cbind(d$a, d$b) * s, precision = pr)
+      expect_equal(q$rank, 2L, label = paste("gpuQr rank at scale", s))
+    }
+  })
+
+  test_that(paste("a column of zeros is aliased in", pr), {
+    skip_if_no_gpu()
+    dz <- transform(d, zero = 0)
+    expect_equal(coef(gpuLm(y ~ a + zero + b, dz, useSingle = single)),
+                 coef(lm(y ~ a + zero + b, dz)), tolerance = tolLm)
+  })
+}
