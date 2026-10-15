@@ -22,17 +22,21 @@ corrected. Version 2.0.0 is a rewrite of the build and much of the code:
   --as-cran`, with the full test suite running on the GPU
 * GitHub Actions: Ubuntu with CUDA 11.8, 12.6 and 13.0 (build and install),
   Ubuntu without CUDA, and Windows without CUDA
-* win-builder (R-devel)
+* win-builder (R-release and R-devel)
+* mac-builder (R-release, macOS arm64)
 
 ## R CMD check results
 
 0 errors | 0 warnings | 1 note
 
 * "Package was archived on CRAN": this is the resubmission described above.
+  The same note lists possibly misspelled words in DESCRIPTION; they are
+  names (Granger, Shabalin, Westfall), "et al.", and maxT, the name of
+  Westfall and Young's method.
 
 ## Use of AI tools
 
-The 2.0.0 modernisation (build system, NVRTC kernels, tests, and the new
+The 2.x modernisation (build system, NVRTC kernels, tests, and the new
 functions) was done by the maintainer with the help of an AI coding
 assistant (Anthropic's Claude). Every function was checked against the base
 R function or published method it implements, by tests that compare the
