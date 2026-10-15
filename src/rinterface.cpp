@@ -214,13 +214,22 @@ SEXP ttestT(SEXP goodPairs, SEXP coeffs)
   return doubles(ts.data(), ts.size());
 }
 
+// Kendall (kernel gpuKendall) or pairwise Spearman (gpuSpearmanPairwise)
+// over pairwise complete rows: list(r, n), the correlations and the
+// number of complete rows each used
 template <typename T>
-SEXP kendallT(SEXP x, int na, SEXP y, int nb, int size)
+SEXP rankCorT(const char * kernel, SEXP x, int na, SEXP y, int nb, int size)
 {
-  std::vector<T> a = narrow<T>(x, "x"), b = narrow<T>(y, "y");
-  SEXP out = PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb));
-  masterKendall(a.data(), na, b.data(), nb, size, REAL(out));
-  UNPROTECT(1);
+  std::vector<T> a = narrow<T>(x, "x", true), b = narrow<T>(y, "y", true);
+  const char * names[] = { "r", "n", "" };
+  SEXP values[] = {
+    PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb)),
+    PROTECT(allocVector(REALSXP, (R_xlen_t) na * nb))
+  };
+  rankCorrelation(kernel, a.data(), na, b.data(), nb, size, REAL(values[0]),
+                  REAL(values[1]));
+  SEXP out = namedList(names, values);
+  UNPROTECT(2);
   return out;
 }
 
@@ -454,8 +463,19 @@ SEXP gpuKendall(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
 {
   requireDevice();
   int na = asInteger(nx), nb = asInteger(ny), n = asInteger(size);
-  return isDouble(precision) ? kendallT<double>(x, na, y, nb, n)
-                             : kendallT<float>(x, na, y, nb, n);
+  return isDouble(precision)
+    ? rankCorT<double>("gpuKendall", x, na, y, nb, n)
+    : rankCorT<float>("gpuKendall", x, na, y, nb, n);
+}
+
+SEXP gpuSpearman(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
+                 SEXP precision)
+{
+  requireDevice();
+  int na = asInteger(nx), nb = asInteger(ny), n = asInteger(size);
+  return isDouble(precision)
+    ? rankCorT<double>("gpuSpearmanPairwise", x, na, y, nb, n)
+    : rankCorT<float>("gpuSpearmanPairwise", x, na, y, nb, n);
 }
 
 SEXP gpuGranger(SEXP x, SEXP rows, SEXP cols, SEXP lag, SEXP precision)

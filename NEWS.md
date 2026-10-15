@@ -28,6 +28,12 @@ New:
   made it slower than `solve()`. `y` may now be a matrix, and results are
   named as `solve()` names them. Building gputools now also needs
   cuSOLVER, which comes with the CUDA toolkit.
+- `gpuCor` computes Spearman's coefficient (`method = "spearman"`), and
+  Kendall's now honours `use = "pairwise.complete.obs"` (it warned and
+  ignored it). Every method returns p-values (`$p.value`) as `cor.test()`
+  gives them -- exactly for Pearson's, as `cor.test(exact = FALSE)` for the
+  rank coefficients -- and Kendall's its z statistics (`$z`). Results carry
+  `cor()`'s dimnames.
 - `gpuHclust` and `gpuDistClust` take `beta`, the parameter of the
   `"flexible"` and `"flexible group"` methods, which was fixed at 0.5. The
   default stays 0.5; Lance and Williams (1967) recommend -0.25.
