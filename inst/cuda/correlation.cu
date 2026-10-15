@@ -305,9 +305,16 @@ __global__ void gpuSignif(const real * gpuNumPairs,
 		if(start+i >= n)
 			break;
 
+		// as tScore() in correlation.cpp: +-Inf at |r| = 1, NaN with fewer
+		// than three pairs, r clamped to [-1, 1] against rounding
 		npairs = gpuNumPairs[start+i];
-		cor = gpuCorrelations[start+i];
-		radicand = (npairs - real(2)) / (real(1) - cor * cor);
-		gpuTScores[start+i] = cor * sqrt(radicand);
+		cor = fmin(real(1), fmax(real(-1), gpuCorrelations[start+i]));
+		radicand = real(1) - cor * cor;
+		if(!(npairs > real(2)))
+			gpuTScores[start+i] = REAL_NAN;
+		else if(radicand <= real(0))
+			gpuTScores[start+i] = cor > real(0) ? REAL_INF : -REAL_INF;
+		else
+			gpuTScores[start+i] = cor * sqrt((npairs - real(2)) / radicand);
 	}
 }

@@ -32,3 +32,22 @@ observations), where C - D cancels badly for small tau.
 Matches a from-the-definition implementation and `cor()` (which agree to
 7e-18). Tests: tied ordinal data in both precisions; 6,000 integer
 observations (~18M pairs) matching `cor()` to 1e-12 in both precisions.
+
+## Correlation t-statistic (`gpuTtest`, `gpuCor(...)$ts`)
+
+**Definition.** For a Pearson correlation r from n pairs, the statistic for
+H0: rho = 0 is t = r sqrt((n - 2) / (1 - r^2)) on n - 2 degrees of
+freedom, as in `cor.test()`. It is +-Inf at |r| = 1 and undefined for
+n < 3.
+
+**Code before.** `gpuCor`'s `$ts` replaced t with 10000 whenever
+r >= 0.999, whatever n was (r = 0.9995 from 10 pairs gave 10000 instead
+of 89.4), and did not do the same for r <= -0.999. In double precision it
+also took the square root in single precision (`sqrtf`, left over from the
+precision templating). `gpuTtest`'s GPU kernel produced NaN for |r| a
+rounding error above 1.
+
+**Now.** One rule on the host and the GPU: r clamped to [-1, 1], +-Inf at
+|r| = 1, NaN with fewer than three pairs, otherwise the formula in full
+precision. Tests: r near +-1, r = +-1, n = 2, and `gpuCor`'s `$ts` against
+the formula, in both precisions.

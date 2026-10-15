@@ -42,10 +42,24 @@ for (pr in precisions) {
 
   test_that(paste("gpuTtest gives the correlation t-score in", pr), {
     skip_if_no_gpu()
-    r <- c(0.1, -0.4, 0.75)
-    n <- c(20, 30, 50)
+    # including near +-1, where a cap used to replace t with 10000
+    r <- c(0.1, -0.4, 0.75, 0.9995, -0.9995)
+    n <- c(20, 30, 50, 10, 10)
     expect_equal(gpuTtest(n, r, precision = pr),
                  r * sqrt((n - 2) / (1 - r^2)), tolerance = tolFor(pr))
+    expect_identical(gpuTtest(c(10, 10, 2), c(1, -1, 0.5), precision = pr),
+                     c(Inf, -Inf, NaN))
+  })
+
+  test_that(paste("gpuCor's t-scores are the correlation t-scores in", pr), {
+    skip_if_no_gpu()
+    near <- cbind(x[, 1], x[, 1] + rnorm(50, sd = 0.01), x[, 2])
+    g <- gpuCor(near, precision = pr)
+    r <- g$coefficients
+    off <- row(r) != col(r)
+    expect_equal(g$ts[off], (r * sqrt((g$pairs - 2) / (1 - r^2)))[off],
+                 tolerance = tolFor(pr))
+    expect_true(all(is.infinite(diag(g$ts)) | diag(g$ts) > 1e3))
   })
 }
 
