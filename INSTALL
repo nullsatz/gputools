@@ -6,7 +6,7 @@ Building gputools needs the NVIDIA CUDA toolkit, version 11.7 or later
 packages:
 
     conda install -c conda-forge cuda-nvcc cuda-nvrtc-dev cuda-cudart-dev \
-        cuda-driver-dev libcublas-dev
+        cuda-driver-dev libcublas-dev libcusolver-dev
 
 Running the GPU functions needs an NVIDIA GPU and driver. The package
 installs and loads without them; the GPU functions then stop with an error

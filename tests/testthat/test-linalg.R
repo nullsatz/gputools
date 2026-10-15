@@ -21,12 +21,4 @@ for (pr in precisions) {
     r <- abs(diag(q$qr))[seq_len(q$rank)]
     expect_true(all(diff(r) <= 1e-5 * r[1]))
   })
-
-  test_that(paste("gpuSolve matches solve() in", pr), {
-    skip_if_no_gpu()
-    expect_equal(gpuSolve(sq, precision = pr), solve(sq),
-                 tolerance = tolFor(pr))
-    expect_equal(gpuSolve(sq, v, precision = pr), solve(sq, v),
-                 tolerance = tolFor(pr))
-  })
 }

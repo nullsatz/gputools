@@ -204,16 +204,19 @@ passed a `size_t` and MI its pitches as `size_t` for `int` parameters,
 which read correctly only because the low half comes first on
 little-endian machines); all launches now match.
 
-## Open decisions
+## Decisions taken
 
-1. **`gpuSolve` computes on the CPU.** It calls base R's `qr()`,
-   `qr.Q()` and `qr.R()` and uses the GPU only for the final triangular
-   solve and product, so it is slower than `solve()` (38 times on the
-   benchmark machine). It is correct, but pointless as it stands. Options:
-   solve on the GPU with cuSOLVER's LU (`getrf`/`getrs`), which adds a
-   dependency on NVIDIA's cuSOLVER library (part of the CUDA toolkit, as
-   cuBLAS is); or factor with `gpuQr` and solve with the triangular
-   factors on the GPU, no new dependency; or deprecate `gpuSolve`.
-2. **The flexible clustering methods' fixed parameters** (see above):
-   expose `beta`, and whether to keep 0.5 or move to Lance & Williams'
-   -0.25 as the default.
+1. **`gpuSolve` computes on the GPU** (it called base R's `qr()`, `qr.Q()`
+   and `qr.R()` on the CPU and used the GPU only for the final step). It now
+   uses NVIDIA's cuSOLVER: LU with partial pivoting (`getrf`/`getrs`) for a
+   square `x`, as `solve()` uses LAPACK's, and Householder QR least squares
+   (`geqrf`, `ormqr`, then a triangular solve) for an overdetermined one.
+   An exactly singular square `x`, or a rank-deficient tall one, is an
+   error. Matches `solve()` and `qr.coef()` to 1e-10 in double precision.
+   RTX 2080 Ti, n = 4000: the inverse took 42.9 s before and 0.34 s now
+   (`solve()`: 0.67 s); x b = y 0.13 s (`solve()`: 0.30 s).
+2. **`beta` for the flexible clustering methods**, exposed on `gpuHclust`
+   and `gpuDistClust` (lambda = beta, so ai = aj = (1 - beta)/2 as Lance &
+   Williams define it), must be below 1. The default stays 0.5 for
+   compatibility; the help documents Lance & Williams' recommended -0.25.
+   Both methods match `lanceWilliams()` for beta = -0.25, 0 and 0.5.

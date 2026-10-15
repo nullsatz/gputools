@@ -35,10 +35,11 @@ gpuDist <- function(points, method = "euclidean", p = 2.0,
     return(d)
 }
 
-gpuHclust <- function(distances, method = "complete",
+gpuHclust <- function(distances, method = "complete", beta = 0.5,
 	precision = getOption("gputools.precision", "single"))
 {
     precision <- .precision(precision)
+    beta <- .flexibleBeta(beta)
     methods <- c("ward", "single", "complete", "average", "mcquitty",
                  "median", "centroid", "flexible", "flexible group", "wpgma")
     method <-  pmatch(method, methods) # method is now an integer
@@ -69,7 +70,7 @@ gpuHclust <- function(distances, method = "complete",
     
     numpoints <- n
     a <- .Call(C_gpuHclust, as.matrix(distances), as.integer(numpoints),
-               method, precision)
+               method, beta, precision)
 
     merge <- matrix(a$merge, numpoints-1, 2)
 
@@ -84,10 +85,11 @@ gpuHclust <- function(distances, method = "complete",
 }
 
 gpuDistClust <- function(points, distmethod = "euclidean", 
-                         clustmethod = "complete",
+                         clustmethod = "complete", beta = 0.5,
                          precision = getOption("gputools.precision", "single"))
 {
     precision <- .precision(precision)
+    beta <- .flexibleBeta(beta)
     if(!is.na(pmatch(distmethod, "euclidian"))) {
         method <- "euclidean"
     }
@@ -118,7 +120,7 @@ gpuDistClust <- function(points, distmethod = "euclidean",
     nump <- nrow(points)
 
     a <- .Call(C_gpuDistClust, distmethod, clustmethod, t(points),
-               as.integer(nump), as.integer(ncol(points)), precision)
+               as.integer(nump), as.integer(ncol(points)), beta, precision)
 
     merge <- matrix(a$merge, nump-1, 2)
 
@@ -131,4 +133,16 @@ gpuDistClust <- function(points, distmethod = "euclidean",
     class(tree) <- "hclust"
 
     return(tree)
+}
+
+# The flexible methods' beta: their update is
+# d(k, i+j) = (1 - beta)/2 (d(k,i) + d(k,j)) + beta d(i,j), which needs
+# beta < 1.
+.flexibleBeta <- function(beta)
+{
+    if (!is.numeric(beta) || length(beta) != 1L || !is.finite(beta) ||
+        beta >= 1) {
+        stop("beta must be a single number below 1")
+    }
+    as.double(beta)
 }

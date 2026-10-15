@@ -18,6 +18,7 @@
 #include "matmult.h"
 #include "mi.h"
 #include "qrdecomp.h"
+#include "solve.h"
 
 #include "rinterface.h"
 #include "routines.h"
@@ -297,35 +298,20 @@ SEXP qrDecompT(SEXP x, SEXP tol)
 }
 
 template <typename T>
-SEXP inverseFromQRT(SEXP q, SEXP r, int n, int p)
+SEXP solveT(SEXP x, SEXP y)
 {
-  std::vector<T> fq = narrow<T>(q, "q"), fr = narrow<T>(r, "r"), inv(n * p);
-
-  T * dQ = gpuAlloc<T>(n * p), * dR = gpuAlloc<T>(p * p),
-    * dInverse = gpuAlloc<T>(n * p);
-  CUDART_CALL(cudaMemcpy(dQ, fq.data(), n * p * sizeof(T),
-                         cudaMemcpyHostToDevice));
-  CUDART_CALL(cudaMemcpy(dR, fr.data(), p * p * sizeof(T),
-                         cudaMemcpyHostToDevice));
-
-  getInverseFromQR(n, p, dQ, dR, dInverse);
-
-  CUDART_CALL(cudaMemcpy(inv.data(), dInverse, n * p * sizeof(T),
-                         cudaMemcpyDeviceToHost));
-  cudaFree(dQ);
-  cudaFree(dR);
-  cudaFree(dInverse);
-  return doubles(inv.data(), inv.size());
-}
-
-template <typename T>
-SEXP solveFromQRT(SEXP q, SEXP r, SEXP y, int n, int p)
-{
-  std::vector<T>
-    fq = narrow<T>(q, "q"), fr = narrow<T>(r, "r"), fy = narrow<T>(y, "y"),
-    b(p);
-  solveFromQR(n, p, fq.data(), fr.data(), fy.data(), b.data());
-  return doubles(b.data(), p);
+  SEXP dx = getAttrib(x, R_DimSymbol), dy = getAttrib(y, R_DimSymbol);
+  int n = INTEGER(dx)[0], p = INTEGER(dx)[1], k = INTEGER(dy)[1];
+  std::vector<T> a = narrow<T>(x, "x"), b = narrow<T>(y, "y"),
+    sol((size_t) p * k);
+  solveLinear(n, p, a.data(), k, b.data(), sol.data());
+  SEXP out = PROTECT(doubles(sol.data(), sol.size()));
+  SEXP dim = PROTECT(allocVector(INTSXP, 2));
+  INTEGER(dim)[0] = p;
+  INTEGER(dim)[1] = k;
+  setAttrib(out, R_DimSymbol, dim);
+  UNPROTECT(2);
+  return out;
 }
 
 template <typename T>
@@ -392,19 +378,21 @@ SEXP clusteringResult(int n, const int * sub, const int * sup,
   return out;
 }
 
+// beta is the flexible methods' parameter; their update
+// (1 - lambda)/2 (d(k,i) + d(k,j)) + beta d(i,j) takes lambda = beta
 template <typename T>
-SEXP hclustT(SEXP distMat, int n, SEXP method)
+SEXP hclustT(SEXP distMat, int n, SEXP method, T beta)
 {
   std::vector<T> d = narrow<T>(distMat, "distances"), heights(n - 1);
   std::vector<int> sub(n - 1), sup(n - 1);
   hcluster(d.data(), n * sizeof(T), n, sub.data(), sup.data(),
-           heights.data(), getClusterEnum(string(method)), T(0.5), T(0.5));
+           heights.data(), getClusterEnum(string(method)), beta, beta);
   return clusteringResult(n, sub.data(), sup.data(), heights.data());
 }
 
 template <typename T>
 SEXP distClustT(SEXP distMethod, SEXP clustMethod, SEXP points, int n,
-                int dim)
+                int dim, T beta)
 {
   std::vector<T> pts = narrow<T>(points, "points"), heights(n - 1);
   std::vector<int> sub(n - 1), sup(n - 1);
@@ -415,7 +403,7 @@ SEXP distClustT(SEXP distMethod, SEXP clustMethod, SEXP points, int n,
                      dim, n, &gpuDistances, &pitch);
   hclusterPreparedDistances(gpuDistances, pitch, n, sub.data(), sup.data(),
                             heights.data(), getClusterEnum(string(clustMethod)),
-                            T(0.5), T(0.5));
+                            beta, beta);
   cudaFree(gpuDistances);
   return clusteringResult(n, sub.data(), sup.data(), heights.data());
 }
@@ -497,22 +485,25 @@ SEXP gpuDist(SEXP points, SEXP numPoints, SEXP dim, SEXP method, SEXP p,
                              : distT<float>(points, n, k, method, p);
 }
 
-SEXP gpuHclust(SEXP distMat, SEXP numPoints, SEXP method, SEXP precision)
+SEXP gpuHclust(SEXP distMat, SEXP numPoints, SEXP method, SEXP beta,
+               SEXP precision)
 {
   requireDevice();
   int n = asInteger(numPoints);
-  return isDouble(precision) ? hclustT<double>(distMat, n, method)
-                             : hclustT<float>(distMat, n, method);
+  double b = asReal(beta);
+  return isDouble(precision) ? hclustT<double>(distMat, n, method, b)
+                             : hclustT<float>(distMat, n, method, (float) b);
 }
 
 SEXP gpuDistClust(SEXP distMethod, SEXP clustMethod, SEXP points,
-                  SEXP numPoints, SEXP dim, SEXP precision)
+                  SEXP numPoints, SEXP dim, SEXP beta, SEXP precision)
 {
   requireDevice();
   int n = asInteger(numPoints), k = asInteger(dim);
+  double b = asReal(beta);
   return isDouble(precision)
-    ? distClustT<double>(distMethod, clustMethod, points, n, k)
-    : distClustT<float>(distMethod, clustMethod, points, n, k);
+    ? distClustT<double>(distMethod, clustMethod, points, n, k, b)
+    : distClustT<float>(distMethod, clustMethod, points, n, k, (float) b);
 }
 
 SEXP gpuQrDecomp(SEXP x, SEXP tol, SEXP precision)
@@ -522,21 +513,12 @@ SEXP gpuQrDecomp(SEXP x, SEXP tol, SEXP precision)
                              : qrDecompT<float>(x, tol);
 }
 
-SEXP gpuInverseFromQR(SEXP q, SEXP r, SEXP rows, SEXP cols, SEXP precision)
+// Solves x b = y, as solve(x, y): x is n x p (n >= p), y is n x k; a square
+// x by LU, an overdetermined one by least squares.
+SEXP gpuSolve(SEXP x, SEXP y, SEXP precision)
 {
   requireDevice();
-  int n = asInteger(rows), p = asInteger(cols);
-  return isDouble(precision) ? inverseFromQRT<double>(q, r, n, p)
-                             : inverseFromQRT<float>(q, r, n, p);
-}
-
-SEXP gpuSolveFromQR(SEXP q, SEXP r, SEXP y, SEXP rows, SEXP cols,
-                    SEXP precision)
-{
-  requireDevice();
-  int n = asInteger(rows), p = asInteger(cols);
-  return isDouble(precision) ? solveFromQRT<double>(q, r, y, n, p)
-                             : solveFromQRT<float>(q, r, y, n, p);
+  return isDouble(precision) ? solveT<double>(x, y) : solveT<float>(x, y);
 }
 
 SEXP gpuMutualInfo(SEXP bins, SEXP splineOrder, SEXP nsamples,

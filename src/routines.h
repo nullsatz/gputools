@@ -14,11 +14,10 @@
   X(gpuGranger, 5)               \
   X(gpuGrangerXY, 7)             \
   X(gpuDist, 6)                  \
-  X(gpuHclust, 4)                \
-  X(gpuDistClust, 6)             \
+  X(gpuHclust, 5)                \
+  X(gpuDistClust, 7)             \
   X(gpuQrDecomp, 3)              \
-  X(gpuInverseFromQR, 5)         \
-  X(gpuSolveFromQR, 6)           \
+  X(gpuSolve, 3)                 \
   X(gpuMutualInfo, 8)            \
   X(gpuLSFit, 10)
 

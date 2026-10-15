@@ -90,7 +90,7 @@ if test -z "${no_cuda}"; then
   LDFLAGS="-L${cuda_lib} `"${R_HOME}/bin/R" CMD config LDFLAGS`"
   AC_LANG([C++])
 
-  AC_CHECK_HEADERS([cuda.h cuda_runtime.h nvrtc.h cublas_v2.h], ,
+  AC_CHECK_HEADERS([cuda.h cuda_runtime.h nvrtc.h cublas_v2.h cusolverDn.h], ,
     [no_cuda="CUDA header $ac_header is missing from ${cuda_include}"
      break])
 fi
@@ -117,6 +117,10 @@ fi
 if test -z "${no_cuda}"; then
   AC_SEARCH_LIBS([cublasCreate_v2], [cublas], ,
     [no_cuda="no cuBLAS library (libcublas) in ${cuda_lib}"])
+fi
+if test -z "${no_cuda}"; then
+  AC_SEARCH_LIBS([cusolverDnCreate], [cusolver], ,
+    [no_cuda="no cuSOLVER library (libcusolver) in ${cuda_lib}"])
 fi
 
 if test -z "${no_cuda}"; then

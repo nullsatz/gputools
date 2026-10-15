@@ -11,22 +11,28 @@ gpuSolve <- function(x, y=NULL,
 	if(p > n) {
 		stop("x represents an underdetermined system")
 	}
+	storage.mode(x) <- "double"
 
-	x.qr <- qr(x)
-	x.q <- qr.Q(x.qr)
-	x.r <- qr.R(x.qr)
-
+	# solve() names the solution's rows by x's columns
 	if(is.null(y)) {
-		inverse <- .Call(C_gpuInverseFromQR, x.q, x.r,
-			as.integer(n), as.integer(p), precision)
-		x.inverse <- matrix(inverse, p, n)
-		return(x.inverse)
-	} else {
-		y <- as.double(y)
-		if(length(y) != n) {
-			stop("y must have length nrows(x)")
-		}
-		return(.Call(C_gpuSolveFromQR, x.q, x.r, y,
-			as.integer(n), as.integer(p), precision))
+		b <- diag(n)
+		sol <- .Call(C_gpuSolve, x, b, precision)
+		dimnames(sol) <- rev(dimnames(x))
+		return(sol)
 	}
+
+	isVector <- is.null(dim(y))
+	b <- as.matrix(y)
+	if(nrow(b) != n) {
+		stop("y must have length nrows(x)")
+	}
+	storage.mode(b) <- "double"
+	sol <- .Call(C_gpuSolve, x, b, precision)
+	if(isVector) {
+		sol <- drop(sol)
+		names(sol) <- colnames(x)
+	} else {
+		dimnames(sol) <- list(colnames(x), colnames(b))
+	}
+	sol
 }

@@ -10,6 +10,7 @@
 
 \usage{
 	gpuDistClust(points, distmethod = "euclidean", clustmethod = "complete",
+		beta = 0.5,
 		precision = getOption("gputools.precision", "single")) 
 }
 
@@ -24,6 +25,17 @@
 		to be applied to distances.  Currently supported method names include
 		"average", "centroid", "complete", "flexible", "flexible group", 
 		"mcquitty", "median", "single", "ward", and "wpgma".}
+	\item{beta}{the parameter of the \code{"flexible"} and
+		\code{"flexible group"} methods, ignored by the others; it must be
+		below 1. The flexible-beta update of Lance and Williams (1967) is
+		\deqn{d(k, i \cup j) = \frac{1 - \beta}{2}\left(d(k,i) + d(k,j)\right) + \beta\, d(i,j);}{d(k, i+j) = (1 - beta)/2 (d(k,i) + d(k,j)) + beta d(i,j);}
+		flexible UPGMA (\code{"flexible group"}, Belbin, Faith and Milligan
+		1992) weights \eqn{d(k,i)} and \eqn{d(k,j)} by the sizes of clusters
+		\eqn{i} and \eqn{j} instead of equally. The default, 0.5, is the value
+		earlier versions of gputools used (it was fixed then).
+		Lance and Williams recommend a small negative value,
+		\code{beta = -0.25}, which is the usual choice in the literature;
+		positive values contract the space, so clusters tend to chain.}
 	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
 		the GPU computes in. Single precision is the default, set with
 		\code{options(gputools.precision = "double")}; it runs many times
@@ -50,6 +62,15 @@
 		the clustering 'method' for the particular agglomeration.}
 }
 
+\references{
+	Lance, G. N. and Williams, W. T. (1967). A general theory of
+	classificatory sorting strategies: 1. Hierarchical systems.
+	\emph{The Computer Journal}, 9(4), 373--380.
+
+	Belbin, L., Faith, D. P. and Milligan, G. W. (1992). A comparison of two
+	approaches to beta-flexible clustering. \emph{Multivariate Behavioral
+	Research}, 27(3), 417--433.
+}
 \seealso{
 	\code{\link{gpuDist}}, \code{\link{gpuHclust}}.
 }

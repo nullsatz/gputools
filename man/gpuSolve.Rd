@@ -3,13 +3,14 @@
 \title{Estimate the solution to a matrix vector equation}
 
 \description{
-	This function estimates the solution to an equation of the form x * b = y
-	where x is a matrix, b is an unknown vector, and y is a known vector.  It
-	does much calculation on a GPU. If the y argument is omitted, the
-	function returns the inverse of x.
+	Solves x b = y for b on the GPU, like \code{\link{solve}}. If y is
+	omitted, returns the inverse of x.
 
-	The function uses R's base 'qr' and then applies the gpu to the result
-	to get the final solution.
+	A square x is solved by LU decomposition with partial pivoting, as
+	\code{solve} does (NVIDIA's cuSOLVER, \code{getrf}/\code{getrs}).
+	An x with more rows than columns is solved in the least-squares sense
+	by Householder QR (\code{geqrf}/\code{ormqr}), and its "inverse" is
+	the pseudo-inverse.
 }
 
 \usage{
@@ -19,7 +20,7 @@
 
 \arguments{
 	\item{x}{a matrix of floating point numbers.}  
-	\item{y}{a vector of floating point numbers of length nrow(x).}
+	\item{y}{a vector of length nrow(x), or a matrix with nrow(x) rows.}
 	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
 		the GPU computes in. Single precision is the default, set with
 		\code{options(gputools.precision = "double")}; it runs many times
@@ -27,10 +28,14 @@
 }
 
 \value{
-a vector or matrix of floating point numbers. If y is not null,
-then the value is an estimate of the vector b of length ncol(x)
-where x * b = y.  If y is null or omitted, the value is a matrix,
-an estimate of a matrix multiplicative pseudo inverse of x.
+b: a vector of length ncol(x) if y is a vector, otherwise a matrix
+with ncol(x) rows. If y is omitted, the ncol(x) by nrow(x) inverse (or
+pseudo-inverse) of x. Rows are named by the columns of x, as with
+\code{solve}.
+
+A square x that is exactly singular is an error, as with \code{solve};
+so is an overdetermined x whose columns are linearly dependent, since
+the least-squares solution is then not unique.
 }
 
 \examples{

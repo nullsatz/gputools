@@ -14,6 +14,7 @@
 
 #include "cudaUtils.h"
 #include "gpublas.h"
+#include "gpusolver.h"
 
 // Kernels are compiled from inst/cuda/<file>.cu with NVRTC the first time
 // one of them is launched, for the architecture of the current device, and
@@ -126,6 +127,7 @@ void driverCheck(CUresult status, const char * call)
 #define DRIVER_CALL(x) driverCheck((x), #x)
 
 std::map<int, cublasHandle_t> blasHandles;
+std::map<int, cusolverDnHandle_t> solverHandles;
 
 const KernelFile & fileForKernel(const std::string & kernelName)
 {
@@ -246,6 +248,25 @@ cublasHandle_t gpuBlasHandle()
   return handle;
 }
 
+cusolverDnHandle_t gpuSolverHandle()
+{
+  int device = 0;
+  CUDART_CALL(cudaGetDevice(&device));
+  auto h = solverHandles.find(device);
+  if (h != solverHandles.end())
+    return h->second;
+  cusolverDnHandle_t handle;
+  CUSOLVER_CALL(cusolverDnCreate(&handle));
+  solverHandles[device] = handle;
+  return handle;
+}
+
+void gpuSolverCheck(cusolverStatus_t status, const char * call)
+{
+  if (status != CUSOLVER_STATUS_SUCCESS)
+    error("gputools: %s failed: cuSOLVER status %d", call, (int) status);
+}
+
 void gpuBlasCheck(cublasStatus_t status, const char * call)
 {
   if (status != CUBLAS_STATUS_SUCCESS)
@@ -314,10 +335,15 @@ SEXP gputoolsUnloadKernels()
     cudaSetDevice(h.first);
     cublasDestroy(h.second);
   }
+  for (auto & h : solverHandles) {
+    cudaSetDevice(h.first);
+    cusolverDnDestroy(h.second);
+  }
   cudaSetDevice(current);
   modules.clear();
   kernels.clear();
   blasHandles.clear();
+  solverHandles.clear();
   return R_NilValue;
 }
 
