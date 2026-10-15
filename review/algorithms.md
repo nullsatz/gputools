@@ -110,3 +110,30 @@ log2(10) - 0.6 log2(3) - 0.4 log2(4) = 1.571, MI = 0.4489, printed as 0.45).
 precision for bins 5 and 10 and spline orders 1-4, and gives the paper's
 0.4489 on its example. Tests: the worked example and the random-data
 comparison, in both precisions.
+
+## Granger causality (`gpuGranger`)
+
+**Definition.** Granger (1969): Y Granger-causes X if X is better
+predicted from its own past and Y's past than from its own past alone. The
+usual test, used here, compares by F-test the regressions
+
+    X_t ~ 1 + X_{t-1..t-p}               (restricted)
+    X_t ~ 1 + X_{t-1..t-p} + Y_{t-1..t-p} (unrestricted)
+
+on the n - p usable time points: F with p and n - 3p - 1 degrees of
+freedom.
+
+**Code.** The statistic and degrees of freedom match: in double precision
+the F statistics agree with this pair of `lm()` fits to 1e-8 and the
+p-values to 1e-6 (2.0.0 fixed the x/y form with one x column and p-values
+rounded to 0).
+
+**Orientation (deferred here from 2.0.0).** Granger's definition does not
+say how to lay a matrix of tests out; that is a convention. The code's is
+`fStatistics[i, j]` = "does column i Granger-cause column j", the usual
+from-row-to-column reading of a directed graph's adjacency matrix,
+consistent between the single-matrix and x/y forms; 2.0.0 corrected the
+documentation to it. Kept. The result matrices now carry dimnames
+`cause` x `effect` (from the variables' names), so a printed result shows
+which way it reads, and the diagonal -- a series against itself, which is no
+test -- is `NA` rather than F = 0, p = 1.

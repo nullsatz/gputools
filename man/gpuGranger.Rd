@@ -31,10 +31,14 @@ gpuGranger(x, y=NULL, lag,
 	Each element of the pValues matrix is the p-value for the corresponding
 	element of the fStatistics matrix.
 
+	Both matrices have dimnames \code{cause} (rows) and \code{effect}
+	(columns), taken from the column names of \code{x} and \code{y}.
+
 	If y is NULL, the test is run on permutations of pairs of columns of x. To
 	find the Granger causality F-statistic estimating the answer to
 	"Does variable x[ ,i] Granger-cause variable x[ ,j]?", look at
-	fStatistics[i, j] and pValues[i, j].
+	fStatistics[i, j] and pValues[i, j]. The diagonal, a variable against
+	itself, is \code{NA}.
 
 	If y is not NULL, the test is run on permutations of pairs (x[ ,i], y[ ,j]).
 	To find the Granger causality F-statistic estimating the answer to

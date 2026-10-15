@@ -42,6 +42,22 @@ for (pr in precisions) {
   })
 }
 
+test_that("gpuGranger's result says which way it reads", {
+  skip_if_no_gpu()
+  g <- gpuGranger(x, lag = 2)
+  expect_identical(dimnames(g$fStatistics),
+                   list(cause = colnames(x), effect = colnames(x)))
+  expect_true(all(is.na(diag(g$fStatistics))) && all(is.na(diag(g$pValues))))
+  # the strong effect is cause -> effect, not the reverse
+  expect_gt(g$fStatistics["cause", "effect"], 100)
+  expect_lt(g$fStatistics["effect", "cause"], 5)
+  gxy <- gpuGranger(x[, 2:3], x[, 1, drop = FALSE], lag = 2)
+  expect_identical(dimnames(gxy$fStatistics),
+                   list(cause = c("cause", "noise"), effect = "effect"))
+  un <- gpuGranger(unname(x), lag = 1)
+  expect_identical(rownames(un$fStatistics), c("x1", "x2", "x3"))
+})
+
 test_that("small Granger p-values are not rounded to zero", {
   skip_if_no_gpu()
   p <- gpuGranger(x, lag = 2, precision = "double")$pValues[2, 1]
