@@ -51,3 +51,40 @@ rounding error above 1.
 |r| = 1, NaN with fewer than three pairs, otherwise the formula in full
 precision. Tests: r near +-1, r = +-1, n = 2, and `gpuCor`'s `$ts` against
 the formula, in both precisions.
+
+## Hierarchical clustering (`gpuHclust`, `gpuDistClust`)
+
+**Definition.** Every method is a Lance-Williams (1967) update: when
+clusters i and j merge, the dissimilarity to each other cluster k becomes
+
+    d(k, i+j) = ai d(k,i) + aj d(k,j) + b d(i,j) + g |d(k,i) - d(k,j)|
+
+with the published coefficients per method (single, complete, average =
+UPGMA, mcquitty = WPGMA, median = WPGMC, centroid = UPGMC, Ward); Lance &
+Williams' flexible-beta method, ai = aj = (1 - b) / 2; and Belbin, Faith &
+Milligan's (1992) flexible UPGMA ("flexible group"),
+ai = (1 - b) ni / (ni + nj). `tests/testthat/helper-gpu.R` implements the
+update directly from these coefficients (`lanceWilliams()`); it agrees with
+`hclust()` to 4e-15 on the seven methods base R has.
+
+**Code before.**
+- `ward` had the two cluster sizes swapped (fixed in 2.0.0).
+- `"flexible group"` was never computed: R passed `"flexible group"`, the
+  C code looked for `"flexible_group"`, and an unknown name fell back to
+  single linkage. Its kernel, which had never run, also had the cluster
+  sizes swapped, the same mistake as Ward's.
+- `wpgma` and `mcquitty` are the same method under two names, as they
+  should be.
+
+**Now.** The C code takes the names R passes and stops on an unknown one
+instead of defaulting; the flexible-UPGMA weights are each cluster's own
+size. All ten methods match `lanceWilliams()` to 1e-10 in double precision
+(and float accuracy in single).
+
+**Open: the flexible methods' parameters.** Both use fixed lambda = beta =
+0.5 (that is, ai + aj = 1/2, b = +1/2), with no argument to change them.
+The formula is applied correctly for those values, but Lance & Williams
+recommend b around -0.25 (slightly space-dilating); b = +0.5 is strongly
+space-contracting. Options: expose `beta` (with ai, aj following from it)
+and keep 0.5 as the default for compatibility, or change the default to the
+literature's -0.25.

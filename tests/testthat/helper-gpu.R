@@ -22,3 +22,49 @@ grangerRef <- function(effect, cause, lag) {
   f <- ((rssR - rssU) / lag) / (rssU / df2)
   c(f = f, p = pf(f, lag, df2, lower.tail = FALSE))
 }
+
+# Agglomerative clustering by the Lance-Williams (1967) update,
+#   d(k, i+j) = ai d(k,i) + aj d(k,j) + b d(i,j) + g |d(k,i) - d(k,j)|,
+# straight from the published coefficients; returns the merge heights.
+# flexible: Lance & Williams' flexible beta, ai = aj = (1 - lambda) / 2;
+# flexible group: Belbin, Faith & Milligan (1992), ai = (1 - lambda) ni / n.
+lanceWilliams <- function(d, method, lambda = 0.5, beta = 0.5) {
+  d <- as.matrix(d)
+  n <- nrow(d)
+  size <- rep(1, n)
+  active <- rep(TRUE, n)
+  diag(d) <- Inf
+  heights <- numeric(n - 1)
+  for (step in seq_len(n - 1)) {
+    dd <- d
+    dd[!active, ] <- Inf
+    dd[, !active] <- Inf
+    w <- which(dd == min(dd), arr.ind = TRUE)[1, ]
+    i <- min(w); j <- max(w)
+    dij <- d[i, j]
+    heights[step] <- dij
+    ni <- size[i]; nj <- size[j]
+    for (k in which(active)) {
+      if (k == i || k == j) next
+      nk <- size[k]; dki <- d[k, i]; dkj <- d[k, j]
+      co <- switch(method,
+        single = c(1/2, 1/2, 0, -1/2),
+        complete = c(1/2, 1/2, 0, 1/2),
+        average = c(ni, nj, 0, 0) / c(ni + nj, ni + nj, 1, 1),
+        mcquitty = , wpgma = c(1/2, 1/2, 0, 0),
+        median = c(1/2, 1/2, -1/4, 0),
+        centroid = c(ni / (ni + nj), nj / (ni + nj),
+                     -ni * nj / (ni + nj)^2, 0),
+        ward = c((ni + nk), (nj + nk), -nk, 0) / (ni + nj + nk),
+        flexible = c((1 - lambda) / 2, (1 - lambda) / 2, beta, 0),
+        "flexible group" = c((1 - lambda) * ni / (ni + nj),
+                             (1 - lambda) * nj / (ni + nj), beta, 0))
+      v <- co[1] * dki + co[2] * dkj + co[3] * dij + co[4] * abs(dki - dkj)
+      d[k, i] <- d[i, k] <- v
+    }
+    size[i] <- ni + nj
+    active[j] <- FALSE
+    d[j, ] <- d[, j] <- Inf
+  }
+  heights
+}

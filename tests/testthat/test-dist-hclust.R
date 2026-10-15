@@ -30,6 +30,17 @@ for (pr in precisions) {
     })
   }
 
+  for (m in c("single", "complete", "average", "mcquitty", "wpgma", "median",
+              "centroid", "ward", "flexible", "flexible group")) {
+    test_that(paste("gpuHclust", m, "follows the Lance-Williams update in",
+                    pr), {
+      skip_if_no_gpu()
+      d <- dist(pts)
+      expect_equal(sort(gpuHclust(d, m, precision = pr)$height),
+                   sort(lanceWilliams(d, m)), tolerance = tolFor(pr))
+    })
+  }
+
   test_that(paste("gpuDistClust is gpuDist then gpuHclust in", pr), {
     skip_if_no_gpu()
     expect_equal(gpuDistClust(pts, precision = pr)$height,
