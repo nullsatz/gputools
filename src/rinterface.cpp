@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <vector>
+#include <cmath>
 
 #include "cuda_runtime.h"
 
@@ -19,6 +20,7 @@
 #include "mi.h"
 #include "qrdecomp.h"
 #include "solve.h"
+#include "rank.h"
 
 #include "rinterface.h"
 #include "routines.h"
@@ -180,6 +182,96 @@ void depthFirst(const int len, const int * merge, int level, int * otop,
 }
 
 namespace {
+
+// Standardises each column of the n x p matrix x so that the correlation
+// of two columns is the dot product of their standardised versions:
+// z = (x - mean) / (sd sqrt(n - 1)), mean and sd taken in double. A column
+// with a missing value, or a constant one, becomes NaN, so its
+// correlations come out NA, as with cor().
+template <typename T>
+std::vector<T> standardised(SEXP x, int n, int p)
+{
+  x = PROTECT(coerceVector(x, REALSXP));
+  const double * px = REAL(x);
+  std::vector<T> z((size_t) n * p);
+  for (int j = 0; j < p; ++j) {
+    const double * col = px + (size_t) j * n;
+    double mean = 0, ss = 0;
+    for (int i = 0; i < n; ++i) mean += col[i];
+    mean /= n;
+    for (int i = 0; i < n; ++i) ss += (col[i] - mean) * (col[i] - mean);
+    double scale = 1 / std::sqrt(ss);   // = 1 / (sd sqrt(n - 1))
+    for (int i = 0; i < n; ++i)
+      z[i + (size_t) j * n] = (T) ((col[i] - mean) * scale);
+  }
+  UNPROTECT(1);
+  return z;
+}
+
+// Pearson correlations of every column of x with every column of y (x
+// itself when y is NULL) over all rows, as one matrix product on the GPU:
+// p x q, column-major.
+template <typename T>
+SEXP corProductT(SEXP x, SEXP y)
+{
+  bool same = isNull(y);   // y = NULL: x with itself
+  SEXP dx = getAttrib(x, R_DimSymbol);
+  int n = INTEGER(dx)[0], p = INTEGER(dx)[1],
+    q = same ? p : INTEGER(getAttrib(y, R_DimSymbol))[1];
+  std::vector<T> zx = standardised<T>(x, n, p), zy;
+  if (!same) zy = standardised<T>(y, n, q);
+
+  T * dZx = gpuAlloc<T>((size_t) n * p), * dZy = same ? dZx
+    : gpuAlloc<T>((size_t) n * q), * dR = gpuAlloc<T>((size_t) p * q);
+  blas::setMatrix(n, p, sizeof(T), zx.data(), n, dZx, n);
+  if (!same) blas::setMatrix(n, q, sizeof(T), zy.data(), n, dZy, n);
+  blas::gemm('T', 'N', p, q, n, T(1), dZx, n, dZy, n, T(0), dR, p);
+
+  std::vector<T> r((size_t) p * q);
+  blas::getMatrix(p, q, sizeof(T), dR, p, r.data(), p);
+  cudaFree(dZx);
+  if (!same) cudaFree(dZy);
+  cudaFree(dR);
+
+  // list(corr, ts): the correlations and their t statistics on n - 2
+  // degrees of freedom (as tScore() in correlation.cpp), both p x q
+  const char * names[] = { "corr", "ts", "" };
+  SEXP values[] = {
+    PROTECT(allocMatrix(REALSXP, p, q)), PROTECT(allocMatrix(REALSXP, p, q))
+  };
+  double * pc = REAL(values[0]), * pt = REAL(values[1]);
+  for (size_t i = 0; i < r.size(); ++i) {
+    double v = r[i];
+    if (v > 1) v = 1;
+    if (v < -1) v = -1;
+    pc[i] = std::isnan(v) ? NA_REAL : v;
+    double denom = 1 - v * v;
+    pt[i] = std::isnan(v) ? NA_REAL
+      : n < 3 ? R_NaN
+      : denom > 0 ? v * std::sqrt((n - 2) / denom)
+      : (v > 0 ? R_PosInf : R_NegInf);
+  }
+  SEXP out = namedList(names, values);
+  UNPROTECT(2);
+  return out;
+}
+
+// rank(ties.method = "average", na.last = "keep") of each column of x,
+// on the GPU
+template <typename T>
+SEXP rankT(SEXP x)
+{
+  SEXP dx = getAttrib(x, R_DimSymbol);
+  int n = INTEGER(dx)[0], p = INTEGER(dx)[1];
+  std::vector<T> a = narrow<T>(x, "x", true), r((size_t) n * p);
+  rankColumns(a.data(), n, p, r.data());
+  SEXP out = PROTECT(allocMatrix(REALSXP, n, p));
+  double * po = REAL(out);
+  for (size_t i = 0; i < r.size(); ++i)
+    po[i] = std::isnan(r[i]) ? NA_REAL : r[i];
+  UNPROTECT(1);
+  return out;
+}
 
 template <typename T>
 SEXP pmccT(UseObs obs, SEXP x, int na, SEXP y, int nb, int size)
@@ -458,6 +550,19 @@ SEXP gpuPmcc(SEXP use, SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
   int na = asInteger(nx), nb = asInteger(ny), n = asInteger(size);
   return isDouble(precision) ? pmccT<double>(obs, x, na, y, nb, n)
                              : pmccT<float>(obs, x, na, y, nb, n);
+}
+
+SEXP gpuCorProduct(SEXP x, SEXP y, SEXP precision)
+{
+  requireDevice();
+  return isDouble(precision) ? corProductT<double>(x, y)
+                             : corProductT<float>(x, y);
+}
+
+SEXP gpuRank(SEXP x, SEXP precision)
+{
+  requireDevice();
+  return isDouble(precision) ? rankT<double>(x) : rankT<float>(x);
 }
 
 SEXP gpuSetDevice(SEXP device)

@@ -1,19 +1,17 @@
 gpuCor <- function(x, y = NULL, use = "everything", method = "pearson",
-    precision = getOption("gputools.precision", "single")) {
+    test = FALSE, precision = getOption("gputools.precision", "single")) {
     precision <- .precision(precision)
     x <- as.matrix(x)
     nx <- ncol(x)
     size <- nrow(x)
 
-    if(is.null(y)) {
-        y <- x
-    } else {
+    if(!is.null(y)) {
         y <- as.matrix(y)
+        if(nrow(y) != size) {
+            stop("x and y have different numbers of rows")
+        }
     }
-    ny <- ncol(y)
-    if(nrow(y) != size) {
-        stop("x and y have different numbers of rows")
-    }
+    ny <- if(is.null(y)) nx else ncol(y)
 
     methods <- c("pearson", "kendall", "spearman")
     method <- pmatch(method, methods, -1)
@@ -32,32 +30,44 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson",
     }
     use <- uses[use]
     storage.mode(x) <- "double"
-    storage.mode(y) <- "double"
-    dn <- list(colnames(x), colnames(y))
+    if(!is.null(y)) storage.mode(y) <- "double"
+    dn <- list(colnames(x), colnames(if(is.null(y)) x else y))
 
     # a column with a missing value gives NA under use = "everything", as
     # with cor()
     incomplete <- function() outer(colSums(is.na(x)) > 0,
                                    colSums(is.na(y)) > 0, "|")
 
+    selfCor <- is.null(y)
+    if(selfCor) y <- x
+    # no pair has to drop rows: every correlation uses all of them, and the
+    # whole matrix is one product of standardised columns on the GPU
+    allRows <- use == "everything" || !(anyNA(x) || anyNA(y))
+
     if(method == "pearson" ||
-       (method == "spearman" && (use == "everything" ||
-                                 !(anyNA(x) || anyNA(y))))) {
+       (method == "spearman" && allRows)) {
         if(method == "spearman") {
             # cor()'s Spearman is Pearson's on the ranks (ties averaged)
-            x <- apply(x, 2L, rank, na.last = "keep", ties.method = "average")
-            y <- apply(y, 2L, rank, na.last = "keep", ties.method = "average")
-            dim(x) <- c(size, nx)
-            dim(y) <- c(size, ny)
-            storage.mode(x) <- "double"
-            storage.mode(y) <- "double"
+            # (rank(ties.method = "average", na.last = "keep") per column,
+            # on the GPU)
+            x <- .Call(C_gpuRank, x, precision)
+            if(!selfCor) y <- .Call(C_gpuRank, y, precision) else y <- x
         }
-        answer <- .Call(C_gpuPmcc, as.integer(use == "pairwise.complete.obs"),
-                        x, as.integer(nx), y, as.integer(ny),
-                        as.integer(size), precision)
-        pairs <- t(matrix(answer$pairs, ny, nx))
-        corr <- t(matrix(answer$corr, ny, nx))
+        if(allRows) {
+            answer <- .Call(C_gpuCorProduct, x, if(selfCor) NULL else y,
+                            precision)
+            corr <- answer$corr
+            ts <- answer$ts
+            pairs <- matrix(as.double(size), nx, ny)
+        } else {
+            answer <- .Call(C_gpuPmcc, 1L, x, as.integer(nx), y,
+                            as.integer(ny), as.integer(size), precision)
+            pairs <- t(matrix(answer$pairs, ny, nx))
+            corr <- t(matrix(answer$corr, ny, nx))
+            ts <- .tScore(corr, pairs)
+        }
     } else {
+        ts <- NULL
         kernel <- if(method == "kendall") C_gpuKendall else C_gpuSpearman
         answer <- .Call(kernel, x, as.integer(nx), y, as.integer(ny),
                         as.integer(size), precision)
@@ -72,21 +82,29 @@ gpuCor <- function(x, y = NULL, use = "everything", method = "pearson",
     dimnames(corr) <- dimnames(pairs) <- dn
 
     if(method == "kendall") {
-        z <- .kendallZ(x, y, corr, pairs)
-        p <- 2 * pnorm(-abs(z))
-        dimnames(z) <- dimnames(p) <- dn
-        return(list(coefficients = corr, z = z, p.value = p, pairs = pairs))
+        res <- list(coefficients = corr, pairs = pairs)
+        if(test) {
+            z <- .kendallZ(x, y, corr, pairs)
+            dimnames(z) <- dn
+            res$z <- z
+            res$p.value <- 2 * pnorm(-abs(z))
+        }
+        return(res)
     }
-    ts <- .tScore(corr, pairs)
-    p <- 2 * pt(-abs(ts), pairs - 2)
-    dimnames(ts) <- dimnames(p) <- dn
-    list(coefficients = corr, ts = ts, p.value = p, pairs = pairs)
+    if(is.null(ts)) ts <- .tScore(corr, pairs)
+    dimnames(ts) <- dn
+    res <- list(coefficients = corr, ts = ts, pairs = pairs)
+    if(test) {
+        res$p.value <- 2 * pt(-abs(ts), pairs - 2)
+    }
+    res
 }
 
 # The t statistic of correlations r from n pairs, as cor.test() computes
 # it: +-Inf at |r| = 1, NaN with fewer than three pairs.
 .tScore <- function(r, n) {
-    r <- pmin(1, pmax(-1, r))
+    r[!is.na(r) & r > 1] <- 1
+    r[!is.na(r) & r < -1] <- -1
     t <- r * sqrt((n - 2) / (1 - r^2))
     t[!is.na(r) & n < 3] <- NaN
     t

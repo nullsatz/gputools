@@ -138,6 +138,16 @@ so there the GPU tests skip. To run them on a Slurm cluster:
 sbatch -p <gpu partition> ci/slurm-gpu-test.sh <conda env> [<conda env> ...]
 ```
 
+## Used in
+
+- The FANTOM5 atlas of active enhancers across human cell types and tissues
+  ([Andersson et al., *Nature* 2014](https://doi.org/10.1038/nature12787))
+  clustered enhancers by their expression with gputools' hierarchical
+  clustering on an NVIDIA GPU.
+
+Using gputools in published work? Let us know in an
+[issue](https://github.com/nullsatz/gputools/issues) and we will list it.
+
 ## Citing
 
 Buckner J, Wilson J, Seligman M, Athey B, Watson S, Meng F (2010). The

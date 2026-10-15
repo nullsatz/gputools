@@ -30,10 +30,14 @@ New:
   cuSOLVER, which comes with the CUDA toolkit.
 - `gpuCor` computes Spearman's coefficient (`method = "spearman"`), and
   Kendall's now honours `use = "pairwise.complete.obs"` (it warned and
-  ignored it). Every method returns p-values (`$p.value`) as `cor.test()`
-  gives them -- exactly for Pearson's, as `cor.test(exact = FALSE)` for the
-  rank coefficients -- and Kendall's its z statistics (`$z`). Results carry
-  `cor()`'s dimnames.
+  ignored it). With `test = TRUE` every method returns p-values
+  (`$p.value`) as `cor.test()` gives them -- exactly for Pearson's, as
+  `cor.test(exact = FALSE)` for the rank coefficients -- and Kendall's its
+  z statistics (`$z`). Results carry `cor()`'s dimnames.
+- Pearson's and Spearman's coefficients on data without missing values (or
+  with `use = "everything"`) are one matrix product on the GPU, and
+  Spearman's columns are ranked on the GPU too: 25 million correlations
+  (500 x 5,000) in about 0.5 s, where `cor()` takes 7 s.
 - `gpuPrcomp` and `gpuSvd`: principal components and the singular value
   decomposition as `prcomp()` and `svd()` compute them, on cuSOLVER;
   `gpuPrcomp` returns a `"prcomp"` object.

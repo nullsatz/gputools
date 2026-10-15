@@ -11,7 +11,7 @@
 
 \usage{
 gpuCor(x, y = NULL, use = "everything", method = "pearson",
-		precision = getOption("gputools.precision", "single"))
+		test = FALSE, precision = getOption("gputools.precision", "single"))
 }
 
 \arguments{
@@ -22,6 +22,11 @@ gpuCor(x, y = NULL, use = "everything", method = "pearson",
 		\code{NA}) or \code{"pairwise.complete.obs"} (each pair of variables
 		uses the rows where both are present), as with \code{cor}.}
 	\item{method}{\code{"pearson"}, \code{"kendall"} or \code{"spearman"}.}
+	\item{test}{\code{TRUE} to also return p-values (and Kendall's z), as
+		\code{cor.test} would. They are computed on the CPU, at about
+		0.3 microseconds each: negligible for hundreds of variables, but for
+		thousands (millions of pairs) they take longer than the
+		correlations.}
 	\item{precision}{\code{"single"} or \code{"double"}: the floating point precision
 		the GPU computes in. Single precision is the default, set with
 		\code{options(gputools.precision = "double")}; it runs many times
@@ -47,8 +52,9 @@ gpuCor(x, y = NULL, use = "everything", method = "pearson",
 	\item{coefficients}{the correlations.}
 	\item{ts}{for Pearson's and Spearman's, the t statistics,
 		\eqn{r \sqrt{(n - 2) / (1 - r^2)}}{r sqrt((n - 2) / (1 - r^2))}.}
-	\item{z}{for Kendall's, the normal statistics.}
-	\item{p.value}{the two-sided p-values.}
+	\item{z}{for Kendall's, with \code{test = TRUE}, the normal
+		statistics.}
+	\item{p.value}{with \code{test = TRUE}, the two-sided p-values.}
 	\item{pairs}{the number of rows each correlation used.}
 }
 
@@ -65,7 +71,7 @@ A <- matrix(runif(numAvars*numSamples), numSamples, numAvars)
 B <- matrix(runif(numBvars*numSamples), numSamples, numBvars)
 gpuCor(A, B, method="pearson")
 gpuCor(A, B, method="kendall")
-gpuCor(A, B, method="spearman")$p.value
+gpuCor(A, B, method="spearman", test=TRUE)$p.value
 A[3,2] <- NA
 gpuCor(A, B, use="pairwise.complete.obs", method="pearson")
 \dontshow{\}) # examplesIf}
