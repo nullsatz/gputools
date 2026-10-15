@@ -1,4 +1,14 @@
-## Resubmission of an archived package
+## Resubmission
+
+The incoming pre-test on Debian checked the package with a fake install
+(CUDA is not available there), so the native routine objects that
+`useDynLib(.registration = TRUE, .fixes = "C_")` creates did not exist,
+and the check reported them as undefined global variables. They are now
+declared with `globalVariables()`, and a test checks that the declared
+list matches the registered routines. `R CMD check --as-cran
+--install=fake` is now clean.
+
+## Return of an archived package
 
 gputools was archived on 2017-12-19 because check problems were not
 corrected. Version 2.1.0 is a rewrite of the build and much of the code:

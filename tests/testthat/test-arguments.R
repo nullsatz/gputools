@@ -42,3 +42,10 @@ test_that("other functions check their arguments", {
   expect_error(gpuGranger(x, lag = 4), "too short")
   expect_error(gpuPrcomp(cbind(x, 1), scale. = TRUE), "constant")
 })
+
+test_that("the declared routine objects are exactly the registered ones", {
+  # R/globals.R declares them for CRAN's fake-install check; a routine added
+  # to src/routines.h must be added there too
+  registered <- names(getDLLRegisteredRoutines("gputools")$.Call)
+  expect_setequal(gputools:::.gpuRoutines, paste0("C_", registered))
+})
