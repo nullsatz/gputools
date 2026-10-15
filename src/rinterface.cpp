@@ -22,6 +22,7 @@
 #include "solve.h"
 #include "rank.h"
 #include "pairs.h"
+#include "kmeans.h"
 
 #include "rinterface.h"
 #include "routines.h"
@@ -358,6 +359,31 @@ SEXP assocT(SEXP x, SEXP y, SEXP q, int mode, double threshold, int k,
   return pairListValue(pairs, &xLen, &yLen);
 }
 
+// Lloyd's k-means of the rows of x from the starting centres:
+// list(cluster, centers, size, iter), as R's kmeans_Lloyd returns them
+template <typename T>
+SEXP kmeansT(SEXP x, SEXP centers, int maxiter)
+{
+  SEXP dx = getAttrib(x, R_DimSymbol);
+  int n = INTEGER(dx)[0], d = INTEGER(dx)[1],
+    k = INTEGER(getAttrib(centers, R_DimSymbol))[0];
+  std::vector<T> hx((size_t) n * d);
+  const double * px = REAL(x);
+  for (size_t e = 0; e < hx.size(); ++e) hx[e] = (T) px[e];
+
+  const char * names[] = { "cluster", "centers", "size", "iter", "" };
+  SEXP values[] = {
+    PROTECT(allocVector(INTSXP, n)), PROTECT(allocMatrix(REALSXP, k, d)),
+    PROTECT(allocVector(INTSXP, k)), PROTECT(allocVector(INTSXP, 1))
+  };
+  std::copy(REAL(centers), REAL(centers) + (size_t) k * d, REAL(values[1]));
+  lloyd<T>(n, d, hx.data(), k, REAL(values[1]), maxiter, INTEGER(values[0]),
+           INTEGER(values[2]), INTEGER(values[3]));
+  SEXP out = namedList(names, values);
+  UNPROTECT(4);
+  return out;
+}
+
 // rank(ties.method = "average", na.last = "keep") of each column of x,
 // on the GPU
 template <typename T>
@@ -682,6 +708,14 @@ SEXP gpuAssoc(SEXP x, SEXP y, SEXP q, SEXP mode, SEXP threshold, SEXP k,
   return isDouble(precision)
     ? assocT<double>(x, y, q, md, thr, kk, tl, lim)
     : assocT<float>(x, y, q, md, thr, kk, tl, lim);
+}
+
+SEXP gpuKmeans(SEXP x, SEXP centers, SEXP iterMax, SEXP precision)
+{
+  requireDevice();
+  int maxiter = asInteger(iterMax);
+  return isDouble(precision) ? kmeansT<double>(x, centers, maxiter)
+                             : kmeansT<float>(x, centers, maxiter);
 }
 
 SEXP gpuRank(SEXP x, SEXP precision)
