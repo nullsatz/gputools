@@ -34,6 +34,9 @@ New:
   gives them -- exactly for Pearson's, as `cor.test(exact = FALSE)` for the
   rank coefficients -- and Kendall's its z statistics (`$z`). Results carry
   `cor()`'s dimnames.
+- `gpuPrcomp` and `gpuSvd`: principal components and the singular value
+  decomposition as `prcomp()` and `svd()` compute them, on cuSOLVER;
+  `gpuPrcomp` returns a `"prcomp"` object.
 - `gpuHclust` and `gpuDistClust` take `beta`, the parameter of the
   `"flexible"` and `"flexible group"` methods, which was fixed at 0.5. The
   default stays 0.5; Lance and Williams (1967) recommend -0.25.

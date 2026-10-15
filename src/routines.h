@@ -19,6 +19,7 @@
   X(gpuDistClust, 7)             \
   X(gpuQrDecomp, 3)              \
   X(gpuSolve, 3)                 \
+  X(gpuSvd, 4)                   \
   X(gpuMutualInfo, 8)            \
   X(gpuLSFit, 10)
 

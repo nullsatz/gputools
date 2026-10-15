@@ -323,6 +323,30 @@ SEXP solveT(SEXP x, SEXP y)
   return out;
 }
 
+// svd() of an m x n matrix with m >= n (the R side transposes a wide
+// one): list(d, u, v), u and v NULL unless asked for
+template <typename T>
+SEXP svdT(SEXP x, bool wantU, bool wantV)
+{
+  SEXP dx = getAttrib(x, R_DimSymbol);
+  int m = INTEGER(dx)[0], n = INTEGER(dx)[1];
+  std::vector<T> a = narrow<T>(x, "x"), s(n), u(wantU ? (size_t) m * n : 0),
+    v(wantV ? (size_t) n * n : 0);
+  singularValues(m, n, a.data(), s.data(), wantU, u.data(), wantV, v.data());
+
+  const char * names[] = { "d", "u", "v", "" };
+  SEXP values[] = {
+    PROTECT(doubles(s.data(), n)),
+    wantU ? PROTECT(allocMatrix(REALSXP, m, n)) : R_NilValue,
+    wantV ? PROTECT(allocMatrix(REALSXP, n, n)) : R_NilValue
+  };
+  for (size_t i = 0; i < u.size(); ++i) REAL(values[1])[i] = u[i];
+  for (size_t i = 0; i < v.size(); ++i) REAL(values[2])[i] = v[i];
+  SEXP out = namedList(names, values);
+  UNPROTECT(1 + wantU + wantV);
+  return out;
+}
+
 template <typename T>
 SEXP lsFitT(SEXP x, SEXP n, SEXP p, SEXP y, SEXP ny, SEXP tol, SEXP coef,
             SEXP resid, SEXP effects)
@@ -539,6 +563,13 @@ SEXP gpuSolve(SEXP x, SEXP y, SEXP precision)
 {
   requireDevice();
   return isDouble(precision) ? solveT<double>(x, y) : solveT<float>(x, y);
+}
+
+SEXP gpuSvd(SEXP x, SEXP wantU, SEXP wantV, SEXP precision)
+{
+  requireDevice();
+  bool u = asLogical(wantU), v = asLogical(wantV);
+  return isDouble(precision) ? svdT<double>(x, u, v) : svdT<float>(x, u, v);
 }
 
 SEXP gpuMutualInfo(SEXP bins, SEXP splineOrder, SEXP nsamples,

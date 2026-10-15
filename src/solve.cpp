@@ -63,3 +63,42 @@ template void solveLinear<float>(int n, int p, const float * a, int k,
                                  const float * b, float * x);
 template void solveLinear<double>(int n, int p, const double * a, int k,
                                   const double * b, double * x);
+
+// Thin SVD of the m x n matrix a (column-major on the host, m >= n): the n
+// singular values in s, and if asked the left singular vectors in u
+// (m x n) and the right ones in v (n x n, not transposed).
+template <typename T>
+void singularValues(int m, int n, const T * a, T * s, bool wantU, T * u,
+                    bool wantV, T * v)
+{
+  T * dA = gpuAlloc<T>((size_t) m * n), * dS = gpuAlloc<T>(n),
+    * dU = wantU ? gpuAlloc<T>((size_t) m * n) : NULL,
+    * dVt = wantV ? gpuAlloc<T>((size_t) n * n) : NULL;
+  CUDART_CALL(cudaMemcpy(dA, a, (size_t) m * n * sizeof(T),
+                         cudaMemcpyHostToDevice));
+
+  int info = solver::gesvd(m, n, dA, m, dS, wantU, dU, m, wantV, dVt, n);
+  if (info > 0) {
+    cudaFree(dA); cudaFree(dS); cudaFree(dU); cudaFree(dVt);
+    error("gputools: the SVD did not converge (%d superdiagonals)", info);
+  }
+
+  CUDART_CALL(cudaMemcpy(s, dS, n * sizeof(T), cudaMemcpyDeviceToHost));
+  if (wantU)
+    CUDART_CALL(cudaMemcpy(u, dU, (size_t) m * n * sizeof(T),
+                           cudaMemcpyDeviceToHost));
+  if (wantV) {
+    std::vector<T> vt((size_t) n * n);
+    CUDART_CALL(cudaMemcpy(vt.data(), dVt, (size_t) n * n * sizeof(T),
+                           cudaMemcpyDeviceToHost));
+    for (int i = 0; i < n; ++i)
+      for (int j = 0; j < n; ++j)
+        v[i + (size_t) j * n] = vt[j + (size_t) i * n];
+  }
+  cudaFree(dA); cudaFree(dS); cudaFree(dU); cudaFree(dVt);
+}
+
+template void singularValues<float>(int m, int n, const float * a, float * s,
+  bool wantU, float * u, bool wantV, float * v);
+template void singularValues<double>(int m, int n, const double * a,
+  double * s, bool wantU, double * u, bool wantV, double * v);
