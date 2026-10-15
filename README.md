@@ -3,22 +3,43 @@
 [![R-CMD-check](https://github.com/nullsatz/gputools/actions/workflows/R-CMD-check.yml/badge.svg)](https://github.com/nullsatz/gputools/actions/workflows/R-CMD-check.yml)
 [![r-universe](https://nullsatz.r-universe.dev/badges/gputools)](https://nullsatz.r-universe.dev/gputools)
 
-GPU versions of some common statistical computations in R, using NVIDIA
-CUDA:
+GPU drop-ins for base-R statistics on wide data. gputools computes the
+statistics that cost the most when there are many variables -- every
+pairwise correlation, distance or association test, and the clustering
+built on them -- on an NVIDIA GPU, and returns the numbers base R would: every
+function is tested against its base-R counterpart, to float accuracy in
+single precision and to 1e-8 or better in double.
+
+It was written for, and mostly used in, genomics: correlating thousands of
+genes or regulatory regions across samples, screening pairs of variables,
+clustering expression profiles. The GPU pays off most there; measured
+against base R on 8 CPU cores, Kendall's tau ran about 2,900 times faster,
+Pearson correlation 16 times, distance matrices 7 times.
+
+## What it computes
+
+**Pairwise statistics over many variables** -- where the GPU wins:
 
 | gputools | base R |
 |---|---|
 | `gpuCor` (Pearson, Kendall), `gpuTtest` | `cor`, the correlation t-test |
-| `gpuDist`, `gpuHclust`, `gpuDistClust` | `dist`, `hclust` |
-| `gpuGranger` | Granger causality F-tests (an `lm` per pair of series) |
-| `gpuMi` | B-spline mutual information (no base equivalent) |
+| `gpuDist` | `dist` |
+| `gpuHclust`, `gpuDistClust` | `hclust`, `hclust(dist())` |
+| `gpuGranger` | Granger causality F-tests for every pair of series |
+| `gpuMi` | B-spline mutual information (Daub et al. 2004) |
+
+**Models and linear algebra**, with the same interface as base R:
+
+| gputools | base R |
+|---|---|
 | `gpuLm`, `gpuLsfit`, `gpuGlm` | `lm`, `lsfit`, `glm` |
 | `gpuQr`, `gpuSolve` | `qr`, `solve` |
 | `gpuMatMult`, `gpuCrossprod`, `gpuTcrossprod` | `%*%`, `crossprod`, `tcrossprod` |
 
-Results match base R: every function is tested against its base-R
-counterpart, to float accuracy in single precision and to 1e-8 or better
-in double.
+A multi-threaded BLAS is about as fast as the GPU at matrix products and
+small regressions; for general GPU array work in R,
+[torch](https://torch.mlverse.org/) is the better tool. The
+[benchmarks vignette](vignettes/benchmarks.Rmd) has the measurements.
 
 ## Installing
 
@@ -72,11 +93,20 @@ node, CI); `gpuAvailable()` says whether the GPU functions can run there.
 
 ```r
 library(gputools)
-x <- matrix(rnorm(2000 * 500), 2000, 500)
 
-r <- gpuCor(x)$coefficients            # cor(x)
-h <- gpuHclust(gpuDist(t(x)))          # hclust(dist(t(x)))
-fit <- gpuLm(mpg ~ ., mtcars)          # an "lm" object: summary(), predict(), ...
+# expression of 2,000 genes (columns) in 300 samples (rows)
+expr <- matrix(rnorm(300 * 2000), 300, 2000)
+
+r <- gpuCor(expr)                       # all 2,000 x 2,000 correlations
+r$coefficients[1:5, 1:5]                # as cor(expr)
+r$ts[1:5, 1:5]                          # their t-statistics
+
+tau <- gpuCor(expr, method = "kendall")$coefficients   # as cor(..., "kendall")
+
+tree <- gpuDistClust(t(expr), clustmethod = "average") # hclust(dist(t(expr)))
+groups <- cutree(tree, k = 10)
+
+fit <- gpuLm(mpg ~ ., mtcars)           # an "lm": summary(), predict(), ...
 ```
 
 Each function computes in single precision by default, which is many times
@@ -105,6 +135,12 @@ so there the GPU tests skip. To run them on a Slurm cluster:
 ```sh
 sbatch -p <gpu partition> ci/slurm-gpu-test.sh <conda env> [<conda env> ...]
 ```
+
+## Citing
+
+Buckner J, Wilson J, Seligman M, Athey B, Watson S, Meng F (2010). The
+gputools package enables GPU computing in R. *Bioinformatics* 26(1),
+134-135. [doi:10.1093/bioinformatics/btp608](https://doi.org/10.1093/bioinformatics/btp608)
 
 ## License
 
