@@ -27,5 +27,5 @@ Description: GPU versions of base R statistics for data with many
     package installs, and its functions explain how to get a 'CUDA' build.
     Described in Buckner et al. (2010) <doi:10.1093/bioinformatics/btp608>.
 License: GPL-3
-URL: https://github.com/nullsatz/gputools
+URL: https://nullsatz.github.io/gputools/, https://github.com/nullsatz/gputools
 BugReports: https://github.com/nullsatz/gputools/issues
