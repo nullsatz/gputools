@@ -3,22 +3,25 @@
 [![R-CMD-check](https://github.com/nullsatz/gputools/actions/workflows/R-CMD-check.yml/badge.svg)](https://github.com/nullsatz/gputools/actions/workflows/R-CMD-check.yml)
 [![r-universe](https://nullsatz.r-universe.dev/badges/gputools)](https://nullsatz.r-universe.dev/gputools)
 
-GPU drop-ins for base-R statistics on wide data. gputools computes the
-statistics that cost the most when there are many variables -- every
-pairwise correlation, distance or association test, and the clustering
-built on them -- on an NVIDIA GPU, and returns the numbers base R would: every
-function is tested against its base-R counterpart, to float accuracy in
-single precision and to 1e-8 or better in double.
+GPU versions of base R's statistics for wide data, on NVIDIA GPUs.
 
-It was written for, and mostly used in, genomics: correlating thousands of
-genes or regulatory regions across samples, screening pairs of variables,
-clustering expression profiles. The GPU pays off most there; measured
-against base R on 8 CPU cores, Kendall's tau ran about 2,900 times faster,
-Pearson correlation 16 times, distance matrices 7 times.
+Wide data has many more variables than samples: thousands of genes in a
+few hundred samples, say. The statistics that cost the most on such data
+are the ones about every pair of variables (correlation, distance,
+association tests) and the clustering built on them. gputools computes
+those on the GPU and returns the numbers base R would. Every function is
+tested against its base R counterpart, to float accuracy in single
+precision and to 1e-8 or better in double.
+
+It was written for genomics, and that is where it is mostly used:
+correlating thousands of genes or regulatory regions across samples,
+screening pairs of variables, clustering expression profiles. Against base
+R on 8 CPU cores, Kendall's tau ran about 2,900 times faster, Pearson
+correlation 16 times, and distance matrices 7 times.
 
 ## What it computes
 
-**Pairwise statistics over many variables** -- where the GPU wins:
+Pairwise statistics over many variables, where the GPU wins:
 
 | gputools | base R |
 |---|---|
@@ -35,7 +38,7 @@ Pearson correlation 16 times, distance matrices 7 times.
 | `gpuMi` | B-spline mutual information (Daub et al. 2004) |
 | `gpuPrcomp`, `gpuSvd` | `prcomp`, `svd` |
 
-**Models and linear algebra**, with the same interface as base R:
+Models and linear algebra, with the same interface as base R:
 
 | gputools | base R |
 |---|---|
@@ -43,15 +46,14 @@ Pearson correlation 16 times, distance matrices 7 times.
 | `gpuQr`, `gpuSolve` | `qr`, `solve` |
 | `gpuMatMult`, `gpuCrossprod`, `gpuTcrossprod` | `%*%`, `crossprod`, `tcrossprod` |
 
-These are there for convenience: R's own `lm`, `glm` and `%*%` were as fast
-or faster at every size we measured; for general GPU array work in R,
-[torch](https://torch.mlverse.org/) is the better tool. The
-[benchmarks vignette](vignettes/benchmarks.Rmd) has the measurements.
+The second group is there for convenience. R's own `lm`, `glm` and `%*%`
+were as fast or faster at every size we measured, and for general GPU
+array work in R, [torch](https://torch.mlverse.org/) is the better tool.
 
 ## Installing
 
-You need an NVIDIA CUDA toolkit, 11.7 or later, to build the package, and
-an NVIDIA GPU and driver to run the GPU functions. Install from
+To build the package you need an NVIDIA CUDA toolkit, 11.7 or later; to
+run the GPU functions, an NVIDIA GPU and driver. Install from
 [r-universe](https://nullsatz.r-universe.dev):
 
 ```r
@@ -71,6 +73,17 @@ CUDA toolkit. The prebuilt packages r-universe offers (Windows, macOS, and
 its opt-in Linux binaries) are built without CUDA: they install and load,
 but their GPU functions cannot run.
 
+The package also installs and loads on a machine with no GPU, such as a
+login node or a CI runner; `gpuAvailable()` says whether the GPU
+functions can run there.
+
+### Finding CUDA
+
+`configure` finds CUDA through `CUDA_HOME`, `CUDA_PATH`, `nvcc` on the
+`PATH`, or `/usr/local/cuda`. In a conda environment, set
+`CUDA_HOME=$CONDA_PREFIX`. See [INSTALL](INSTALL) for the details and the
+conda packages.
+
 ### Windows
 
 gputools runs on Windows under **WSL2** (the Windows Subsystem for
@@ -85,16 +98,6 @@ Linux), which supports CUDA:
 
 The native Windows package installs and loads, but its GPU functions
 cannot run.
-
-### Finding CUDA
-
-`configure` finds CUDA through `CUDA_HOME`, `CUDA_PATH`, `nvcc` on the
-`PATH`, or `/usr/local/cuda`; in a conda environment set
-`CUDA_HOME=$CONDA_PREFIX`. See [INSTALL](INSTALL) for the details and the
-conda packages.
-
-The package also installs and loads on a machine with no GPU (a login
-node, CI); `gpuAvailable()` says whether the GPU functions can run there.
 
 ## Using it
 
@@ -130,9 +133,13 @@ options(gputools.precision = "double")
 Kernels are compiled for the GPU in use the first time each is needed, so
 the first call of a function takes a fraction of a second longer.
 
+## How fast
+
 Whether the GPU is faster depends on the function, the data size and the
-hardware. On an RTX A5500, single precision, the GPU started to win at
-about these sizes:
+hardware. The numbers here are from an RTX A5500 in single precision,
+against base R on 8 CPU cores.
+
+**Where the GPU starts to win.** Below these sizes, base R is faster:
 
 | function | faster than base R from |
 |---|---|
@@ -146,22 +153,26 @@ about these sizes:
 | `gpuSolve` | 300 x 300 |
 | `gpuQr` | 1,000 columns |
 
-For finding the strongly correlated pairs among many variables,
-`gpuCorPairs` never builds the correlation matrix: every pair with
-|r| >= 0.8 among 10,000 variables took 0.02 s against 6.5 s for `cor()`
-and `which()`, and among 50,000 variables, 0.09 s. An eQTL scan with
-`gpuAssoc` (20,000 genes, 50,000 SNPs, 500 samples, 5 covariates) took
-0.37 s against 11 s for Matrix eQTL, reporting the same associations.
-`gpuKmeans` put 100,000 points into 1,000 clusters in 0.25 s, against
-14.5 s for `kmeans()`. Permutation tests
-gain most: a thousand permutations of every correlation among 1,000 x
-1,000 variables, maxT included, took 0.13 s against 20 s in R, and of
-t tests of 20,000 genes, 0.06 s against 23 s.
+**At genomics sizes**, the gains are large:
 
-Below these sizes base R is faster, and each call carries a fixed cost of
-about 50 µs, so **don't loop over small pieces**: put all the variables in
-one matrix and make one call. `vignette("benchmarks", package = "gputools")`
-has the full measurements and the script to repeat them on your hardware.
+| job | gputools | base R or the standard tool |
+|---|---|---|
+| every pair with \|r\| >= 0.8 among 10,000 variables (`gpuCorPairs`) | 0.02 s | 6.5 s (`cor()` and `which()`) |
+| the same among 50,000 variables | 0.09 s | not run (the matrix is 20 GB) |
+| eQTL scan: 20,000 genes, 50,000 SNPs, 500 samples, 5 covariates (`gpuAssoc`) | 0.37 s | 11 s (Matrix eQTL, the same associations) |
+| 100,000 points into 1,000 clusters (`gpuKmeans`) | 0.25 s | 14.5 s (`kmeans()`) |
+| 1,000 permutations of every correlation among 1,000 x 1,000 variables, maxT (`gpuCorPerm`) | 0.13 s | 20 s |
+| 1,000 permutations of t tests of 20,000 genes (`gpuRowTtest`) | 0.06 s | 23 s |
+
+Permutation tests gain the most, because a thousand permutations cost a
+thousand times the test in R and one batched computation on the GPU.
+`gpuCorPairs` never builds the correlation matrix, so it also runs at sizes
+where `cor()` cannot.
+
+Each call carries a fixed cost of about 50 µs, so **don't loop over small
+pieces**: put all the variables in one matrix and make one call.
+`vignette("benchmarks", package = "gputools")` has the full measurements
+and the script to repeat them on your hardware.
 
 ## Testing on a GPU
 
