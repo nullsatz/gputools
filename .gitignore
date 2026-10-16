@@ -5,3 +5,4 @@ src/Makevars
 src/*.o
 src/*.so
 src/nocuda-reason.h
+docs/

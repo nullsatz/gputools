@@ -1,0 +1,60 @@
+url: https://nullsatz.github.io/gputools/
+
+template:
+  bootstrap: 5
+
+home:
+  title: GPU drop-ins for base R statistics on wide data
+
+navbar:
+  structure:
+    left: [reference, articles]
+    right: [search, github]
+
+reference:
+- title: Pairwise statistics over many variables
+  desc: Every pair of variables at once, on the GPU.
+  contents:
+  - gpuCor
+  - gpuCorPairs
+  - gpuAssoc
+  - gpuTtest
+  - gpuDist
+  - gpuGranger
+  - gpuMi
+- title: Permutation tests
+  desc: Permutation and Westfall-Young maxT p-values for every test.
+  contents:
+  - gpuCorPerm
+  - gpuRowTtest
+- title: Clustering and components
+  contents:
+  - gpuHclust
+  - gpuDistClust
+  - gpuKmeans
+  - gpuPrcomp
+  - gpuSvd
+- title: Models and linear algebra
+  desc: The same interface as base R; base R is as fast at most sizes.
+  contents:
+  - gpuLm
+  - gpuLm.fit
+  - gpuLm.defaultTol
+  - gpuLsfit
+  - gpuGlm
+  - gpuQr
+  - gpuSolve
+  - gpuMatMult
+  - gpuCrossprod
+  - gpuTcrossprod
+  - cpuMatMult
+- title: The GPU
+  contents:
+  - gpuAvailable
+  - chooseGpu
+  - getGpuId
+
+articles:
+- title: Benchmarks
+  contents:
+  - benchmarks
