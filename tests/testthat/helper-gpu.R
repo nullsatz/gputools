@@ -9,13 +9,15 @@ skip_if_no_gpu <- function() {
 }
 
 # Granger causality F-test, "does cause[] Granger-cause effect[]", by lm().
-grangerRef <- function(effect, cause, lag) {
+# tol is lm()'s rank tolerance: its default 1e-7 drops a cause within 1e-6
+# of the effect as aliased (F = 0), where the fits are still well defined
+grangerRef <- function(effect, cause, lag, tol = 1e-7) {
   n <- length(effect)
   rows <- (lag + 1):n
   lags <- function(v) sapply(1:lag, function(k) v[rows - k])
   y <- effect[rows]
-  restricted <- lm(y ~ lags(effect))
-  unrestricted <- lm(y ~ lags(effect) + lags(cause))
+  restricted <- lm(y ~ lags(effect), tol = tol)
+  unrestricted <- lm(y ~ lags(effect) + lags(cause), tol = tol)
   rssR <- sum(residuals(restricted)^2)
   rssU <- sum(residuals(unrestricted)^2)
   df2 <- length(rows) - 2 * lag - 1

@@ -6,41 +6,140 @@ noise <- rnorm(len)
 x <- cbind(effect, cause, noise)
 
 # fStatistics[i, j] answers "does column i Granger-cause column j?"
+# The tests compute in double whatever the precision argument says
 for (pr in precisions) {
-  test_that(paste("gpuGranger matches an lm() F-test in", pr), {
+  test_that(paste("gpuGranger matches an lm() F-test with precision", pr), {
     skip_if_no_gpu()
     for (lag in 1:2) {
       g <- gpuGranger(x, lag = lag, precision = pr)
       for (i in 1:3) for (j in 1:3) if (i != j) {
         ref <- grangerRef(x[, j], x[, i], lag)
-        if (pr == "double") {
-          expect_equal(g$fStatistics[i, j], unname(ref["f"]), tolerance = 1e-8)
-          expect_equal(g$pValues[i, j], unname(ref["p"]), tolerance = 1e-6)
-        } else {
-          # near-zero F loses relative precision to float32 cancellation in
-          # the residual sums of squares; compare on an absolute floor
-          expect_lt(abs(g$fStatistics[i, j] - ref["f"]),
-                    1e-3 * max(1, ref["f"]))
-          expect_lt(abs(g$pValues[i, j] - ref["p"]), 1e-3)
-        }
+        expect_equal(g$fStatistics[i, j], unname(ref["f"]), tolerance = 1e-8)
+        expect_equal(g$pValues[i, j], unname(ref["p"]), tolerance = 1e-8)
       }
     }
   })
 
-  test_that(paste("gpuGranger x/y form agrees with the single-matrix form in",
+  test_that(paste("gpuGranger x/y form agrees with the single-matrix form,",
                   pr), {
     skip_if_no_gpu()
     g <- gpuGranger(x, lag = 2, precision = pr)
     # several x columns, one y column
     gxy <- gpuGranger(x[, 2:3], x[, 1, drop = FALSE], lag = 2, precision = pr)
     expect_equal(gxy$fStatistics[, 1], g$fStatistics[2:3, 1],
-                 tolerance = tolFor(pr), ignore_attr = TRUE)
+                 tolerance = 1e-10, ignore_attr = TRUE)
     # one x column, several y columns
     gxy <- gpuGranger(x[, 1, drop = FALSE], x[, 2:3], lag = 2, precision = pr)
     expect_equal(gxy$fStatistics[1, ], g$fStatistics[1, 2:3],
-                 tolerance = tolFor(pr), ignore_attr = TRUE)
+                 tolerance = 1e-10, ignore_attr = TRUE)
   })
 }
+
+test_that("gpuGranger is accurate on long random walks and trends", {
+  skip_if_no_gpu()
+  set.seed(7)
+  n <- 5000
+  walks <- apply(matrix(rnorm(n * 4), n, 4), 2, cumsum)
+  walks[2:n, 3] <- walks[2:n, 3] + 0.05 * walks[1:(n - 1), 1]
+  drift <- apply(1 + matrix(rnorm(n * 3), n, 3), 2, cumsum)
+  trend <- 0.01 * seq_len(n) + matrix(rnorm(n * 3), n, 3)
+  for (lag in c(1, 3)) for (x in list(walks, drift, trend)) {
+    g <- expect_no_warning(gpuGranger(x, lag = lag))
+    p <- ncol(x)
+    for (i in 1:p) for (j in 1:p) if (i != j) {
+      ref <- grangerRef(x[, j], x[, i], lag)
+      expect_equal(g$fStatistics[i, j], unname(ref["f"]), tolerance = 1e-7,
+                   info = paste("pair", i, j, "lag", lag))
+    }
+  }
+})
+
+test_that("gpuGranger resolves a cause nearly equal to the effect", {
+  skip_if_no_gpu()
+  set.seed(50)
+  e <- cumsum(rnorm(2000))
+  x <- cbind(e, e + 1e-6 * rnorm(2000), cumsum(rnorm(2000)))
+  g <- expect_no_warning(gpuGranger(x, lag = 2))
+  for (ij in list(c(2, 1), c(3, 1))) {
+    ref <- grangerRef(x[, ij[2]], x[, ij[1]], 2, tol = 1e-12)
+    expect_equal(g$fStatistics[ij[1], ij[2]], unname(ref["f"]),
+                 tolerance = 1e-6)
+  }
+})
+
+test_that("gpuGranger flags what it cannot resolve, and only that", {
+  skip_if_no_gpu()
+  set.seed(51)
+  x <- apply(matrix(rnorm(150 * 3), 150, 3), 2, cumsum)
+  # a cause that is the effect: nothing of its lags is left beside them
+  expect_warning(g <- gpuGranger(x, x[, 2, drop = FALSE], lag = 2),
+                 "1 pair\\(s\\) are too ill-conditioned")
+  expect_true(is.na(g$fStatistics[2, 1]))
+  expect_true(is.finite(g$fStatistics[1, 1]) && is.finite(g$fStatistics[3, 1]))
+  # a constant series has no tests, and no warning
+  xc <- x
+  xc[, 2] <- 4
+  g <- expect_no_warning(gpuGranger(xc, lag = 2))
+  expect_true(all(is.na(g$fStatistics[2, ])) && all(is.na(g$fStatistics[, 2])))
+  expect_true(is.finite(g$fStatistics[1, 3]))
+  # series integrated three times at a long lag: every pair is either
+  # flagged (NA, with the warning) or within 0.1 percent of least squares
+  set.seed(1)
+  x3 <- matrix(rnorm(3000 * 3), 3000, 3)
+  for (k in 1:3) x3 <- apply(x3, 2, cumsum)
+  warned <- 0
+  g <- withCallingHandlers(gpuGranger(x3, lag = 5),
+                           warning = function(w) {
+                             warned <<- warned + 1
+                             invokeRestart("muffleWarning")
+                           })
+  off <- row(g$fStatistics) != col(g$fStatistics)
+  flagged <- sum(is.na(g$fStatistics[off]))
+  expect_equal(warned, as.integer(flagged > 0))
+  for (i in 1:3) for (j in 1:3) if (i != j && is.finite(g$fStatistics[i, j])) {
+    ref <- grangerRef(x3[, j], x3[, i], 5, tol = 1e-12)
+    expect_equal(g$fStatistics[i, j], unname(ref["f"]), tolerance = 1e-3,
+                 info = paste("pair", i, j))
+  }
+})
+
+test_that("gpuGranger agrees with lm() across several tiles of effects", {
+  skip_if_no_gpu()
+  # n = 20,000 at lag 3 puts about 34 effects in a tile, so 50 series
+  # take two tiles: the second tile's indexing, its diagonal and the x/y
+  # form on a subset are all exercised
+  set.seed(8)
+  n <- 20000
+  x <- matrix(rnorm(n * 50), n, 50)
+  x[2:n, 45] <- x[2:n, 45] + 0.1 * x[1:(n - 1), 3]
+  g <- expect_no_warning(gpuGranger(x, lag = 3))
+  expect_true(all(is.na(diag(g$fStatistics))))
+  expect_true(all(is.finite(g$fStatistics[row(g$fStatistics) != col(g$fStatistics)])))
+  pairs <- rbind(c(3, 45), c(45, 3), c(1, 50), c(50, 1), c(34, 35), c(35, 34),
+                 c(10, 40), c(40, 49), c(49, 48), c(2, 36))
+  for (r in seq_len(nrow(pairs))) {
+    i <- pairs[r, 1]; j <- pairs[r, 2]
+    ref <- grangerRef(x[, j], x[, i], 3)
+    expect_equal(g$fStatistics[i, j], unname(ref["f"]), tolerance = 1e-7,
+                 info = paste("pair", i, j))
+  }
+  expect_gt(g$fStatistics[3, 45], 20)
+  gxy <- gpuGranger(x[, 1:5], x[, 40:50], lag = 3)
+  expect_equal(gxy$fStatistics, g$fStatistics[1:5, 40:50], tolerance = 1e-10,
+               ignore_attr = TRUE)
+})
+
+test_that("gpuGranger checks its arguments", {
+  skip_if_no_gpu()
+  expect_error(gpuGranger(x, lag = 0), "positive whole number")
+  expect_error(gpuGranger(x, lag = 1.5), "positive whole number")
+  expect_error(gpuGranger(x, lag = 17), "at most 16")
+  expect_error(gpuGranger(x, lag = 1e10), "at most 16")
+  expect_error(gpuGranger(x[, 0], lag = 1), "at least one column")
+  expect_error(gpuGranger(x[1:7, ], lag = 2), "too short")
+  expect_error(gpuGranger(x, x[1:100, ], lag = 2), "different numbers of rows")
+  expect_equal(dim(gpuGranger(x, lag = 16)$fStatistics), c(3, 3))
+})
 
 test_that("gpuGranger's result says which way it reads", {
   skip_if_no_gpu()

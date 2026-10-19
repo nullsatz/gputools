@@ -519,33 +519,24 @@ SEXP rankCorT(const char * kernel, SEXP x, int na, SEXP y, int nb, int size)
   return out;
 }
 
-template <typename T>
-SEXP fAndP(const std::vector<T> & f, const std::vector<T> & p)
+// Granger tests always compute in double (see granger.cpp)
+SEXP grangerD(SEXP x, int rows, int nx, SEXP y, int ny, int lag)
 {
-  const char * names[] = { "fStats", "pValues", "" };
+  std::vector<double> a = narrow<double>(x, "x"), b;
+  const double * py = NULL;
+  if (!isNull(y)) { b = narrow<double>(y, "y"); py = b.data(); }
+  else ny = nx;
+  std::vector<double> f((size_t) nx * ny), p((size_t) nx * ny);
+  int unresolved = 0;
+  granger(rows, nx, a.data(), ny, py, lag, f.data(), p.data(), &unresolved);
+  const char * names[] = { "fStats", "pValues", "unresolved", "" };
   SEXP values[] = {
-    PROTECT(doubles(f.data(), f.size())), PROTECT(doubles(p.data(), p.size()))
+    PROTECT(doubles(f.data(), f.size())), PROTECT(doubles(p.data(), p.size())),
+    PROTECT(ScalarInteger(unresolved))
   };
   SEXP out = namedList(names, values);
-  UNPROTECT(2);
+  UNPROTECT(3);
   return out;
-}
-
-template <typename T>
-SEXP grangerT(SEXP x, int rows, int n, int lag)
-{
-  std::vector<T> a = narrow<T>(x, "x"), f(n * n), p(n * n);
-  granger(rows, n, a.data(), lag, f.data(), p.data());
-  return fAndP(f, p);
-}
-
-template <typename T>
-SEXP grangerXYT(SEXP x, int rows, int nx, SEXP y, int ny, int lag)
-{
-  std::vector<T>
-    a = narrow<T>(x, "x"), b = narrow<T>(y, "y"), f(nx * ny), p(nx * ny);
-  grangerxy(rows, nx, a.data(), ny, b.data(), lag, f.data(), p.data());
-  return fAndP(f, p);
 }
 
 template <typename T>
@@ -854,19 +845,16 @@ SEXP gpuSpearman(SEXP x, SEXP nx, SEXP y, SEXP ny, SEXP size,
 SEXP gpuGranger(SEXP x, SEXP rows, SEXP cols, SEXP lag, SEXP precision)
 {
   requireDevice();
-  int r = asInteger(rows), n = asInteger(cols), p = asInteger(lag);
-  return isDouble(precision) ? grangerT<double>(x, r, n, p)
-                             : grangerT<float>(x, r, n, p);
+  return grangerD(x, asInteger(rows), asInteger(cols), R_NilValue, 0,
+                  asInteger(lag));
 }
 
 SEXP gpuGrangerXY(SEXP x, SEXP rows, SEXP colsx, SEXP y, SEXP colsy,
                   SEXP lag, SEXP precision)
 {
   requireDevice();
-  int r = asInteger(rows), nx = asInteger(colsx), ny = asInteger(colsy),
-    p = asInteger(lag);
-  return isDouble(precision) ? grangerXYT<double>(x, r, nx, y, ny, p)
-                             : grangerXYT<float>(x, r, nx, y, ny, p);
+  return grangerD(x, asInteger(rows), asInteger(colsx), y, asInteger(colsy),
+                  asInteger(lag));
 }
 
 SEXP gpuDist(SEXP points, SEXP numPoints, SEXP dim, SEXP method, SEXP p,

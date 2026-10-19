@@ -145,6 +145,19 @@ inline void trsmLeftUpper(int m, int n, float alpha, const float * a,
                           CUBLAS_DIAG_NON_UNIT, m, n, &alpha, a, lda, b, ldb));
 }
 
+// b independent products c_k = alpha op(a_k) op(b_k) + beta c_k, the k-th
+// operands strideA, strideB, strideC elements after the first
+inline void gemmStridedBatched(char transa, char transb, int m, int n, int k,
+                               float alpha, const float * a, int lda,
+                               long long strideA, const float * b, int ldb,
+                               long long strideB, float beta, float * c,
+                               int ldc, long long strideC, int batch)
+{
+  CUBLAS_CALL(cublasSgemmStridedBatched(gpuBlasHandle(), op(transa),
+    op(transb), m, n, k, &alpha, a, lda, strideA, b, ldb, strideB, &beta, c,
+    ldc, strideC, batch));
+}
+
 // the same in double precision
 
 inline void copy(int n, const double * x, int incx, double * y, int incy)
@@ -210,6 +223,17 @@ inline void gemm(char transa, char transb, int m, int n, int k, double alpha,
 {
   CUBLAS_CALL(cublasDgemm(gpuBlasHandle(), op(transa), op(transb), m, n, k,
                           &alpha, a, lda, b, ldb, &beta, c, ldc));
+}
+
+inline void gemmStridedBatched(char transa, char transb, int m, int n, int k,
+                               double alpha, const double * a, int lda,
+                               long long strideA, const double * b, int ldb,
+                               long long strideB, double beta, double * c,
+                               int ldc, long long strideC, int batch)
+{
+  CUBLAS_CALL(cublasDgemmStridedBatched(gpuBlasHandle(), op(transa),
+    op(transb), m, n, k, &alpha, a, lda, strideA, b, ldb, strideB, &beta, c,
+    ldc, strideC, batch));
 }
 
 inline void syrk(char uplo, char trans, int n, int k, double alpha,
