@@ -1,3 +1,20 @@
+# gputools 2.1.1
+
+- `gpuGranger()` reported F = 0, p = 1, "no causality", for a pair it
+  could not resolve (collinear lags, a constant series, a cause identical
+  to the effect), computed in single precision by default on uncentred
+  data (F statistics of long random walks off by more than 10 percent),
+  and built one regression per pair with memory growing as the square of
+  the number of series. It now computes every pair in double by the
+  Frisch-Waugh route, with each effect's own past projected out once, and
+  the cause's test taken from a few matrix products, agreeing with `lm()`
+  to about 1e-8; a pair it cannot resolve in double is `NA` with a warning
+  (series integrated twice or more should be differenced first), a series
+  against itself or a constant series `NA` without one. `lag` is checked
+  (1 to 16). The `precision` argument is accepted but the tests always
+  compute in double. The method and its limits follow the Python package
+  widestats.
+
 # gputools 2.1.0
 
 - New `gpuCorPerm()`: permutation p-values for every correlation between

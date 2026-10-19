@@ -91,9 +91,14 @@ decomposing large matrices (`gpuSolve`, `gpuPrcomp`).
 
 **Single or double precision.** Consumer and workstation GPUs run double
 precision many times slower than single; data-centre GPUs do not. For
-statistics whose result is a correlation, a distance or a test statistic,
-single precision usually loses nothing that matters; for least squares on
-badly conditioned data, use double.
+statistics whose result is a correlation or a distance, single precision
+usually loses nothing that matters; for least squares, and for anything
+that subtracts two nearly equal sums of squares, use double. `gpuGranger`
+is the clear case: its F statistic is a difference of two residual sums
+of squares, and in single precision it was off by more than 10 percent on
+long random walks, so it now always computes in double, whatever
+`precision` says. (The Granger timings in this vignette were measured
+before that change; `bench/run-benchmarks.R` repeats them.)
 
 ## When the GPU pays off
 

@@ -1,5 +1,5 @@
 Package: gputools
-Version: 2.1.0
+Version: 2.1.1
 Title: GPU Drop-Ins for Statistics on Wide Data
 Authors@R: c(person("Josh", "Buckner", email = "nullsatz@gmail.com",
                     role = c("aut", "cre")),
