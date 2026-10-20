@@ -6,7 +6,12 @@
 // sums of squares do not cancel.
 
 // t (genes x nb): Welch's t, or Student's with the pooled variance if
-// pooled is set; NaN where a variance is zero
+// pooled is set. A within-group sum of squares within rounding of zero
+// (16 eps of the sum of squares it is taken from) is zero: a row constant
+// within the group would otherwise get a large finite t where the true t
+// is infinite. A zero standard error with the means apart gives +/-Inf
+// (a labelling that separates the groups completely); with the means
+// equal, or a constant row (NaN after scaling), there is no test: NaN.
 __global__ void gpuRowT(const real * s1, const real * q1, const real * s,
 	const real * q, int genes, int nb, int n1, int n2, int pooled,
 	real * t)
@@ -16,7 +21,11 @@ __global__ void gpuRowT(const real * s1, const real * q1, const real * s,
 	int g = e % genes;
 	real a1 = s1[e], b1 = q1[e], a2 = s[g] - a1, b2 = q[g] - b1;
 	real m1 = a1 / n1, m2 = a2 / n2;
-	real ss1 = fmax(b1 - a1 * m1, real(0)), ss2 = fmax(b2 - a2 * m2, real(0));
+	const real tiny = real(16) * (sizeof(real) == 4 ? real(1.1920929e-7)
+	                                                : real(2.220446049250313e-16));
+	real ss1 = b1 - a1 * m1, ss2 = b2 - a2 * m2;
+	if(ss1 <= tiny * b1) ss1 = real(0);
+	if(ss2 <= tiny * b2) ss2 = real(0);
 	real se2;
 	if(pooled) {
 		real v = (ss1 + ss2) / (n1 + n2 - 2);
@@ -24,26 +33,32 @@ __global__ void gpuRowT(const real * s1, const real * q1, const real * s,
 	} else {
 		se2 = ss1 / (n1 - 1) / n1 + ss2 / (n2 - 1) / n2;
 	}
-	t[e] = se2 > real(0) ? (m1 - m2) / sqrt(se2) : REAL_NAN;
+	real diff = m1 - m2;
+	if(se2 > real(0)) t[e] = diff / sqrt(se2);
+	else if(diff > real(0)) t[e] = REAL_INF;
+	else if(diff < real(0)) t[e] = -REAL_INF;
+	else t[e] = REAL_NAN;
 }
 
-// For a block of c labellings, global columns first .. first + c - 1 of
-// which column 0 is the observed one (skipped): counts[g] += 1 where
-// |t_b| >= |t0| (1 - eps), and maxima[b - 1] = the largest |t_b| over the
-// genes (NaN counting as 0). One block of 256 threads per column.
-__global__ void gpuRowTCount(const real * t, const real * t0, int genes,
-	int first, real eps, int * counts, double * maxima)
+// For a block of labellings whose column 0 is the observed one, recomputed
+// with the block (so a labelling equivalent to it is compared with the
+// same arithmetic), and columns 1 .. c the permutations first .. first +
+// c - 1: counts[g] += 1 where |t_b| >= |t0| (1 - eps), and maxima[first +
+// b - 1] = the largest |t_b| over the rows that have a test (a row with
+// no observed test, NaN, counts as 0 everywhere). One block of 256
+// threads per permutation column.
+__global__ void gpuRowTCount(const real * t, int genes, int first, real eps,
+	int * counts, double * maxima)
 {
 	__shared__ double best[256];
-	int b = first + blockIdx.x;
-	if(b == 0) return;
-	const real * tb = t + (size_t) blockIdx.x * genes;
+	const real * t0 = t;
+	const real * tb = t + (size_t) (blockIdx.x + 1) * genes;
 	double m = 0;
 	for(int g = threadIdx.x; g < genes; g += blockDim.x) {
 		real v = tb[g], o = t0[g];
-		if(isnan(v)) continue;
+		if(isnan(o) || isnan(v)) continue;
 		m = fmax(m, (double) fabs(v));
-		if(!isnan(o) && fabs(v) >= fabs(o) * (real(1) - eps))
+		if(fabs(v) >= fabs(o) * (real(1) - eps))
 			atomicAdd(counts + g, 1);
 	}
 	best[threadIdx.x] = m;
@@ -54,5 +69,5 @@ __global__ void gpuRowTCount(const real * t, const real * t0, int genes,
 			                         best[threadIdx.x + stride]);
 		__syncthreads();
 	}
-	if(threadIdx.x == 0) maxima[b - 1] = best[0];
+	if(threadIdx.x == 0) maxima[first + blockIdx.x] = best[0];
 }

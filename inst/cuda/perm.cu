@@ -13,7 +13,8 @@ __global__ void gpuPermuteRows(const real * z, int n, int q, const int * perm,
 }
 
 // One permutation's correlations rb (p x q) against the observed r0:
-// counts[e] += 1 where |rb| >= |r0| - eps. Entries that are no test (NaN,
+// counts[e] += 1 where |rb| >= |r0| (1 - eps), a relative allowance for
+// rounding in the comparison. Entries that are no test (NaN,
 // or the diagonal of x with itself) are set to 0 in rb, so that its
 // largest |value| is the permutation's maximum statistic.
 __global__ void gpuCountExceed(real * rb, const real * r0, int p, int q,
@@ -26,5 +27,5 @@ __global__ void gpuCountExceed(real * rb, const real * r0, int p, int q,
 		rb[e] = real(0);
 		return;
 	}
-	if(fabs(v) >= fabs(o) - eps) counts[e]++;
+	if(fabs(v) >= fabs(o) * (real(1) - eps)) counts[e]++;
 }

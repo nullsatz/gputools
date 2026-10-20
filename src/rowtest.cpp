@@ -25,14 +25,19 @@ void rowTtests(int genes, int n, const T * x, int nb, const int * labels,
     }
   for (size_t e = 0; e < g.size(); ++e) g[e] = (T) labels[e];
 
-  // labellings a block at a time, so that genes x block fits in ~128 MB
+  // labellings a block at a time, so that genes x block fits in ~128 MB;
+  // each block's product also carries the observed labelling as its
+  // column 0, recomputed with the block (the same arithmetic, even where
+  // the library picks kernels by width), so that a permutation equivalent
+  // to the observed labelling always counts as reaching it
   int block = (int) std::max<size_t>(1, std::min<size_t>(nb,
     ((size_t) 1 << 25) / genes));
   T * dX = gpuAlloc<T>(gn), * dX2 = gpuAlloc<T>(gn), * dS = gpuAlloc<T>(genes),
     * dQ = gpuAlloc<T>(genes), * dG = gpuAlloc<T>((size_t) n * nb),
-    * dS1 = gpuAlloc<T>((size_t) genes * block),
-    * dQ1 = gpuAlloc<T>((size_t) genes * block),
-    * dT = gpuAlloc<T>((size_t) genes * block), * dT0 = gpuAlloc<T>(genes);
+    * dGb = gpuAlloc<T>((size_t) n * (block + 1)),
+    * dS1 = gpuAlloc<T>((size_t) genes * (block + 1)),
+    * dQ1 = gpuAlloc<T>((size_t) genes * (block + 1)),
+    * dT = gpuAlloc<T>((size_t) genes * (block + 1));
   int * dCounts = gpuAlloc<int>(genes);
   double * dMax = gpuAlloc<double>(nb > 1 ? nb - 1 : 1);
   CUDART_CALL(cudaMemcpy(dX, x, gn * sizeof(T), cudaMemcpyHostToDevice));
@@ -48,31 +53,38 @@ void rowTtests(int genes, int n, const T * x, int nb, const int * labels,
 
   int n2 = n - n1, pool = pooled;
   T teps = (T) eps;
-  for (int b0 = 0; b0 < nb; b0 += block) {
+  std::vector<T> ht(genes);
+  // the observed labelling (column 0 of labels) heads every block
+  CUDART_CALL(cudaMemcpy(dGb, dG, n * sizeof(T), cudaMemcpyDeviceToDevice));
+  for (int b0 = 1; b0 < std::max(nb, 2); b0 += block) {
+    // permutations b0 .. b0 + c - 1 (none when nb == 1: the observed only)
     int c = std::min(block, nb - b0);
-    T * dGc = dG + (size_t) b0 * n;
-    blas::gemm('N', 'N', genes, c, n, T(1), dX, genes, dGc, n, T(0), dS1,
+    if (c > 0)
+      CUDART_CALL(cudaMemcpy(dGb + n, dG + (size_t) b0 * n,
+                             (size_t) c * n * sizeof(T),
+                             cudaMemcpyDeviceToDevice));
+    int cols = 1 + std::max(c, 0);
+    blas::gemm('N', 'N', genes, cols, n, T(1), dX, genes, dGb, n, T(0), dS1,
                genes);
-    blas::gemm('N', 'N', genes, c, n, T(1), dX2, genes, dGc, n, T(0), dQ1,
+    blas::gemm('N', 'N', genes, cols, n, T(1), dX2, genes, dGb, n, T(0), dQ1,
                genes);
-    size_t entries = (size_t) genes * c;
+    size_t entries = (size_t) genes * cols;
     dim3 grid((unsigned) ((entries + 255) / 256)), threads(256);
-    void * tArgs[] = { &dS1, &dQ1, &dS, &dQ, &genes, &c, &n1, &n2, &pool,
+    void * tArgs[] = { &dS1, &dQ1, &dS, &dQ, &genes, &cols, &n1, &n2, &pool,
                        &dT };
     cudaLaunch("gpuRowT", tArgs, grid, threads, precisionOf<T>());
-    if (b0 == 0)
-      CUDART_CALL(cudaMemcpy(dT0, dT, genes * sizeof(T),
-                             cudaMemcpyDeviceToDevice));
-    if (nb > 1) {
+    if (b0 == 1)
+      CUDART_CALL(cudaMemcpy(ht.data(), dT, genes * sizeof(T),
+                             cudaMemcpyDeviceToHost));
+    if (c > 0) {
+      int first = b0 - 1;
       dim3 cgrid(c);
-      void * cArgs[] = { &dT, &dT0, &genes, &b0, &teps, &dCounts, &dMax };
+      void * cArgs[] = { &dT, &genes, &first, &teps, &dCounts, &dMax };
       cudaLaunch("gpuRowTCount", cArgs, cgrid, threads, precisionOf<T>());
     }
+    if (nb <= 1) break;
   }
 
-  std::vector<T> ht(genes);
-  CUDART_CALL(cudaMemcpy(ht.data(), dT0, genes * sizeof(T),
-                         cudaMemcpyDeviceToHost));
   for (int r = 0; r < genes; ++r) t0[r] = ht[r];
   CUDART_CALL(cudaMemcpy(counts, dCounts, genes * sizeof(int),
                          cudaMemcpyDeviceToHost));
@@ -81,7 +93,7 @@ void rowTtests(int genes, int n, const T * x, int nb, const int * labels,
                            cudaMemcpyDeviceToHost));
 
   cudaFree(dX); cudaFree(dX2); cudaFree(dS); cudaFree(dQ); cudaFree(dG);
-  cudaFree(dS1); cudaFree(dQ1); cudaFree(dT); cudaFree(dT0);
+  cudaFree(dGb); cudaFree(dS1); cudaFree(dQ1); cudaFree(dT);
   cudaFree(dCounts); cudaFree(dMax);
 }
 

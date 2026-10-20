@@ -1,5 +1,27 @@
 # gputools 2.1.1
 
+- `gpuMi()` gave `NaN` (or worse) for a constant variable, built its
+  B-spline weights in single precision when `precision = "single"` (a
+  value on a knot, as discrete data put them, could land in the
+  neighbouring bin), accepted `splineOrder > bins`, and computed every
+  pair's joint distribution in a per-pair loop. It now builds the weights
+  in double from the double data, takes every pair's joint distribution
+  from one matrix product per tile, computes the information in log form
+  (no large entropies subtracted; never below 0), returns exactly 0 for a
+  constant variable, checks `1 <= splineOrder <= bins`, and defaults to
+  Daub et al.'s `bins = 10, splineOrder = 3` instead of plain binning into
+  two bins. Its help page no longer claims the data must lie in [0, 1].
+- `gpuRowTtest()` with equal groups could count a permutation equivalent
+  to the observed labelling as more extreme, or fail to count its swap,
+  giving p-values too small for strongly separated rows: labellings are
+  now canonical and the observed t is recomputed with every block of
+  permutations. A row constant within each group with the means apart is
+  `Inf`/`-Inf` with p 0 rather than `NaN`; rows with no test no longer
+  enter the maxT maxima.
+- `gpuCorPerm()`'s rounding allowance is relative, as `gpuRowTtest()`'s.
+- Spearman ranks (`gpuCor`, `gpuCorPairs`, `gpuCorPerm`) are taken in
+  double before any narrowing to single, so distinct values no longer tie.
+
 - `gpuGranger()` reported F = 0, p = 1, "no causality", for a pair it
   could not resolve (collinear lags, a constant series, a cause identical
   to the effect), computed in single precision by default on uncentred
