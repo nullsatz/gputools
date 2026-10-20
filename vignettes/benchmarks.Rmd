@@ -97,8 +97,10 @@ that subtracts two nearly equal sums of squares, use double. `gpuGranger`
 is the clear case: its F statistic is a difference of two residual sums
 of squares, and in single precision it was off by more than 10 percent on
 long random walks, so it now always computes in double, whatever
-`precision` says. (The Granger timings in this vignette were measured
-before that change; `bench/run-benchmarks.R` repeats them.)
+`precision` says; its two columns in the tables are therefore the same
+computation, and it still runs over a hundred times faster than the
+`lm.fit` loop at 50 series, since each effect's own past is projected out
+once and every cause's test against it comes from a few matrix products.
 
 ## When the GPU pays off
 
