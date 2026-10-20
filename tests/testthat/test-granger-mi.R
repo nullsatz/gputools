@@ -213,3 +213,35 @@ test_that("the reference reproduces the paper's own numbers", {
   expect_equal(entropyBits(colMeans(w)),
                log2(10) - 0.6 * log2(3) - 0.4 * log2(4))
 })
+
+test_that("gpuMi gives a constant variable exactly 0, and checks its arguments", {
+  skip_if_no_gpu()
+  set.seed(9)
+  X <- matrix(rnorm(100 * 3), 100, 3)
+  X[, 2] <- 3
+  m <- gpuMi(X)
+  expect_false(anyNA(m))
+  expect_true(all(m[2, ] == 0) && all(m[, 2] == 0))
+  expect_gt(m[1, 1], 0)
+  expect_true(all(m >= 0))
+  expect_equal(gpuMi(X, X), m, ignore_attr = TRUE)
+  expect_error(gpuMi(X, bins = 3, splineOrder = 4), "splineOrder <= bins")
+  expect_error(gpuMi(X, bins = 2.5), "whole numbers")
+  expect_error(gpuMi(X, bins = 65), "at most 64")
+  expect_error(gpuMi(X, X[1:50, ]), "different numbers of rows")
+  expect_error(gpuMi(X[1, , drop = FALSE]), "at least 2 rows")
+})
+
+test_that("gpuMi in single precision keeps knot-valued data in their bins", {
+  skip_if_no_gpu()
+  # discrete data sit exactly on the knots; weights rounded to single
+  # once moved values into the neighbouring bin, so single and double
+  # disagreed by far more than single's rounding
+  set.seed(10)
+  X <- matrix(sample(0:9, 300 * 4, replace = TRUE), 300, 4)
+  for (b in c(5, 10, 20)) {
+    expect_equal(gpuMi(X, bins = b, splineOrder = 3, precision = "single"),
+                 gpuMi(X, bins = b, splineOrder = 3, precision = "double"),
+                 tolerance = 1e-5, label = paste("bins", b))
+  }
+})

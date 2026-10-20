@@ -1,178 +1,114 @@
-#include<stdlib.h>
-#include<stdio.h>
-#include<string.h>
-#include<math.h>
-#include<R.h>
-#include<cuseful.h>
-#include<mi.h>
+// B-spline mutual information of every pair of variables: Daub et al.
+// (2004), with the weights computed in double from the double data and
+// the joint distributions of every pair from one matrix product per tile
+// (see inst/cuda/mi.cu for the kernels and the formulas). T is the
+// precision of the products; the method and its guards follow the Python
+// package widestats (mi.py).
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+#include "cuda_runtime.h"
+
+#include "R.h"
 
 #include "cudaUtils.h"
+#include "gpublas.h"
+#include "mi.h"
 
-#define NTHREADS 16
+namespace {
 
+// the weights of nvars variables, n x nvars*bins in T on the device
 template <typename T>
-int initKnots(int nbins, int order, T ** knots) {
-  int
-    om1 = order - 1,
-    degree = nbins - 1,
-    dpo = degree + order,
-    nknots = dpo + 1;
-
-  *knots = R_Calloc(nknots, T); 
-  for(int i = 0; i < nknots; i++) {
-    if(i <= om1)
-      (*knots)[i] = T(0);
-    else if(i <= degree)
-      (*knots)[i] = (*knots)[i-1] + T(1);
-    else
-      (*knots)[i] = (*knots)[degree] + T(1);
-  }
-  return nknots;
-}
-
-
-template <typename T>
-void bSplineMutualInfo(int nbins, int order, int nsamples,
-                       int nx, const T * x,
-                       int ny, const T * y,
-                       T * out_mi)
+T * weights(int n, int nvars, int bins, int order, const double * x)
 {
-  size_t
-    pitch[2], pitch_bins[2],
-    col_bytes = (size_t)nsamples * sizeof(T);
-  int
-    nknots, nblocks[2], size[2] = { nx, ny };
-  T
-    * knots, * dknots,
-    * stage[2], * dx[2], * dentropy[2], * dbins[2];
-  const T
-    * data[2] = { x, y };
-
-  nknots = initKnots(nbins, order, &knots);
-  T knot_max = knots[nknots - 1];
-  cudaMalloc((void **)&dknots, nknots * sizeof(T));
-  cudaMemcpy(dknots, knots, nknots * sizeof(T), cudaMemcpyHostToDevice);
-  R_Free(knots);
-
-  checkCudaError("bSplineMutualInfoSingle: 1");
-        
-  for(int i = 0; i < 2; i++) {
-    cudaMallocPitch((void **)&(dx[i]), pitch + i, col_bytes, size[i]);
-    cudaMallocHost((void **)&(stage[i]), size[i] * col_bytes);
-    cudaMalloc((void **)&(dentropy[i]), size[i] * sizeof(T));
-    cudaMallocPitch((void **)&(dbins[i]), pitch_bins + i,
-                    nbins * col_bytes, size[i]);
-    cudaMemset2D(dbins[i], pitch_bins[i], 0, nbins * col_bytes, size[i]);
-
-    nblocks[i] = size[i] / NTHREADS;
-    if(nblocks[i] * NTHREADS < size[i])
-      nblocks[i]++;
+  double * dX = gpuAlloc<double>((size_t) n * nvars);
+  CUDART_CALL(cudaMemcpy(dX, x, (size_t) n * nvars * sizeof(double),
+                         cudaMemcpyHostToDevice));
+  size_t count = (size_t) n * nvars * bins;
+  double * dW = gpuAlloc<double>(count);
+  int threads = 128;
+  {
+    int nn = n, nv = nvars, nb = bins, no = order;
+    void * args[] = { &nn, &nv, &nb, &no, &dX, &dW };
+    cudaLaunch("miWeights", args, dim3((nvars + threads - 1) / threads),
+               dim3(threads), Precision::Double);
   }
-
-  checkCudaError("bSplineMutualInfoSingle: 2");
-
-  cudaStream_t stream[2];
-  for(int i = 0; i < 2; i++)
-    cudaStreamCreate(stream + i);
-  for(int i = 0; i < 2; i++) {
-    cudaMemcpyAsync(stage[i], data[i], size[i] * col_bytes,
-                    cudaMemcpyHostToHost, stream[i]);
-    cudaMemcpy2DAsync(dx[i], pitch[i], stage[i], col_bytes, col_bytes,
-                      size[i], cudaMemcpyHostToDevice, stream[i]);
+  cudaFree(dX);
+  if (sizeof(T) == sizeof(double)) return (T *) dW;
+  // the product in single: narrow the weights once
+  T * dWs = gpuAlloc<T>(count);
+  {
+    size_t cnt = count;
+    void * args[] = { &dW, &dWs, &cnt };
+    cudaLaunch("miNarrow", args,
+               dim3((unsigned) ((count + 255) / 256)), dim3(256),
+               Precision::Double);
   }
-  for(int i = 0; i < 2; i++) {
-    dim3
-      grid(nblocks[i]),
-      block(NTHREADS);
-
-    // pitches go to the kernels in elements, as the int they take
-    int xpitch = pitch[i] / sizeof(T);
-
-    void * scaleArgs[] = {
-      &knot_max,
-      size + i,
-      &nsamples,
-      dx + i,
-      &xpitch
-    };
-    cudaLaunch("scale", scaleArgs,
-                      grid, block, precisionOf<T>(), stream[i]);
-
-    int pitch_bins_i = pitch_bins[i] / sizeof(T);
-    void * gbsArgs[] = {
-      &nbins, &order,
-      &nknots, &dknots,
-      &nsamples, size + i,
-      dx + i, &xpitch,
-      dbins + i,
-      &pitch_bins_i
-    };
-    cudaLaunch("get_bin_scores", gbsArgs,
-                      grid, block, precisionOf<T>(), stream[i]);
-
-    void * entropyArgs[] = {
-      &nbins,
-      &nsamples,
-      size + i,
-      dbins + i,
-      &pitch_bins_i,
-      dentropy + i
-    };
-    cudaLaunch("get_entropy", entropyArgs,
-                      grid, block, precisionOf<T>(), stream[i]);
-  }
-  checkCudaError("bSplineMutualInfoSingle: 3");
-
-  cudaFree(dknots);
-  for(int i = 0; i < 2; i++) {
-    cudaFreeHost(stage[i]);
-    cudaFree(dx[i]);
-  }
-
-  size_t pitch_mi;
-  T * dmi;
-  cudaMallocPitch((void **)&dmi, &pitch_mi, ny * sizeof(T), nx);
-
-  dim3
-    gridDim(nblocks[0], nblocks[1]), blockDim(NTHREADS, NTHREADS);
-
-  int
-    elem_pitch_bins[2] = { (int) (pitch_bins[0] / sizeof(T)),
-                           (int) (pitch_bins[1] / sizeof(T)) },
-    dpitch_mi = pitch_mi / sizeof(T);
-
-  void * miArgs[] = {
-    &nbins, &nsamples,
-    &nx, dbins, elem_pitch_bins, dentropy,
-    &ny, dbins + 1, elem_pitch_bins + 1, dentropy + 1,
-    &dmi, &dpitch_mi
-  };
-  cudaLaunch("get_mi", miArgs, gridDim, blockDim, precisionOf<T>());
-  checkCudaError("bSplineMutualInfoSingle: 4");
-
-  for(int i = 0; i < 2; i++)
-    cudaFree(dbins[i]);
-
-  T * mi_stage;
-  cudaMallocHost((void **)&mi_stage, nx * ny * sizeof(T)); 
-
-  cudaMemcpy2D(mi_stage, ny * sizeof(T), dmi, pitch_mi,
-               ny * sizeof(T), nx, cudaMemcpyDeviceToHost);
-  checkCudaError("bSplineMutualInfoSingle: 5");
-  cudaFree(dmi);
-
-  memcpy(out_mi, mi_stage, nx * ny * sizeof(T));
-  cudaFreeHost(mi_stage);
-  checkCudaError("bSplineMutualInfoSingle: 6");
+  cudaFree(dW);
+  return dWs;
 }
 
-template int initKnots<float>(int nbins, int order, float ** knots);
-template int initKnots<double>(int nbins, int order, double ** knots);
-template void bSplineMutualInfo<float>(int nbins, int order, int nsamples,
-                       int nx, const float * x,
-                       int ny, const float * y,
-                       float * out_mi);
-template void bSplineMutualInfo<double>(int nbins, int order, int nsamples,
-                       int nx, const double * x,
-                       int ny, const double * y,
-                       double * out_mi);
+} // namespace
+
+template <typename T>
+void bSplineMutualInfo(int bins, int order, int n, int nx, const double * x,
+                       int ny, const double * y, double * out)
+{
+  const bool self = y == NULL || y == x;
+  if (self) { y = x; ny = nx; }
+  T * dWx = weights<T>(n, nx, bins, order, x);
+  T * dWy = self ? dWx : weights<T>(n, ny, bins, order, y);
+  T * dMi = gpuAlloc<T>((size_t) nx * ny);
+  // a tile's product holds (tile*bins)^2 entries: about 2^24 of them
+  int tile = std::max(1, (int) (4096 / bins));
+  T * dJ = gpuAlloc<T>((size_t) tile * bins * tile * bins);
+  T invn = (T) (1.0 / n);
+  for (int i0 = 0; i0 < nx; i0 += tile) {
+    int tx = std::min(tile, nx - i0);
+    for (int j0 = 0; j0 < ny; j0 += tile) {
+      int ty = std::min(tile, ny - j0);
+      int ldj = tx * bins;
+      // every pair's joint distribution (times n) in this tile: a bins x
+      // bins block of W_x' W_y per pair
+      blas::gemm('T', 'N', tx * bins, ty * bins, n, T(1),
+                 dWx + (size_t) i0 * bins * n, n,
+                 dWy + (size_t) j0 * bins * n, n, T(0), dJ, ldj);
+      int nb = bins, ttx = tx, tty = ty, ii0 = i0, jj0 = j0, ldm = ny;
+      size_t pairs = (size_t) tx * ty;
+      void * args[] = { &nb, &ttx, &tty, &dJ, &ldj, &invn, &ii0, &jj0, &dMi,
+                        &ldm };
+      cudaLaunch("miPairs", args, dim3((unsigned) ((pairs + 255) / 256)),
+                 dim3(256), precisionOf<T>());
+    }
+  }
+  std::vector<T> h((size_t) nx * ny);
+  CUDART_CALL(cudaMemcpy(h.data(), dMi, h.size() * sizeof(T),
+                         cudaMemcpyDeviceToHost));
+  cudaFree(dJ); cudaFree(dMi);
+  if (!self) cudaFree(dWy);
+  cudaFree(dWx);
+  // out[j + i*ny] is the information of y_j with x_i. A constant variable
+  // shares no information: exactly 0, not rounding; an estimate of 0 can
+  // round just below it
+  std::vector<char> cx(nx, 0), cy(ny, 0);
+  for (int i = 0; i < nx; i++) {
+    const double * c = x + (size_t) i * n;
+    cx[i] = std::equal(c + 1, c + n, c);
+  }
+  for (int j = 0; j < ny; j++) {
+    const double * c = y + (size_t) j * n;
+    cy[j] = self ? cx[j] : std::equal(c + 1, c + n, c);
+  }
+  for (int i = 0; i < nx; i++)
+    for (int j = 0; j < ny; j++) {
+      size_t e = (size_t) j + (size_t) i * ny;
+      out[e] = (cx[i] || cy[j]) ? 0.0 : std::max(0.0, (double) h[e]);
+    }
+}
+
+template void bSplineMutualInfo<float>(int, int, int, int, const double *,
+                                       int, const double *, double *);
+template void bSplineMutualInfo<double>(int, int, int, int, const double *,
+                                        int, const double *, double *);

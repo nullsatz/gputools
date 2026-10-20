@@ -50,8 +50,17 @@ gpuRowTtest(x, group, var.equal = FALSE, B = 0L,
 	keeps the dependence between genes, which the adjustment exploits, and
 	makes no assumption of normality.
 
-	A constant row, or one constant within both groups, has no test:
-	its statistic is \code{NaN} and its p-values \code{NA}.
+	A permuted \eqn{|t_b|} within a relative allowance of \eqn{|t|}
+	(1e-10 in double, 1e-5 in single) counts as reaching it, so that a
+	relabelling equivalent to the observed one always counts; with equal
+	groups a labelling and its swap are made the same labelling, as they
+	are the same test. A row constant within each group but with the
+	groups' means apart separates them completely: its statistic is
+	\code{Inf} or \code{-Inf} and its p-values 0 (as SciPy reports it),
+	and in the permutations every relabelling that separates the groups
+	as completely counts. A constant row, or one constant within both
+	groups with equal means, has no test: its statistic is \code{NaN} and
+	its p-values \code{NA}.
 }
 
 \value{

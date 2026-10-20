@@ -45,7 +45,9 @@ gpuCorPerm(x, y = NULL, B = 1000L, method = "pearson",
 	never zero. The adjusted p-value counts instead the permutations whose
 	largest \eqn{|r_b|} over all the tests reaches \eqn{|r|}: single-step
 	maxT (Westfall and Young 1993), which controls the family-wise error
-	rate.
+	rate. A permuted \eqn{|r_b|} within a relative allowance of \eqn{|r|}
+	(1e-10 in double, 1e-5 in single) counts as reaching it, so that a
+	permutation equivalent to the observed data always counts.
 
 	The whole \code{ncol(x)} by \code{ncol(y)} matrix is held on the GPU,
 	twice; for wider data, split the columns of \code{y} (the maxT

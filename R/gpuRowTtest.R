@@ -40,10 +40,17 @@ gpuRowTtest <- function(x, group, var.equal = FALSE, B = 0L,
         se <- sqrt(a + b)
         df <- (a + b)^2 / (a^2 / (n1 - 1) + b^2 / (n2 - 1))
     }
+    # a zero standard error with the means apart is a complete separation
+    # of the groups: t infinite, p 0 (as SciPy reports it); with the means
+    # equal as well, or a constant row, there is no test
     t <- (m1 - m2) / se
-    t[se == 0] <- NaN
+    t[se == 0 & m1 == m2] <- NaN
+    p.value <- 2 * pt(-abs(t), df)
+    # (Welch's df is 0/0 there, so the p-value is set directly)
+    p.value[is.infinite(t)] <- 0
+    if(!var.equal) df[is.infinite(t)] <- NA
     res <- data.frame(mean1 = m1, mean2 = m2, statistic = t, df = df,
-                      p.value = 2 * pt(-abs(t), df), row.names = rownames(x))
+                      p.value = p.value, row.names = rownames(x))
 
     if(B > 0) {
         # the permutations, drawn here so set.seed() reproduces them, on
@@ -51,6 +58,16 @@ gpuRowTtest <- function(x, group, var.equal = FALSE, B = 0L,
         labels <- matrix(0L, n, B + 1L)
         labels[, 1] <- in1
         for(b in seq_len(B)) labels[, b + 1L] <- in1[sample.int(n)]
+        if(n1 == n2) {
+            # With equal groups a labelling and its swap give the same |t|
+            # in exact arithmetic but are computed by different roundings,
+            # which for strongly separated rows can differ by more than the
+            # allowance: a swap of the observed labelling could then fail
+            # to count, making p-values too small. Putting sample 1 in
+            # group 1 always makes the two the same column, bit for bit.
+            flip <- labels[1, ] == 0L
+            labels[, flip] <- 1L - labels[, flip]
+        }
         eps <- if(precision == "double") 1e-10 else 1e-5
         ans <- .Call(C_gpuRowTtest, x, labels, n1, isTRUE(var.equal), eps,
                      precision)

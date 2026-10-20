@@ -1,157 +1,118 @@
-#define NTHREADS 16
+// B-spline mutual information (Daub et al. 2004) of every pair of
+// variables, as src/mi.cpp drives it:
+//
+//   - each variable's values get B-spline weights over `bins` bins
+//     (miWeights, always in double from the double data: rounding the data
+//     to single first moves a value on a knot, as discrete data put them,
+//     into the neighbouring bin), laid out as W (n x nvars*bins,
+//     column-major: sample k of variable v's bin i at W[k + (v*bins + i)*n])
+//     so that one matrix product W_x' W_y / n (cuBLAS, from the host) holds
+//     the joint distribution of every pair as a bins x bins block;
+//   - miPairs reads each block and computes the mutual information in log
+//     form, sum P log2(P / (P_a P_b)) with the marginals P_a, P_b the
+//     block's own row and column sums: the same as H_a + H_b - H_ab, but
+//     without subtracting large entropies, and consistent with any rounding
+//     in the product. 0 log 0 counts as 0.
+//
+// bins + order - 1 is at most MI_MAXSLOTS (the R code limits bins to 64).
 
-__global__ void scale(real knot_max, int nx, int nsamples,
-                      real * x, int pitch_x)
+#define MI_MAXSLOTS 128
+
+// the knot vector 0 (order times), 1, ..., bins - order, span (order
+// times), span = bins - order + 1; knot i of bins + order
+__device__ double miKnot(int i, int bins, int order)
 {
-  int
-    col_idx = blockDim.x * blockIdx.x + threadIdx.x;
+  if (i < order) return 0.0;
+  if (i <= bins - 1) return (double) (i - order + 1);
+  return (double) (bins - order + 1);
+}
 
-  if(col_idx >= nx) return;
-
-  real
-    min, max,
-    * col = x + col_idx * pitch_x;
-
-  // find the min and the max
-  min = max = col[0];
-  for(int i = 1; i < nsamples; i++) {
-    if(col[i] < min) min = col[i];
-    if(col[i] > max) max = col[i];
+// Each variable's weights: one thread per variable, over its n samples.
+// A constant variable is put wholly at the domain's start (every value in
+// the first bin).
+__global__ void miWeights(int n, int nvars, int bins, int order,
+                          const double * x, double * w)
+{
+  int v = blockIdx.x * blockDim.x + threadIdx.x;
+  if (v >= nvars) return;
+  const double * col = x + (size_t) v * n;
+  double lo = col[0], hi = col[0];
+  for (int k = 1; k < n; k++) {
+    if (col[k] < lo) lo = col[k];
+    if (col[k] > hi) hi = col[k];
   }
-
-  real delta = max - min;
-  for(int i = 0; i < nsamples; i++)
-    col[i] = (knot_max * (col[i] - min)) / delta;
-}
-
-__device__ real do_fraction(real numer, real denom) {
-  real result = real(0); 
-
-  if((numer == denom) && (numer != real(0)))
-    result = real(1);
-  else if(denom != real(0))
-    result = numer / denom;
-
-  return result;
-}
-
-// bins must be initialized to zero before calling get_bin_scores
-__global__ void get_bin_scores(int nbins, int order,
-                               int nknots, real * knots, int nsamples,
-                               int nx, real * x, int pitch_x,
-                               real * bins, int pitch_bins)
-{
-  int
-    col_x = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if(col_x >= nx)
-    return;
-
-  real
-    ld, rd, z,
-    term1, term2,
-    * in_col = x + col_x * pitch_x,
-    * bin_col = bins + col_x * pitch_bins;
-  int i0;
-
-  for(int k = 0; k < nsamples; k++, bin_col += nbins) {
-    z = in_col[k];
-    i0 = (int)floor(z) + order - 1;
-    if(i0 >= nbins)
-      i0 = nbins - 1;
-
-    bin_col[i0] = real(1);
-    for(int i = 2; i <= order; i++) {
-      for(int j = i0 - i + 1; j <= i0; j++) {
-        rd = do_fraction(knots[j + i] - z, knots[j + i] - knots[j + 1]);
-
-        if((j < 0) || (j >= nbins) || (j >= nknots) || (j + i - 1 < 0) || (j > nknots))
-          term1 = real(0);
-        else {
-          ld = do_fraction(z - knots[j],
-                           knots[j + i - 1] - knots[j]);
-          term1 = ld * bin_col[j];
-        }
-
-        if((j + 1 < 0) || (j + 1 >= nbins) || (j + 1 >= nknots) || (j + i < 0) || (j + i >= nknots))
-          term2 = real(0);
-        else {
-          rd = do_fraction(knots[j + i] - z,
-                           knots[j + i] - knots[j + 1]);
-          term2 = rd * bin_col[j + 1];
-        }
-        bin_col[j] = term1 + term2;
+  double width = hi > lo ? hi - lo : 1.0;
+  int span = bins - order + 1, slots = bins + order - 1;
+  double wk[MI_MAXSLOTS];
+  for (int k = 0; k < n; k++) {
+    double z = (col[k] - lo) / width * span;
+    // order 1: the knot interval holding the value, among the non-empty
+    // ones order - 1 .. bins - 1; the far end of the domain belongs to the
+    // last
+    int cell = (int) floor(z);
+    if (cell < 0) cell = 0;
+    if (cell > span - 1) cell = span - 1;
+    cell += order - 1;
+    for (int i = 0; i < slots; i++) wk[i] = 0.0;
+    wk[cell] = 1.0;
+    // Cox-de Boor: B_{i,k} = (z - t_i)/(t_{i+k-1} - t_i) B_{i,k-1}
+    //   + (t_{i+k} - z)/(t_{i+k} - t_{i+1}) B_{i+1,k-1}, 0/0 as 0
+    for (int kk = 2; kk <= order; kk++) {
+      int count = bins + order - kk;
+      for (int i = 0; i < count; i++) {
+        double ti = miKnot(i, bins, order), tik = miKnot(i + kk, bins, order);
+        double lden = miKnot(i + kk - 1, bins, order) - ti;
+        double rden = tik - miKnot(i + 1, bins, order);
+        double left = lden > 0 ? (z - ti) / lden * wk[i] : 0.0;
+        double right = rden > 0 ? (tik - z) / rden * wk[i + 1] : 0.0;
+        wk[i] = left + right;
       }
     }
+    for (int i = 0; i < bins; i++)
+      w[k + ((size_t) v * bins + i) * n] = wk[i];
   }
 }
 
-__global__ void get_entropy(int nbins, int nsamples, int nx,
-                            real * bin_scores, int pitch_bin_scores, real * entropies)
+// Single-precision copy of the weights, for the product in single.
+__global__ void miNarrow(const double * in, float * out, size_t count)
 {
-  int
-    col_x = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if(col_x >= nx)
-    return;
-
-  real
-    * in_col = bin_scores + col_x * pitch_bin_scores,
-    entropy = real(0), prob, logp;
-
-  for(int i = 0; i < nbins; i++) {
-    prob = real(0);
-    for(int j = 0; j < nsamples; j++)
-      prob += in_col[j * nbins + i];
-    prob /= (double) nsamples;
-
-    if(prob <= real(0))
-      logp = real(0);
-    else
-      logp = log2(prob);
-
-    entropy += prob * logp;
-  }
-  entropies[col_x] = -entropy;
+  size_t e = blockIdx.x * (size_t) blockDim.x + threadIdx.x;
+  if (e < count) out[e] = (float) in[e];
 }
 
-__global__ void get_mi(int nbins, int nsamples,
-                       int nx, real * x_bin_scores, int pitch_x_bin_scores,
-                       real * entropies_x,
-                       int ny, real * y_bin_scores, int pitch_y_bin_scores,
-                       real * entropies_y,
-                       real * mis, int pitch_mis)
+// The mutual information of each pair of a tile from the product j
+// (tx*bins x ty*bins, leading dimension ldj) of their weights, scaled by
+// invn = 1/n to the joint distribution. Writes mi[(j0 + b) + (i0 + a)*ldm]
+// for x variable a and y variable b of the tile, in bits.
+__global__ void miPairs(int bins, int tx, int ty, const real * j, int ldj,
+                        real invn, int i0, int j0, real * mi, int ldm)
 {
-  int
-    col_x = blockDim.x * blockIdx.x + threadIdx.x,
-    col_y = blockDim.y * blockIdx.y + threadIdx.y;
-
-  if((col_x >= nx) || (col_y >= ny))
-    return;
-
-  real
-    prob, logp, mi = real(0),
-    * x_bins = x_bin_scores + col_x * pitch_x_bin_scores,
-    * y_bins = y_bin_scores + col_y * pitch_y_bin_scores;
-                
-  // calculate joint entropy
-  for(int i = 0; i < nbins; i++) {
-    for(int j = 0; j < nbins; j++) {
-      prob = real(0);
-      for(int k = 0; k < nsamples; k++)
-        prob += x_bins[k * nbins + i] * y_bins[k * nbins + j];
-      prob /= (real)nsamples;
-
-      if(prob <= real(0))
-        logp = real(0);
-      else
-        logp = log2(prob);
-
-      mi += prob * logp;
+  size_t e = blockIdx.x * (size_t) blockDim.x + threadIdx.x;
+  if (e >= (size_t) tx * ty) return;
+  int a = e % tx, b = e / tx;
+  const real * block = j + (size_t) a * bins + (size_t) b * bins * ldj;
+  real rows[MI_MAXSLOTS], cols[MI_MAXSLOTS];
+  for (int i = 0; i < bins; i++) { rows[i] = real(0); cols[i] = real(0); }
+  for (int c = 0; c < bins; c++)
+    for (int r = 0; r < bins; r++) {
+      real p = block[r + (size_t) c * ldj] * invn;
+      rows[r] += p;
+      cols[c] += p;
     }
-  }
-
-  // calculate mi from entropies
-  mi += entropies_x[col_x] + entropies_y[col_y];
-  (mis + col_y * pitch_mis)[col_x] = mi;
+  // in logs, each clamped below at the smallest normal number: where an
+  // entry is positive its row and column sums are at least as large, so
+  // every log is finite
+  const real tiny = sizeof(real) == 4 ? real(1.17549435e-38)
+                                      : real(2.2250738585072014e-308);
+  real sum = real(0);
+  for (int c = 0; c < bins; c++)
+    for (int r = 0; r < bins; r++) {
+      real p = block[r + (size_t) c * ldj] * invn;
+      if (p > real(0)) {
+        real lr = rows[r] > tiny ? rows[r] : tiny;
+        real lc = cols[c] > tiny ? cols[c] : tiny;
+        sum += p * (log2(p) - log2(lr) - log2(lc));
+      }
+    }
+  mi[(size_t) (j0 + b) + (size_t) (i0 + a) * ldm] = sum;
 }

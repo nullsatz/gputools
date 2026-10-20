@@ -89,3 +89,62 @@ test_that("gpuRowTtest names, constant rows and refusals", {
   x[1, 1] <- NA
   expect_error(gpuRowTtest(x, group), "missing")
 })
+
+test_that("gpuRowTtest counts a labelling equivalent to the observed one exactly", {
+  skip_if_no_gpu()
+  # equal groups: a labelling and its swap are the same test. For a row
+  # that separates the groups completely, the permutations equal to the
+  # observed labelling or its swap are exactly the ones that reach it;
+  # the count of those is known from the draws themselves
+  set.seed(84)
+  n <- 10
+  x <- matrix(rnorm(50 * n), 50, n)
+  group <- rep(1:2, each = 5)
+  x[1, group == 1] <- x[1, group == 1] + 1000
+  for (pr in precisions) {
+    B <- 3000
+    set.seed(85)
+    res <- gpuRowTtest(x, group, B = B, precision = pr)
+    set.seed(85)
+    in1 <- group == 1
+    same <- 0
+    for (b in seq_len(B)) {
+      lab <- in1[sample.int(n)]
+      if (all(lab == in1) || all(lab == !in1)) same <- same + 1
+    }
+    expect_equal(res$p.perm[1], (same + 1) / (B + 1), info = pr)
+    expect_equal(res$p.adjusted[1], (same + 1) / (B + 1), info = pr)
+  }
+})
+
+test_that("gpuRowTtest reports a complete separation as infinite", {
+  skip_if_no_gpu()
+  set.seed(86)
+  x <- matrix(rnorm(4 * 8), 4, 8)
+  group <- rep(c("a", "b"), each = 4)
+  x[2, ] <- rep(c(1, 2), each = 4)      # constant within each group, apart
+  x[3, ] <- 7                            # constant: no test
+  B <- 500
+  set.seed(87)
+  res <- gpuRowTtest(x, group, B = B)
+  expect_equal(res$statistic[2], -Inf)
+  expect_equal(res$p.value[2], 0)
+  expect_true(is.na(res$df[2]))
+  # only a relabelling that separates the groups as completely (the
+  # observed one or its swap) reaches an infinite t: count those draws
+  set.seed(87)
+  in1 <- group == "a"
+  same <- 0
+  for (b in seq_len(B)) {
+    lab <- in1[sample.int(8)]
+    if (all(lab == in1) || all(lab == !in1)) same <- same + 1
+  }
+  expect_equal(res$p.perm[2], (same + 1) / (B + 1))
+  expect_equal(res$p.adjusted[2], (same + 1) / (B + 1))
+  expect_true(is.nan(res$statistic[3]) && is.na(res$p.perm[3]))
+  expect_true(all(is.finite(res$statistic[c(1, 4)])))
+  # Student's df is defined there
+  pooled <- gpuRowTtest(x, group, var.equal = TRUE)
+  expect_equal(pooled$statistic[2], -Inf)
+  expect_equal(pooled$df[2], 6)
+})

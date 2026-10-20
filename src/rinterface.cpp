@@ -539,13 +539,19 @@ SEXP grangerD(SEXP x, int rows, int nx, SEXP y, int ny, int lag)
   return out;
 }
 
+// the weights are always computed in double; T is the precision of the
+// products
 template <typename T>
 SEXP mutualInfoT(int bins, int order, int nsamples, SEXP x, int na, SEXP y,
                  int nb)
 {
-  std::vector<T> a = narrow<T>(x, "x"), b = narrow<T>(y, "y"), mi(na * nb);
-  bSplineMutualInfo(bins, order, nsamples, na, a.data(), nb, b.data(),
-                    mi.data());
+  std::vector<double> a = narrow<double>(x, "x"), b;
+  const double * py = NULL;
+  if (!isNull(y)) { b = narrow<double>(y, "y"); py = b.data(); }
+  else nb = na;
+  std::vector<double> mi((size_t) na * nb);
+  bSplineMutualInfo<T>(bins, order, nsamples, na, a.data(), nb, py,
+                       mi.data());
   return doubles(mi.data(), mi.size());
 }
 
@@ -797,7 +803,9 @@ SEXP gpuRowTtest(SEXP x, SEXP labels, SEXP n1, SEXP pooled, SEXP eps,
 SEXP gpuRank(SEXP x, SEXP precision)
 {
   requireDevice();
-  return isDouble(precision) ? rankT<double>(x) : rankT<float>(x);
+  // ranks are always taken in double: narrowed to single first, distinct
+  // values that round to the same float would tie
+  return rankT<double>(x);
 }
 
 SEXP gpuSetDevice(SEXP device)

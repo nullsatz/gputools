@@ -41,7 +41,7 @@ gpuCorPerm <- function(x, y = NULL, B = 1000L, method = "pearson",
     perms <- vapply(seq_len(B), function(b) sample.int(n), integer(n)) - 1L
     dim(perms) <- c(n, B)
     # a permuted correlation equal to the observed one counts as at least
-    # as extreme; this allows for rounding in the comparison
+    # as extreme; a relative allowance for rounding in the comparison
     eps <- if(precision == "double") 1e-10 else 1e-5
     ans <- .Call(C_gpuCorPerm, x, y, perms, eps, precision)
 
@@ -52,7 +52,7 @@ gpuCorPerm <- function(x, y = NULL, B = 1000L, method = "pearson",
     # Westfall and Young's single-step maxT: how often the permutation's
     # largest |r| over all the tests reaches this one
     maxima <- sort(ans$maxima)
-    reach <- B - findInterval(abs(r) - eps, maxima, left.open = TRUE)
+    reach <- B - findInterval(abs(r) * (1 - eps), maxima, left.open = TRUE)
     adjusted <- (reach + 1) / (B + 1)
     p[is.na(r)] <- NA
     adjusted[is.na(r)] <- NA
