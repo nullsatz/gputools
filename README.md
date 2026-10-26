@@ -1,5 +1,6 @@
 # gputools
 
+[![CRAN](https://www.r-pkg.org/badges/version/gputools)](https://cran.r-project.org/package=gputools)
 [![R-CMD-check](https://github.com/nullsatz/gputools/actions/workflows/R-CMD-check.yml/badge.svg)](https://github.com/nullsatz/gputools/actions/workflows/R-CMD-check.yml)
 [![r-universe](https://nullsatz.r-universe.dev/badges/gputools)](https://nullsatz.r-universe.dev/gputools)
 
@@ -53,8 +54,14 @@ array work in R, [torch](https://torch.mlverse.org/) is the better tool.
 ## Installing
 
 To build the package you need an NVIDIA CUDA toolkit, 11.7 or later; to
-run the GPU functions, an NVIDIA GPU and driver. Install from
-[r-universe](https://nullsatz.r-universe.dev):
+run the GPU functions, an NVIDIA GPU and driver. Install the released
+version from [CRAN](https://cran.r-project.org/package=gputools):
+
+```r
+install.packages("gputools")
+```
+
+the development version from [r-universe](https://nullsatz.r-universe.dev):
 
 ```r
 install.packages("gputools",
@@ -68,10 +75,10 @@ or from GitHub:
 remotes::install_github("nullsatz/gputools")
 ```
 
-Either way, on Linux gputools is compiled on your machine against your
-CUDA toolkit. The prebuilt packages r-universe offers (Windows, macOS, and
-its opt-in Linux binaries) are built without CUDA: they install and load,
-but their GPU functions cannot run.
+Whichever way, on Linux gputools is compiled on your machine against your
+CUDA toolkit. The prebuilt binaries CRAN and r-universe offer (Windows,
+macOS, and r-universe's opt-in Linux binaries) are built without CUDA:
+they install and load, but their GPU functions cannot run.
 
 The package also installs and loads on a machine with no GPU, such as a
 login node or a CI runner; `gpuAvailable()` says whether the GPU
