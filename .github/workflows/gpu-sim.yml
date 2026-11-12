@@ -1,0 +1,109 @@
+name: GPU Simulator
+
+# Optional, non-required check. GitHub's runners have no GPU, so in
+# R-CMD-check.yml the GPU tests skip themselves. This job builds gputools
+# against CUDA 13.0 and runs R CMD check on a simulated NVIDIA H100
+# (https://github.com/pantheongpu/pantheonsim), so the tests and examples
+# run their kernels (compiled by NVRTC to compute_90 PTX) and compare them
+# with base R. cuBLAS and cuSOLVER calls are computed on the host by the
+# simulator. A simulator cannot reproduce hardware-specific behavior or
+# timing, so this complements the real-GPU runs and does not replace them.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "R/**"
+      - "src/**"
+      - "inst/cuda/**"
+      - "tests/**"
+      - "man/**"
+      - "configure"
+      - "configure.ac"
+      - "DESCRIPTION"
+      - "NAMESPACE"
+      - ".github/workflows/gpu-sim.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: R CMD check (CUDA 13.0 and simulated H100)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # Installs the CUDA 13.0 toolkit (nvcc, cudart, NVRTC, cuBLAS,
+      # cuSOLVER) in /usr/local/cuda-13.0. library-path is disabled because
+      # gputools links the toolkit's cuBLAS and cuSOLVER; the tests run
+      # under `vgpu run` instead.
+      - name: Set up the simulated GPU and CUDA toolkit
+        uses: pantheongpu/setup-pantheonsim@ca87fe3143b29166822b923d6050945c5179408c # v0.1.5
+        with:
+          gpu: nvidia/h100
+          cuda-toolkit: "13.0"
+          library-path: 'false'
+
+      # R, testthat and the compilers from conda-forge, as in R-CMD-check.yml
+      - uses: conda-incubator/setup-miniconda@be893c923ea9cf1cf7cd510fbdde27c7e18cbdcb # v4.1.0
+        with:
+          miniforge-version: latest
+          activate-environment: gputools
+          channels: conda-forge
+          channel-priority: flexible
+          conda-remove-defaults: true
+
+      - name: Install R
+        run: |
+          for attempt in 1 2 3; do
+            conda install -y r-base r-testthat r-knitr r-rmarkdown pandoc \
+              cxx-compiler c-compiler make && break
+            if [ $attempt = 3 ]; then exit 1; fi
+            echo "conda install failed (attempt $attempt); retrying"
+            sleep 30
+          done
+          R --version | head -1
+
+      # --preload: conda's R links packages with --disable-new-dtags, so the
+      # toolkit directory is an RPATH that the loader reads before the
+      # simulator's libraries on LD_LIBRARY_PATH; preloading them avoids
+      # that. It also loads the simulator's libcuda at start-up: gputools
+      # does not link libcuda and takes the driver functions from the
+      # runtime (cudaGetDriverEntryPointByVersion), which the simulator only
+      # supports when its libcuda is already loaded.
+      - name: R CMD check on the simulated H100
+        env:
+          _R_CHECK_FORCE_SUGGESTS_: false
+          CUDA_HOME: /usr/local/cuda-13.0
+        run: |
+          R CMD build .
+          vgpu run --preload \
+            R CMD check --no-manual gputools_*.tar.gz || true
+          cat gputools.Rcheck/00check.log
+          if grep -q "WITHOUT CUDA" gputools.Rcheck/00install.out; then
+            cat gputools.Rcheck/00install.out
+            echo "expected a CUDA build"; exit 1
+          fi
+          out=$(ls gputools.Rcheck/tests/testthat.Rout* | head -1)
+          tail -n 40 "$out"
+          if grep -qE "^\* .*(ERROR|WARNING)" gputools.Rcheck/00check.log; then
+            exit 1
+          fi
+          # every GPU test skips itself without a usable device, so a
+          # skipped test means the simulated GPU was not used
+          summary=$(grep -a "^\[ FAIL" "$out" | tail -1)
+          echo "$summary"
+          if ! [[ "$summary" =~ ^\[\ FAIL\ 0\ \|\ WARN\ [0-9]+\ \|\ SKIP\ 0\ \|\ PASS\ [1-9] ]]; then
+            echo "expected no failed and no skipped tests"; exit 1
+          fi
