@@ -1,8 +1,8 @@
 name: GPU Simulator
 
-# Optional, non-required check. GitHub's runners have no GPU, so in
-# R-CMD-check.yml the GPU tests skip themselves. This job builds gputools
-# against CUDA 13.0 and runs R CMD check on a simulated NVIDIA H100
+# GitHub's runners have no GPU, so in R-CMD-check.yml the GPU tests skip
+# themselves. This job builds gputools against CUDA 13.0 and runs R CMD
+# check on a simulated NVIDIA H100
 # (https://github.com/pantheongpu/pantheonsim), so the tests and examples
 # run their kernels (compiled by NVRTC to compute_90 PTX) and compare them
 # with base R. cuBLAS and cuSOLVER calls are computed on the host by the
@@ -49,7 +49,7 @@ jobs:
       # gputools links the toolkit's cuBLAS and cuSOLVER; the tests run
       # under `vgpu run` instead.
       - name: Set up the simulated GPU and CUDA toolkit
-        uses: pantheongpu/setup-pantheonsim@ca87fe3143b29166822b923d6050945c5179408c # v0.1.5
+        uses: pantheongpu/setup-pantheonsim@656f502ef4782d94d34d8ddd368e333960609639 # v0.1.8
         with:
           gpu: nvidia/h100
           cuda-toolkit: "13.0"
@@ -78,10 +78,7 @@ jobs:
       # --preload: conda's R links packages with --disable-new-dtags, so the
       # toolkit directory is an RPATH that the loader reads before the
       # simulator's libraries on LD_LIBRARY_PATH; preloading them avoids
-      # that. It also loads the simulator's libcuda at start-up: gputools
-      # does not link libcuda and takes the driver functions from the
-      # runtime (cudaGetDriverEntryPointByVersion), which the simulator only
-      # supports when its libcuda is already loaded.
+      # that.
       - name: R CMD check on the simulated H100
         env:
           _R_CHECK_FORCE_SUGGESTS_: false
